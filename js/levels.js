@@ -5,6 +5,7 @@ const LEVELS = [
   {
     name: 'First Breakfast',
     balls: 10,
+    par: 7, // 3 stars needs: win + shots <= par + zero misses/veggies
     goal: 8, // calories to win
     barrels: [
       { x: 150, y: 220, kind: 'snack',  content: 'kibble'   },

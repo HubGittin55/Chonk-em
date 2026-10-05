@@ -20,6 +20,12 @@ global.document = { getElementById: () => elStub() };
 global.window = { addEventListener: () => {}, devicePixelRatio: 1 };
 global.requestAnimationFrame = () => {};
 global.CanvasRenderingContext2D = function () {};
+const lsStore = new Map();
+global.localStorage = {
+  getItem: (k) => (lsStore.has(k) ? lsStore.get(k) : null),
+  setItem: (k, v) => lsStore.set(k, String(v)),
+  removeItem: (k) => lsStore.delete(k),
+};
 
 // ---------- boot the game ----------
 const root = path.join(__dirname, '..');
@@ -120,7 +126,31 @@ for (let i = 0; i < 120 * 2; i++) {
 T('bridge: gap loot caught while bridge active', bridged);
 game.bridgeT = 0;
 
-// 8. win path
+// 8. stunkus systems: combo multiplier, frenzy, jiggle, eased body, shotsFired, mute
+loadLevel(0);
+deliver({ cal: 1 }); deliver({ cal: 1 }); deliver({ cal: 1 }); deliver({ cal: 1 });
+T('combos: after 3 clean deliveries, 4th+ earns ×2 calories', game.combo === 4 && game.mult === 2);
+T('jiggle: delivery kicks the belly spring', game.jiggleV > 0);
+game.calories = 7; game.stageMisses = 0; game.stageVeggies = 0;
+const ballsBefore = game.balls;
+deliver({ cal: 1 }); // clean stage-up → FEAST FRENZY
+T('frenzy: clean stage-up triggers FEAST FRENZY (+2 yarn, 0.35× time)',
+  game.frenzy === 6 && game.balls === ballsBefore + 2 && game.timeScale === 0.35);
+step(60);
+T('chonk-stages: body width eases toward target (not instant)',
+  game.displayRx > stageRx(0) && game.displayRx < stageRx(game.stage));
+T('saves: best stars persisted to localStorage', lsStore.has('chonk-em:best'));
+loadLevel(0);
+fireShot(150, 400);
+T('stars/par: shotsFired counts balls launched', game.shotsFired === 1);
+game.multiShots = 1; game.shots = [];
+fireShot(150, 400);
+T('stars/par: multi-shot counts all 3 balls', game.shotsFired === 4);
+AudioSys.toggle();
+T('audio: mute toggle flips state', AudioSys.muted === true);
+AudioSys.toggle();
+
+// 9. win path
 game.calories = game.level.goal; // ensure threshold
 game.over = null;
 deliver({ cal: 1 });

@@ -71,9 +71,11 @@ const Cats = {
     ctx.restore();
   },
 
-  // Main cat beside the bowl. stage 0..4 widens the body. face: normal|happy|bliss|disgust|sad
-  drawMain(ctx, x, y, stage, nomT, face, time) {
-    const rx = 62 + stage * 24, ry = 58;
+  // Main cat beside the bowl. rx = eased body half-width, jiggle = spring wobble.
+  // face: normal|happy|bliss|disgust|sad
+  drawMain(ctx, x, y, rx, nomT, face, time, jiggle) {
+    const ry = 58;
+    const j = jiggle || 0;
     ctx.save();
     ctx.translate(x, y);
     const bob = nomT > 0 ? Math.abs(Math.sin(nomT * 28)) * 5 : 0;
@@ -87,12 +89,12 @@ const Cats = {
     ctx.strokeStyle = '#d98a35'; ctx.lineWidth = 13;
     ctx.beginPath(); ctx.moveTo(rx + 40, -44 + swish); ctx.lineTo(rx + 40, -30 + swish); ctx.stroke();
 
-    // Body
+    // Body (jiggle = squash & stretch on the vertical axis)
     ctx.fillStyle = '#f2a24b';
-    ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 0, rx, ry * (1 + j * 0.10), 0, 0, 7); ctx.fill();
     // Belly
     ctx.fillStyle = '#f8d9a8';
-    ctx.beginPath(); ctx.ellipse(0, 20, rx * 0.62, ry * 0.52, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 20 + j * 26, rx * 0.62, ry * 0.52 * (1 + j * 0.16), 0, 0, 7); ctx.fill();
     // Body stripes
     ctx.strokeStyle = '#d98a35'; ctx.lineWidth = 4;
     for (const sx of [-0.4, 0, 0.4]) {

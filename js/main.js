@@ -42,15 +42,31 @@ const STAGES = [
   { at: 32, name: 'Chonky' },
   { at: 50, name: 'ABSOLUTE UNIT' },
 ];
+const stageRx = (s) => 62 + s * 24; // body half-width per chonk stage
+
+// localStorage helpers (best stars, settings)
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('chonk-em:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('chonk-em:' + k, JSON.stringify(v)); } catch (e) {} },
+};
+function saveBest(idx, stars, cal) {
+  const best = store.get('best', {});
+  const cur = best[idx] || { stars: 0, cal: 0 };
+  best[idx] = { stars: Math.max(cur.stars, stars), cal: Math.max(cur.cal, cal) };
+  store.set('best', best);
+}
 
 const game = {
   levelIndex: 0, level: null,
   balls: 0, shots: [], items: [], barrels: [],
-  multiShots: 0, slowT: 0, magnetT: 0, bridgeT: 0,
-  calories: 0, stage: 0, combo: 0,
+  multiShots: 0, slowT: 0, magnetT: 0, bridgeT: 0, shotsFired: 0,
+  calories: 0, stage: 0, combo: 0, mult: 1,
   time: 0, over: null, popups: [],
   nomT: 0, face: 'normal', faceT: 0,
   aim: null, aimAng: null,
+  jiggle: 0, jiggleV: 0, displayRx: stageRx(0),
+  timeScale: 1, frenzy: 0,
+  misses: 0, veggies: 0, stageMisses: 0, stageVeggies: 0,
 };
 
 function stageFor(cal) {
@@ -65,16 +81,19 @@ function loadLevel(i) {
   game.level = L;
   game.balls = L.balls;
   game.shots = [];
-  game.multiShots = 0; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0;
+  game.multiShots = 0; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0; game.shotsFired = 0;
   game.items = [];
   game.popups = [];
   game.barrels = L.barrels.map(b => ({ x: b.x, y: b.y, r: 22, kind: b.kind, content: b.content, cleared: false }));
   game.calories = 0;
   game.stage = 0;
-  game.combo = 0;
+  game.combo = 0; game.mult = 1;
   game.over = null;
   game.aim = null; game.aimAng = null;
   game.nomT = 0; game.face = 'normal'; game.faceT = 0;
+  game.jiggle = 0; game.jiggleV = 0; game.displayRx = stageRx(0);
+  game.timeScale = 1; game.frenzy = 0;
+  game.misses = 0; game.veggies = 0; game.stageMisses = 0; game.stageVeggies = 0;
   hideOverlay();
 }
 
@@ -104,6 +123,7 @@ function fireShot(px, py) {
       r: BALL_R, life: 0, slowT: 0, bounces: 0,
     });
     game.balls--;
+    game.shotsFired++;
   }
   AudioSys.pop();
 }
@@ -124,11 +144,12 @@ function onBarrelBurst(barrel) {
 }
 
 function deliver(item) {
+  if (game.over) return;
   if (item.power) {
-    game.combo++;
     game.nomT = 0.6;
     game.face = 'happy'; game.faceT = 1.2;
-    AudioSys.jingle();
+    game.jiggleV += 2;
+    AudioSys.powerup();
     if (item.power === 'multi')  { game.multiShots = 1;    addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ MULTI-YARN!', '#ef6c00'); }
     if (item.power === 'wide')   { game.bridgeT = 15;      addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ BRIDGE!', '#ef6c00'); }
     if (item.power === 'slow')   { game.slowT = 5;         addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ SLOW-MO!', '#ef6c00'); }
@@ -136,34 +157,59 @@ function deliver(item) {
     return;
   }
   const before = game.stage;
-  game.calories = Math.max(0, game.calories + item.cal);
+
+  // Combo calorie multiplier: every 3 clean deliveries bumps it, cap ×4.
+  game.mult = Math.min(4, 1 + Math.floor(game.combo / 3));
+  const gained = item.cal > 0 ? item.cal * game.mult : item.cal;
+
+  game.calories = Math.max(0, game.calories + gained);
   game.stage = stageFor(game.calories);
   game.nomT = 0.6;
+  game.jiggleV += item.cal > 0 ? 2 + gained * 0.5 : 1.5;
 
   if (item.cal < 0) {
-    game.combo = 0;
+    game.combo = 0; game.mult = 1;
+    game.veggies++; game.stageVeggies++;
     game.face = 'disgust'; game.faceT = 1.8;
     AudioSys.sad();
-    addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, item.cal + ' ugh', '#c62828');
+    addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, gained + ' ugh', '#c62828');
   } else {
     game.combo++;
     AudioSys.nom();
-    addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '+' + item.cal, '#2e7d32');
-    if (game.combo >= 2) addPopup(Conveyor.BOWL_X + 96, Conveyor.BOWL_Y - 96, 'COMBO ×' + game.combo, '#ff8f00');
+    addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '+' + gained, '#2e7d32');
+    if (game.combo >= 2) {
+      addPopup(Conveyor.BOWL_X + 96, Conveyor.BOWL_Y - 96,
+        'COMBO ×' + game.combo + (game.mult > 1 ? '  (×' + game.mult + ' cal)' : ''), '#ff8f00');
+    }
   }
 
   if (game.stage > before) {
+    const cleanStage = game.stageMisses === 0 && game.stageVeggies === 0;
     game.face = game.stage >= 3 ? 'bliss' : 'happy';
     game.faceT = 2.2;
     addPopup(360, 660, 'CHONK UP: ' + STAGES[game.stage].name + '!', '#6a1b9a');
     AudioSys.jingle();
+    game.stageMisses = 0; game.stageVeggies = 0;
+    if (cleanStage) triggerFrenzy();
   }
 
   if (game.calories >= game.level.goal) endGame(true);
 }
 
+function triggerFrenzy() {
+  game.frenzy = 6;          // seconds of slow-mo
+  game.timeScale = 0.35;
+  game.balls += 2;          // the cat demands MORE
+  game.face = 'bliss'; game.faceT = 6;
+  game.jiggleV += 6;
+  addPopup(300, 420, 'FEAST FRENZY! +2 🧶', '#ff6f00');
+  AudioSys.frenzy();
+}
+
 function loseItem(item) {
-  game.combo = 0;
+  if (game.over) return;
+  game.combo = 0; game.mult = 1;
+  game.misses++; game.stageMisses++;
   game.face = 'sad'; game.faceT = 1.2;
   AudioSys.sad();
   addPopup(Math.max(40, Math.min(W - 40, item.x)), H - 70, 'lost…', '#8a7a66');
@@ -172,9 +218,21 @@ function loseItem(item) {
 function endGame(win) {
   if (game.over) return;
   game.over = win ? 'win' : 'lose';
+  let stars = '';
+  if (win) {
+    // 1 = goal met, +1 under par, +1 zero misses and zero veggies
+    let n = 1;
+    if (game.shotsFired <= game.level.par) n++;
+    if (game.misses === 0 && game.veggies === 0) n++;
+    stars = '★'.repeat(n) + '☆'.repeat(3 - n);
+    saveBest(game.levelIndex, n, game.calories);
+    AudioSys.win();
+  } else {
+    AudioSys.lose();
+  }
   overlayTitle.textContent = win ? 'CHONK ACHIEVED!' : 'Still scrawny…';
   overlaySub.textContent = win
-    ? `${game.calories} calories — the cat is ${STAGES[game.stage].name}.`
+    ? `${stars}   ${game.calories} calories — the cat is ${STAGES[game.stage].name}.`
     : `${game.calories}/${game.level.goal} calories. The cat demands another try.`;
   overlay.classList.remove('hidden');
 }
@@ -183,39 +241,55 @@ function hideOverlay() { overlay.classList.add('hidden'); }
 
 function tick(dt) {
   game.time += dt;
-  Conveyor.t += dt;
 
+  // Real-time UI timers (unaffected by slow-mo)
   for (const p of game.popups) p.t += dt;
   game.popups = game.popups.filter(p => p.t < 1.3);
   if (game.nomT > 0) game.nomT -= dt;
   if (game.faceT > 0) { game.faceT -= dt; if (game.faceT <= 0) game.face = 'normal'; }
+  if (game.frenzy > 0) {
+    game.frenzy -= dt;
+    if (game.frenzy <= 0) { game.frenzy = 0; game.timeScale = 1; }
+  }
+
+  // World updates run at timeScale (slow-mo during FEAST FRENZY or slow-mo power-up)
+  if (game.slowT > 0) { game.slowT -= dt; if (game.frenzy <= 0) game.timeScale = 0.45; }
+  else if (game.frenzy <= 0) game.timeScale = 1;
+  const wdt = dt * game.timeScale;
+  Conveyor.t += wdt;
+
+  // Belly jiggle spring + eased body width
+  game.jiggleV += (-140 * game.jiggle - 9 * game.jiggleV) * wdt;
+  game.jiggle += game.jiggleV * wdt;
+  const targetRx = stageRx(game.stage);
+  game.displayRx += (targetRx - game.displayRx) * Math.min(1, dt * 4);
 
   if (game.magnetT > 0) game.magnetT -= dt;
   if (game.bridgeT > 0) game.bridgeT -= dt;
 
   for (let i = game.shots.length - 1; i >= 0; i--) {
-    if (Physics.stepBall(game.shots[i], dt, game.barrels, onBarrelBurst)) game.shots.splice(i, 1);
+    if (Physics.stepBall(game.shots[i], wdt, game.barrels, onBarrelBurst)) game.shots.splice(i, 1);
   }
 
   for (const it of game.items) {
-    it.t += dt;
+    it.t += wdt;
     if (it.state === 'fall') {
-      it.vy += ITEM_GRAV * (it.grav || 1) * dt;
-      if (it.drift) it.vx += Math.sin(it.t * 7) * it.drift * dt;
-      if (game.magnetT > 0) it.vx += Math.sign(Conveyor.BOWL_X - it.x) * 300 * dt;
-      it.x += it.vx * dt;
-      it.y += it.vy * dt;
+      it.vy += ITEM_GRAV * (it.grav || 1) * wdt;
+      if (it.drift) it.vx += Math.sin(it.t * 7) * it.drift * wdt;
+      if (game.magnetT > 0) it.vx += Math.sign(Conveyor.BOWL_X - it.x) * 300 * wdt;
+      it.x += it.vx * wdt;
+      it.y += it.vy * wdt;
       if (it.y >= Conveyor.BELT_Y && it.vy > 0 && Conveyor.onBelt(it.x, game.bridgeT > 0)) {
         it.state = 'belt'; it.y = Conveyor.BELT_Y; it.vy = 0;
         AudioSys.catch();
       }
-      if (it.y > H + 40 && !it.gone) { it.gone = true; if (!game.over) loseItem(it); }
+      if (it.y > H + 40 && !it.gone) { it.gone = true; loseItem(it); }
     } else if (it.state === 'belt') {
-      it.x -= Conveyor.SPEED * dt;
+      it.x -= Conveyor.SPEED * wdt;
       if (it.x <= Conveyor.BOWL_X) it.state = 'drop';
     } else if (it.state === 'drop') {
-      it.y += 460 * dt;
-      if (it.y >= Conveyor.BOWL_Y && !it.gone) { it.gone = true; if (!game.over) deliver(it); }
+      it.y += 460 * wdt;
+      if (it.y >= Conveyor.BOWL_Y && !it.gone) { it.gone = true; deliver(it); }
     }
   }
   game.items = game.items.filter(i => !i.gone);
@@ -262,7 +336,8 @@ function drawHUD() {
   ctx.fillStyle = '#5b3a1e';
   ctx.font = '600 14px system-ui, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(`${STAGES[game.stage].name} · ${game.calories}/${game.level.goal} cal`, W / 2, 50);
+  ctx.fillText(`${STAGES[game.stage].name} · ${game.calories}/${game.level.goal} cal` +
+    (game.mult > 1 ? ` · ×${game.mult}` : ''), W / 2, 50);
 }
 
 function drawPreview() {
@@ -343,6 +418,24 @@ function drawHint() {
   ctx.globalAlpha = 1;
 }
 
+function drawFrenzy() {
+  if (game.frenzy <= 0) return;
+  const pulse = 1 + 0.07 * Math.sin(game.time * 10);
+  ctx.save();
+  ctx.translate(W / 2, 116);
+  ctx.scale(pulse, pulse);
+  ctx.font = 'bold 30px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillStyle = '#ff6f00';
+  ctx.strokeText('FEAST FRENZY!', 0, 0);
+  ctx.fillText('FEAST FRENZY!', 0, 0);
+  ctx.restore();
+  ctx.fillStyle = 'rgba(255,111,0,0.4)';
+  ctx.fillRect(W / 2 - 60, 128, 120 * Math.max(0, game.frenzy / 6), 6);
+}
+
 function render() {
   drawBackground();
   drawBarrels(ctx, game.barrels, game.time);
@@ -351,14 +444,26 @@ function render() {
   drawPreview();
   drawBall();
   Cats.drawShooter(ctx, SHOOT.x, SHOOT.y, game.aimAng, !game.shots.length && game.balls > 0 && !game.over);
-  Cats.drawMain(ctx, 360, 806, game.stage, game.nomT, game.face, game.time);
+  Cats.drawMain(ctx, 360, 806, game.displayRx, game.nomT, game.face, game.time, game.jiggle);
   drawHUD();
   drawPowerHUD();
+  drawFrenzy();
   drawPopups();
   drawHint();
 }
 
 /* ---------------- boot ---------------- */
+
+const muteBtn = document.getElementById('mute');
+function refreshMute() { muteBtn.textContent = AudioSys.muted ? '🔇' : '🔊'; }
+muteBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  AudioSys.init();
+  AudioSys.toggle();
+  refreshMute();
+});
+AudioSys.loadMute();
+refreshMute();
 
 Input.init({
   canAim: () => !game.over && !game.shots.length && game.balls > 0,
@@ -382,10 +487,8 @@ function frame(now) {
   let dt = (now - last) / 1000;
   last = now;
   dt = Math.min(dt, 0.1);
-  if (game.slowT > 0) game.slowT -= dt; // slow-mo timer runs in real time
-  const scale = game.slowT > 0 ? 0.45 : 1;
   acc += dt;
-  while (acc >= STEP) { tick(STEP * scale); acc -= STEP; }
+  while (acc >= STEP) { tick(STEP); acc -= STEP; }
   render();
   requestAnimationFrame(frame);
 }

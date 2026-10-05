@@ -20,13 +20,13 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 - [x] `belt-catch` — funnel cut per owner directive; belt spans playfield + static gap; wide→bridge, magnet→bowl pull — **DONE (qwen, 2026-10-05)**. Smoke: `node tools/smoke.js` 18/18.
 
 - [x] `contents-full` — all snack/veggie types with fall behaviors, power-up barrels (multi-yarn, wide funnel, slow-mo, magnet) — **DONE (qwen, 2026-10-05)**. Smoke: `node tools/smoke.js` 16/16. Known quirks: wide/magnet timers run in game time (stretch during slow-mo); multi-shot preview shows center ball only.
-- [ ] `chonk-stages` — all 5 stages + belly jiggle + faces (bliss/disgust) — **in progress — stunkus** (patch-handoff flow: Stunkus builds locally, Qwen pushes)
+- [x] `chonk-stages` — eased body growth (displayRx), belly jiggle spring, mood faces — done (stunkus, 2026-10-05)
+- [x] `combos` — streak calorie multiplier (×2–×4), FEAST FRENZY (6s slow-mo +2 yarn) on clean stage-up — done (stunkus, 2026-10-05)
+- [x] `stars-saves` — 1–3 stars per level (goal/par/flawless), best saved to localStorage — done (stunkus, 2026-10-05)
+- [x] `audio` — mute toggle (persisted), powerup/frenzy/win/lose stingers — done (stunkus, 2026-10-05)
 - [ ] `barrel-types` — armored (2-hit), mystery (???) barrels
-- [ ] `combos` — delivery streak multiplier, FEAST FRENZY
 - [ ] `hazards` — vacuum patrol, cucumber spook
 - [ ] `levels-2-15` — level pack + level select map
-- [ ] `stars-saves` — localStorage persistence
-- [ ] `audio` — WebAudio synth SFX + mute
 
 ## v0.3 — Portable
 
