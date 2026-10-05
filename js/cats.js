@@ -98,11 +98,11 @@ function eyesMain(ctx, hx, hy, ex, face, time) {
 // Generated sprite assets (Qwen Image 2.1, alpha PNGs). Loaded eagerly;
 // if any sprite is missing the vector renderer takes over (asset 404 safe).
 const Sprites = {
-  imgs: [0,1,2,3,4].map(i => {
+  imgs: (typeof Image === 'function') ? [0,1,2,3,4].map(i => {
     const im = new Image();
     im.src = 'assets/cat_stage' + i + '.png';
     return im;
-  }),
+  }) : [],
   ready: 0,
   init() {
     this.imgs.forEach(im => im.onload = () => { this.ready++; });
