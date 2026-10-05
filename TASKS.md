@@ -17,11 +17,11 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 
 ## v0.2 — Game (backlog, don't start yet)
 
-- [ ] `contents-full` — all snack/veggie types with fall behaviors, power-up barrels (multi-yarn, wide funnel, slow-mo, magnet)
+- [ ] `contents-full` — all snack/veggie types with fall behaviors, power-up barrels (multi-yarn, wide funnel, slow-mo, magnet) — **in progress — qwen**
+- [ ] `chonk-stages` — all 5 stages + belly jiggle + faces (bliss/disgust) — **in progress — stunkus** (patch-handoff flow: Stunkus builds locally, Qwen pushes)
 - [ ] `barrel-types` — armored (2-hit), mystery (???) barrels
-- [ ] `hazards` — vacuum patrol, cucumber spook
-- [ ] `chonk-stages` — all 5 stages + belly jiggle + faces (bliss/disgust)
 - [ ] `combos` — delivery streak multiplier, FEAST FRENZY
+- [ ] `hazards` — vacuum patrol, cucumber spook
 - [ ] `levels-2-15` — level pack + level select map
 - [ ] `stars-saves` — localStorage persistence
 - [ ] `audio` — WebAudio synth SFX + mute
