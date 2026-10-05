@@ -17,7 +17,7 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 
 ## v0.2 — Game (backlog, don't start yet)
 
-- [ ] `contents-full` — all snack/veggie types with fall behaviors, power-up barrels (multi-yarn, wide funnel, slow-mo, magnet) — **in progress — qwen**
+- [x] `contents-full` — all snack/veggie types with fall behaviors, power-up barrels (multi-yarn, wide funnel, slow-mo, magnet) — **DONE (qwen, 2026-10-05)**. Smoke: `node tools/smoke.js` 16/16. Known quirks: wide/magnet timers run in game time (stretch during slow-mo); multi-shot preview shows center ball only.
 - [ ] `chonk-stages` — all 5 stages + belly jiggle + faces (bliss/disgust) — **in progress — stunkus** (patch-handoff flow: Stunkus builds locally, Qwen pushes)
 - [ ] `barrel-types` — armored (2-hit), mystery (???) barrels
 - [ ] `combos` — delivery streak multiplier, FEAST FRENZY
