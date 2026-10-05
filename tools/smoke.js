@@ -48,23 +48,24 @@ T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && g
 step(1200); // 10s: ball bursts the center column, then falls out
 T('fire: ball dies out cleanly', game.shots.length === 0);
 
-// 3. multi-yarn shot
+// 3. multi-yarn shot (fresh level: test 2's center-column run may have won the level)
+loadLevel(0);
 game.multiShots = 1;
 fireShot(300, 500);
-T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 6);
+T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 7);
 T('multi: consumed after firing', game.multiShots === 0);
 game.shots = [];
 
 // 4. power-up activations via bowl delivery
 deliver({ power: 'wide' });
-T('power wide: funnel 2x for 15s', Funnel.wideT === 15 && Funnel.effHalf() === 96);
+T('power wide→bridge: gap bridged 15s', game.bridgeT === 15);
 deliver({ power: 'slow' });
 T('power slow-mo: 5s armed', game.slowT === 5);
 deliver({ power: 'magnet' });
 T('power magnet: 15s armed', game.magnetT === 15);
 deliver({ power: 'multi' });
 T('power multi: next shot armed', game.multiShots === 1);
-game.multiShots = 0; game.slowT = 0; game.magnetT = 0; Funnel.wideT = 0;
+game.multiShots = 0; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0;
 
 // 5. distinct fall behaviors: tuna (heavy) outpaces salmon (light+drift)
 game.items = [
@@ -81,7 +82,7 @@ game.items = [];
 game.magnetT = 15;
 game.items = [{ x: 480, y: 400, vx: 0, vy: 100, r: 9, state: 'fall', cal: 1, grav: 1, drift: 0, t: 0, gone: false }];
 step(60);
-T('magnet: loot drifts toward funnel x', game.items[0].vx < -20);
+T('magnet: loot drifts toward the bowl', game.items[0].vx < -20);
 game.magnetT = 0; game.items = [];
 
 // 7. full chain: shot bursts a barrel; magnet-assisted loot gets caught
@@ -91,15 +92,33 @@ fireShot(300, 300); // straight down at center column
 let burst = false;
 for (let i = 0; i < 120 * 4; i++) { tick(1 / 120); if (target.cleared) break; }
 T('chain: shot bursts barrel', target.cleared);
-game.magnetT = 15;
-game.items.push({ x: Funnel.x, y: 480, vx: 0, vy: 120, r: 9, state: 'fall', cal: 1, grav: 1, drift: 0, t: 0, gone: false });
+// loot lands on belt left of the gap → rides
+ game.items.push({ x: 300, y: 650, vx: 0, vy: 100, r: 9, state: 'fall', cal: 1, grav: 1, drift: 0, t: 0, gone: false });
 let caught = false;
-for (let i = 0; i < 120 * 3; i++) {
+for (let i = 0; i < 120 * 2; i++) {
   tick(1 / 120);
-  if (game.items.some(it => it.state === 'chute' || it.state === 'belt' || it.state === 'drop')) { caught = true; break; }
+  if (game.items.some(it => it.state === 'belt' || it.state === 'drop')) { caught = true; break; }
 }
-T('chain: loot caught by funnel → chute/belt', caught);
-game.magnetT = 0;
+T('chain: loot lands on belt → rides to bowl', caught);
+// loot over the gap → lost
+const comboBefore = game.combo;
+game.items.push({ x: 490, y: 650, vx: 0, vy: 100, r: 9, state: 'fall', cal: 1, grav: 1, drift: 0, t: 0, gone: false });
+let lost = false;
+for (let i = 0; i < 120 * 4; i++) {
+  tick(1 / 120);
+  if (!game.items.some(it => it.x === 490 && !it.gone)) { lost = true; break; }
+}
+T('gap: loot through the gap is lost', lost);
+// bridge power-up saves gap loot
+game.bridgeT = 15;
+game.items.push({ x: 490, y: 650, vx: 0, vy: 100, r: 9, state: 'fall', cal: 1, grav: 1, drift: 0, t: 0, gone: false });
+let bridged = false;
+for (let i = 0; i < 120 * 2; i++) {
+  tick(1 / 120);
+  if (game.items.some(it => it.state === 'belt' && it.x <= 490)) { bridged = true; break; }
+}
+T('bridge: gap loot caught while bridge active', bridged);
+game.bridgeT = 0;
 
 // 8. win path
 game.calories = game.level.goal; // ensure threshold

@@ -1,43 +1,62 @@
 'use strict';
-/* Conveyor belt + food bowl. Loot rides left, drops into the bowl. */
+/* Conveyor belt + food bowl. v0.2: belt spans the playfield bottom (funnel cut,
+   owner directive 2026-10-05). Loot landing on the belt rides left to the bowl;
+   loot falling through the static gap on the right is lost. */
 
 const Conveyor = {
-  BELT_Y: 752,   // belt centerline
+  BELT_Y: 700,
   SPEED: 130,    // px/s, leftward
   BOWL_X: 100,
-  BOWL_Y: 794,
+  BOWL_Y: 744,
+  LEFT: 40, RIGHT: 560,      // belt extent
+  GAP_L: 440, GAP_R: 540,    // static gap — learnable miss zone
   t: 0,
 
-  draw(ctx) {
+  onBelt(x, bridged) {
+    if (bridged) return x >= this.LEFT && x <= this.RIGHT;
+    return (x >= this.LEFT && x < this.GAP_L) || (x >= this.GAP_R && x <= this.RIGHT);
+  },
+
+  draw(ctx, bridged) {
     const by = this.BELT_Y;
+    const segs = bridged ? [[this.LEFT, this.RIGHT]]
+                         : [[this.LEFT, this.GAP_L], [this.GAP_R, this.RIGHT]];
 
     // Legs
     ctx.fillStyle = '#4a4a52';
-    for (const lx of [110, 250, 390]) {
-      ctx.fillRect(lx - 5, by + 12, 10, 96);
+    for (const [a, b] of segs) {
+      for (let lx = a + 40; lx < b - 20; lx += 140) ctx.fillRect(lx - 5, by + 12, 10, 96);
     }
 
-    // Belt body
-    ctx.fillStyle = '#5b5b66';
-    ctx.beginPath();
-    ctx.roundRect(64, by - 13, 410, 26, 13);
-    ctx.fill();
-    // Moving slats
-    ctx.strokeStyle = '#7a7a85'; ctx.lineWidth = 3;
-    const off = (this.t * this.SPEED) % 40;
-    ctx.save();
-    ctx.beginPath(); ctx.roundRect(64, by - 13, 410, 26, 13); ctx.clip();
-    for (let x = 64 - 40 + off; x < 480; x += 40) {
-      ctx.beginPath(); ctx.moveTo(x, by - 13); ctx.lineTo(x, by + 13); ctx.stroke();
-    }
-    ctx.restore();
-    // Rollers
-    ctx.fillStyle = '#3d3d44';
-    for (const rx of [76, 462]) {
-      ctx.beginPath(); ctx.arc(rx, by, 15, 0, 7); ctx.fill();
-      ctx.fillStyle = '#7a7a85';
-      ctx.beginPath(); ctx.arc(rx, by, 6, 0, 7); ctx.fill();
+    for (const [a, b] of segs) {
+      // Belt body
+      ctx.fillStyle = '#5b5b66';
+      ctx.beginPath(); ctx.roundRect(a, by - 13, b - a, 26, 13); ctx.fill();
+      // Moving slats
+      ctx.strokeStyle = '#7a7a85'; ctx.lineWidth = 3;
+      const off = (this.t * this.SPEED) % 40;
+      ctx.save();
+      ctx.beginPath(); ctx.roundRect(a, by - 13, b - a, 26, 13); ctx.clip();
+      for (let x = a - 40 + off; x < b; x += 40) {
+        ctx.beginPath(); ctx.moveTo(x, by - 13); ctx.lineTo(x, by + 13); ctx.stroke();
+      }
+      ctx.restore();
+      // Rollers at segment ends
       ctx.fillStyle = '#3d3d44';
+      for (const rx of [a + 12, b - 12]) {
+        ctx.beginPath(); ctx.arc(rx, by, 15, 0, 7); ctx.fill();
+        ctx.fillStyle = '#7a7a85';
+        ctx.beginPath(); ctx.arc(rx, by, 6, 0, 7); ctx.fill();
+        ctx.fillStyle = '#3d3d44';
+      }
+    }
+
+    // Bridge plate over the gap (power-up active)
+    if (bridged) {
+      ctx.fillStyle = '#8d6e63';
+      ctx.beginPath(); ctx.roundRect(this.GAP_L - 6, by - 17, this.GAP_R - this.GAP_L + 12, 11, 4); ctx.fill();
+      ctx.strokeStyle = '#5d4037'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(this.GAP_L - 6, by - 17, this.GAP_R - this.GAP_L + 12, 11, 4); ctx.stroke();
     }
 
     // Bowl

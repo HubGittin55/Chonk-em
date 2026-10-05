@@ -46,7 +46,7 @@ const STAGES = [
 const game = {
   levelIndex: 0, level: null,
   balls: 0, shots: [], items: [], barrels: [],
-  multiShots: 0, slowT: 0, magnetT: 0,
+  multiShots: 0, slowT: 0, magnetT: 0, bridgeT: 0,
   calories: 0, stage: 0, combo: 0,
   time: 0, over: null, popups: [],
   nomT: 0, face: 'normal', faceT: 0,
@@ -65,7 +65,7 @@ function loadLevel(i) {
   game.level = L;
   game.balls = L.balls;
   game.shots = [];
-  game.multiShots = 0; game.slowT = 0; game.magnetT = 0;
+  game.multiShots = 0; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0;
   game.items = [];
   game.popups = [];
   game.barrels = L.barrels.map(b => ({ x: b.x, y: b.y, r: 22, kind: b.kind, content: b.content, cleared: false }));
@@ -75,7 +75,6 @@ function loadLevel(i) {
   game.over = null;
   game.aim = null; game.aimAng = null;
   game.nomT = 0; game.face = 'normal'; game.faceT = 0;
-  Funnel.reset(L.funnel);
   hideOverlay();
 }
 
@@ -131,7 +130,7 @@ function deliver(item) {
     game.face = 'happy'; game.faceT = 1.2;
     AudioSys.jingle();
     if (item.power === 'multi')  { game.multiShots = 1;    addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ MULTI-YARN!', '#ef6c00'); }
-    if (item.power === 'wide')   { Funnel.wideT = 15;      addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ WIDE FUNNEL!', '#ef6c00'); }
+    if (item.power === 'wide')   { game.bridgeT = 15;      addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ BRIDGE!', '#ef6c00'); }
     if (item.power === 'slow')   { game.slowT = 5;         addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ SLOW-MO!', '#ef6c00'); }
     if (item.power === 'magnet') { game.magnetT = 15;      addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ MAGNET!', '#ef6c00'); }
     return;
@@ -184,7 +183,6 @@ function hideOverlay() { overlay.classList.add('hidden'); }
 
 function tick(dt) {
   game.time += dt;
-  Funnel.update(dt);
   Conveyor.t += dt;
 
   for (const p of game.popups) p.t += dt;
@@ -193,6 +191,7 @@ function tick(dt) {
   if (game.faceT > 0) { game.faceT -= dt; if (game.faceT <= 0) game.face = 'normal'; }
 
   if (game.magnetT > 0) game.magnetT -= dt;
+  if (game.bridgeT > 0) game.bridgeT -= dt;
 
   for (let i = game.shots.length - 1; i >= 0; i--) {
     if (Physics.stepBall(game.shots[i], dt, game.barrels, onBarrelBurst)) game.shots.splice(i, 1);
@@ -203,14 +202,14 @@ function tick(dt) {
     if (it.state === 'fall') {
       it.vy += ITEM_GRAV * (it.grav || 1) * dt;
       if (it.drift) it.vx += Math.sin(it.t * 7) * it.drift * dt;
-      if (game.magnetT > 0) it.vx += Math.sign(Funnel.x - it.x) * 300 * dt;
+      if (game.magnetT > 0) it.vx += Math.sign(Conveyor.BOWL_X - it.x) * 300 * dt;
       it.x += it.vx * dt;
       it.y += it.vy * dt;
-      Funnel.tryCatch(it);
+      if (it.y >= Conveyor.BELT_Y && it.vy > 0 && Conveyor.onBelt(it.x, game.bridgeT > 0)) {
+        it.state = 'belt'; it.y = Conveyor.BELT_Y; it.vy = 0;
+        AudioSys.catch();
+      }
       if (it.y > H + 40 && !it.gone) { it.gone = true; if (!game.over) loseItem(it); }
-    } else if (it.state === 'chute') {
-      it.y += 340 * dt;
-      if (it.y >= Conveyor.BELT_Y) { it.y = Conveyor.BELT_Y; it.state = 'belt'; }
     } else if (it.state === 'belt') {
       it.x -= Conveyor.SPEED * dt;
       if (it.x <= Conveyor.BOWL_X) it.state = 'drop';
@@ -323,7 +322,7 @@ function drawPopups() {
 function drawPowerHUD() {
   const bits = [];
   if (game.multiShots > 0) bits.push('🧶×3 NEXT');
-  if (Funnel.wideT > 0)     bits.push('⭐ WIDE ' + Math.ceil(Funnel.wideT));
+  if (game.bridgeT > 0)     bits.push('⭐ BRIDGE ' + Math.ceil(game.bridgeT));
   if (game.slowT > 0)       bits.push('⭐ SLOW ' + Math.ceil(game.slowT));
   if (game.magnetT > 0)     bits.push('⭐ MAGNET ' + Math.ceil(game.magnetT));
   if (!bits.length) return;
@@ -347,8 +346,7 @@ function drawHint() {
 function render() {
   drawBackground();
   drawBarrels(ctx, game.barrels, game.time);
-  Funnel.draw(ctx);
-  Conveyor.draw(ctx);
+  Conveyor.draw(ctx, game.bridgeT > 0);
   drawItems();
   drawPreview();
   drawBall();

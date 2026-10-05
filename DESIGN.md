@@ -23,7 +23,7 @@ Working title: **CHONK 'EM**. Tagline: *"No scrawny cats on my watch."*
 
 ```
 Aim → Launch yarn ball → Burst barrels → Loot spills & falls
-  → Funnel catches → Conveyor ride → Bowl → Main cat eats
+  → Belt catch (gap = miss) → Conveyor ride → Bowl → Main cat eats
   → Chonk Meter fills → Level goal check → Next level
 ```
 
@@ -43,7 +43,7 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 - Contents are **labeled, not random**: snack barrels carry a fish icon, veggie barrels a broccoli icon, power-up barrels a star. Aiming stays a real decision. Later levels add **mystery barrels (???)** for chaos.
 - Barrel types:
   - **Snack barrel** — spills a snack (see 4.3).
-  - **Veggie barrel** — spills a veggie. Sometimes guards a snack barrel behind it: crack it carefully and let the veggie miss the funnel, or leave it alone.
+  - **Veggie barrel** — spills a veggie. Sometimes guards a snack barrel behind it: crack it carefully and let the veggie fall into the belt gap, or leave it alone.
   - **Power-up barrel** — spills a power-up (see 4.3).
   - **Armored barrel** (later levels) — takes 2 hits, usually guarding the good stuff.
 
@@ -56,14 +56,15 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 | Broccoli | −2 | The betrayal |
 | Celery | −1 | Minor betrayal |
 | ★ Multi-yarn | power-up | Next shot fires 3 yarn balls |
-| ★ Wide funnel | power-up | 2× funnel width, 15 s |
+| ★ Bridge! | power-up | Belt gap bridged, 15 s |
 | ★ Slow-mo | power-up | 5 s slow motion for precision |
-| ★ Magnet barrel | power-up | Falling contents drift toward funnel, 15 s |
+| ★ Magnet barrel | power-up | Falling contents drift toward the bowl, 15 s |
 
-### 4.4 Funnel → conveyor → bowl
-- **Funnel** hangs center-field and **sways side to side** (speed/width tuned per level). Contents that land in it slide down to the conveyor. Contents that miss it are lost — sad trombone meow.
-- **Conveyor belt** carries loot leftward, off the gameplay area, with a little animated belt. Pure anticipation beat — you watch your feast ride over.
-- **Bowl** sits at the conveyor's end, next to the main cat. Veggie in the bowl = negative calories, disgusted cat face, combo reset.
+### 4.4 Conveyor → bowl *(v0.2 revision — funnel cut, owner directive 2026-10-05)*
+- **Why the funnel got cut:** its sway made every catch a timing coin-flip — random chance, not strategy. Playtest verdict: too hard, not enough decision.
+- **Conveyor belt** spans the bottom of the playfield. Loot that lands on the belt rides left to the bowl. Where loot lands is determined by which barrel you burst and eject velocity — readable, learnable geometry.
+- **Static gap** on the right side of the belt: loot falling through it is lost — sad trombone meow. The gap is fixed per level: aim-with-consequences is preserved as *positioning* strategy, not sway timing.
+- **Bowl** sits at the conveyor's left end, next to the main cat. Veggie in the bowl = negative calories, disgusted cat face, combo reset.
 
 ### 4.5 Main cat
 - Sits left of the playfield beside the bowl, outside the gameplay area. Eats each delivery with a nom animation.
@@ -82,9 +83,9 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 ## 5. Level structure
 
 - Hand-authored layouts (JSON), ~15 levels for v1.
-- Level definition: barrel list (type, x, y, contents), yarn ball count, chonk goal, funnel sway params, hazard set, par.
+- Level definition: barrel list (type, x, y, contents), yarn ball count, chonk goal, belt gap position, hazard set, par.
 - Stars: 1 = goal met, 2 = under par yarn balls, 3 = goal + zero veggies eaten + zero missed loot.
-- Difficulty levers: funnel sway speed, mystery barrels, armored barrels, vacuum timing, narrower funnel.
+- Difficulty levers: gap width/position, mystery barrels, armored barrels, vacuum timing, loot eject spread.
 
 ## 6. Controls & portability
 
@@ -116,8 +117,7 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 /js/physics.js   — gravity, circle collision, bounce, eject velocities
 /js/levels.js    — level data (JSON-ish)
 /js/barrels.js   — barrel rendering, burst, contents spawn
-/js/funnel.js    — funnel sway + catch detection
-/js/conveyor.js  — belt animation + delivery
+/js/conveyor.js  — belt animation + catch + delivery
 /js/cats.js      — shooter cat + main cat rendering, chonk stages
 /js/audio.js     — WebAudio synth
 /js/input.js     — unified pointer input
@@ -139,6 +139,6 @@ No multiplayer, no accounts, no IAP, no backend leaderboards, no 3D, no framewor
 
 ## 12. Open questions
 
-- Funnel: sway on its own (timing skill) vs player-steerable (control skill)? Current verdict: sway — keeps one-thumb purity.
+- Funnel: sway on its own (timing skill) vs player-steerable (control skill)? Verdict 2026-10-05: **neither — cut it.** Belt gap geometry replaces it.
 - Should the main cat ever *lose* chonk (diet level)? Verdict so far: absolutely not. This is a pro-chonk household.
 - Level editor for players? Nice-to-have post-v1.

@@ -6,7 +6,6 @@ const LEVELS = [
     name: 'First Breakfast',
     balls: 10,
     goal: 8, // calories to win
-    funnel: { cx: 300, range: 120, speed: 0.9, half: 48, y: 636 },
     barrels: [
       { x: 150, y: 220, kind: 'snack',  content: 'kibble'   },
       { x: 300, y: 200, kind: 'snack',  content: 'salmon'   },
