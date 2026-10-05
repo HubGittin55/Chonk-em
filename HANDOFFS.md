@@ -5,6 +5,15 @@ to the same entry. Format is in COLLAB.md. If it's not in this file (or in git h
 
 ---
 
+## Handoff — AoT asset overhaul — qwen, 2026-10-06
+Done: full sprite overhaul in Attack on Titan bold-linework style using the owner's fast turbo recipe (8 steps, CFG 1.6, euler_ancestral+beta, viggle-turbo LoRA — ~30s/gen). Fleet: **4 cat varieties (tabby, orange, tuxedo, calico) × 8 chonk stages (10→80 lb)** = 32 sprites + 9 barrel skins + bowl + yarn + shooter cat + kitchen bg. Weight system now runs to 80 lb (milestones 10..80, 9-stage STAGES table); cat variety rolls random per level. All draw sites keep vector fallbacks. Assets quantized to 128 colors (2.2MB shipped, raw gitignored). Smoke 35/35.
+Files: assets/*.png, js/cats.js, js/barrels.js, js/conveyor.js, js/main.js, tools/gen_sprites.py, tools/smoke.js
+How to verify: play live — cat varieties rotate per level, chonk ladder morphs 10→80 lb, barrels show contents, AoT kitchen bg.
+**Prompt lessons learned (important for future art):** (1) mild edit prompts ("one step fatter") barely change the model — use hyperbolic reinforcement like the owner's examples ("twice as obese, massive corpulent belly dominates the composition, head and legs even smaller"); (2) edit chains drift toward the fat-cat prior (orange tabby) — lock colors explicitly in the prompt ("this cat is a BLACK AND WHITE TUXEDO and must stay one, NOT orange") and add drift words to the negative prompt; (3) magenta chroma bg + sprite_prep still the cleanest keying path.
+Review (stunkus): —
+
+---
+
 ## Handoff — sprite pipeline + cat-chonk stages — qwen, 2026-10-06
 Done: ComfyUI MCP installed (`pi mcp add comfy-mcp`, 41 tools, spawns in new pi sessions). Workflows in `tools/comfy/`. `tools/gen_sprites.py` (t2i base + chained image-edit for style consistency) + `tools/sprite_prep.py` (magenta chroma → true alpha, despill, trim). Five cat-chonk stages generated on the 3090 → `assets/cat_stage0..4.png` (RGBA, ~420px, 4.5MB). cats.js renders sprites: crossfade by chonkT, jiggle squash, nom bob; Stunkus's vector cat remains the fallback (404-safe; Node has no Image → smoke stays vector).
 Files: assets/cat_stage*.png, tools/gen_sprites.py, tools/sprite_prep.py, tools/comfy/*, js/cats.js, TASKS.md

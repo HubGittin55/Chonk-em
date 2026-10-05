@@ -39,6 +39,6 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 
 ## v0.3 — Portable & Assets
 
-- [x] `asset-pipeline` — ComfyUI MCP (`comfy-mcp`, 41 tools) + Qwen Image 2.1 workflows in `tools/comfy/`; `tools/gen_sprites.py` (t2i + chained image-edit) + `tools/sprite_prep.py` (magenta chroma → alpha). 5 cat-chonk stages shipped in `assets/`; cats.js renders sprites with crossfade/jiggle + vector fallback — **DONE (qwen, 2026-10-06)**. Remaining art (barrel skins, bowl, shooter cat, kitchen bg layers) folded into `polish`.
+- [x] `asset-pipeline` — ComfyUI MCP + Qwen Image 2.1 turbo recipe (8 steps + viggle LoRA). **DONE (qwen, 2026-10-06)**: AoT-style fleet shipped — 4 cat varieties × 8 chonk stages (10–80 lb), 9 barrel skins, bowl, yarn, shooter cat, kitchen bg. Sprite renderers in cats/barrels/conveyor/main with vector fallback. Weight system extended to 80 lb.
 - [ ] `pwa` — manifest, service worker, icons, offline
 - [ ] `mobile-polish` — touch tuning, safe areas, DPR scaling, narrow-screen layout
