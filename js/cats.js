@@ -95,6 +95,22 @@ function eyesMain(ctx, hx, hy, ex, face, time) {
 
 // -----------------------------------------------------------------------------
 
+// Generated sprite assets (Qwen Image 2.1, alpha PNGs). Loaded eagerly;
+// if any sprite is missing the vector renderer takes over (asset 404 safe).
+const Sprites = {
+  imgs: [0,1,2,3,4].map(i => {
+    const im = new Image();
+    im.src = 'assets/cat_stage' + i + '.png';
+    return im;
+  }),
+  ready: 0,
+  init() {
+    this.imgs.forEach(im => im.onload = () => { this.ready++; });
+  },
+  ok() { return this.ready === 5; },
+};
+if (typeof Image === 'function') Sprites.init();
+
 const Cats = {
   // Shooter cat perched at the top. aimAng in radians (canvas coords), loaded = yarn ready.
   drawShooter(ctx, x, y, aimAng, loaded) {
@@ -184,6 +200,34 @@ const Cats = {
     const wob = cat.wob || { belly: { x: 0 }, cheek: { x: 0 }, tail: { x: 0 } };
     const nomT = cat.nomT || 0, face = cat.face || 'normal', time = cat.time || 0;
     const jB = wob.belly.x || 0, jC = wob.cheek.x || 0, jT = wob.tail.x || 0;
+    const bob = nomT > 0 ? Math.abs(Math.sin(nomT * 28)) * 5 : 0;
+
+    // ---- Generated-sprite path: crossfade between chonk stages, jiggle squash ----
+    if (typeof Image === 'function' && Sprites.ok()) {
+      const pos = t * 4, i = Math.min(4, Math.floor(pos)), f = pos - i;
+      const H = 132 + t * 48;                        // fits belt (700) → floor (880)
+      const sy = (1 + jB * 0.07) * (1 - bob * 0.012);
+      const sx = 1 - jB * 0.035;
+      const baseY = y + 74;                          // feet anchor
+      ctx.save();
+      ctx.translate(x, baseY - H * sy / 2 - bob);
+      ctx.scale(sx, sy);
+      const drawStage = (idx, alpha) => {
+        if (alpha <= 0.01) return;
+        const im = Sprites.imgs[idx];
+        const w = H * (im.width / im.height);
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(im, -w / 2, -H / 2, w, H);
+      };
+      drawStage(i, 1 - f);
+      if (f > 0.01) drawStage(Math.min(4, i + 1), f);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+      void face; void jC; void jT;
+      return;
+    }
+
+    // ---- Vector fallback ----
     const breathe = 1 + 0.018 * Math.sin(time * 2.4);
 
     const rx = 62 + t * 88;
@@ -192,7 +236,6 @@ const Cats = {
 
     ctx.save();
     ctx.translate(x, y);
-    const bob = nomT > 0 ? Math.abs(Math.sin(nomT * 28)) * 5 : 0;
 
     // Ground shadow (spreads with mass)
     ctx.fillStyle = 'rgba(60,35,10,0.18)';
