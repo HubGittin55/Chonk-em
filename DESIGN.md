@@ -68,7 +68,7 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 
 ### 4.5 Main cat
 - Sits beside the bowl. Eats each delivery with a nom animation.
-- **Lifetime weight in pounds**, starting at 5.0 lb, +0.4 lb per calorie, persistent across levels (localStorage). Veggies never slim the cat. Milestone popups at 10/15/20/25/30 lb.
+- **Lifetime weight in pounds**, starting at 5.0 lb, +0.2 lb per calorie, cap 80 lb (visual max 60 lb), persistent across levels (localStorage). Veggies never slim the cat. Milestone popups every 10 lb.
 - **Procedural multi-part body** — not one scaling oval. Each part grows at its own rate with weight: belly apron sags and spreads, jowls bloom beside the muzzle, haunches emerge, paws chunk up and splay (pink toe beans past ~30% chonk), tail thickens, the neck vanishes into the loaf. The head barely grows, like a real cat; the ears stay fixed and look adorably small.
 - **Three-spring wobble:** belly (slow, heavy), cheeks (quick), tail (sway) — impulses on every delivery, nom, frenzy, and weight milestone, plus idle breathing.
 
@@ -80,6 +80,12 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 ### 4.7 Hazards (later levels)
 - **Vacuum cleaner:** patrols beneath the conveyor, eats loot off the belt. Time your shots.
 - **Cucumber:** if a yarn ball hits it, the shooter cat gets spooked and loot scatters extra hard (spec TBD — `hazards`).
+
+### 4.8 Menu & progression
+- Title menu (PLAY / LEVELS / HOW TO PLAY) with the player's actual cat on screen; level select grid with best stars, locked levels, and unlock progression (beating a level unlocks the next); pause button during play.
+
+### 4.9 Art asset pipeline
+- `js/assets.js` loads PNGs from `assets/` at boot (2.5 s timeout); every sprite has a procedural vector fallback, so the game works with zero assets. `assets/SPEC.md` is the brief for the image-gen session: logo, kitchen bg, shooter cat, 3 barrel variants, bowl, yarn ball, and `cat-0…cat-4` (five chonk stages, same pose/framing).
 
 ## 5. Level structure
 
@@ -98,7 +104,7 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 
 ## 7. Art direction
 
-- Cute-flat vector style. v1 was drawn in code; **v0.3+ adds generated sprite assets** (ComfyUI Qwen Image 2.1 pipeline, `tools/gen_sprites.py` + `tools/sprite_prep.py`, magenta-chroma → alpha PNGs in `assets/`) rendered with vector fallback when an asset 404s. Sprites must match the cute-flat look: clean outlines, soft gradients, solid magenta background at generation time. Warm kitchen/pastel backgrounds per level.
+- Cute-flat vector style, drawn in code (no asset pipeline for v1). Warm kitchen/pastel backgrounds per level.
 - **Shooter cat:** aiming pose, ears perk on release, yarn ball loaded in paws.
 - **Barrels:** wooden staves with icon badges (fish / broccoli / star / ???).
 - **Main cat:** layered ellipses, width = f(chonk stage), tail swish, disgust face for veggies, bliss face for tuna.

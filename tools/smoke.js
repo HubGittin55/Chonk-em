@@ -29,9 +29,10 @@ global.localStorage = {
 
 // ---------- boot the game ----------
 const root = path.join(__dirname, '..');
-const files = ['audio', 'physics', 'levels', 'barrels', 'conveyor', 'cats', 'input', 'main'];
+const files = ['audio', 'physics', 'levels', 'barrels', 'conveyor', 'cats', 'input', 'assets', 'main'];
 const src = files.map(f => fs.readFileSync(path.join(root, 'js', f + '.js'), 'utf8')).join('\n');
 vm.runInThisContext(src, { filename: 'chonk.bundle.js' });
+setScreen('game'); // tests drive gameplay directly; section 12 covers the menu flow
 
 // ---------- test kit ----------
 let pass = 0, fail = 0;
@@ -43,14 +44,15 @@ const step = (n) => { for (let i = 0; i < n; i++) tick(1 / 120); };
 
 console.log('CHONK-EM smoke test (v0.2 contents-full)');
 
-// 1. boot
-T('boot: level 1 loads with 13 barrels (incl. 2 power)', game.barrels.length === 13 && game.balls === 10);
+// 1. boot (menu-first: tests load level 1 explicitly)
+loadLevel(0);
+T('boot: level 1 loads with 13 barrels (incl. 2 power)', game.barrels.length === 13 && game.balls === 8);
 T('boot: power barrels present', game.barrels.some(b => b.kind === 'power' && b.content === 'wide') &&
   game.barrels.some(b => b.kind === 'power' && b.content === 'multi'));
 
 // 2. single shot
 fireShot(300, 500);
-T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 9);
+T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 7);
 step(1200); // 10s: ball bursts the center column, then falls out
 T('fire: ball dies out cleanly', game.shots.length === 0);
 
@@ -58,7 +60,7 @@ T('fire: ball dies out cleanly', game.shots.length === 0);
 loadLevel(0);
 game.multiShots = 1;
 fireShot(300, 500);
-T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 7);
+T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 5);
 T('multi: consumed after firing', game.multiShots === 0);
 game.shots = [];
 
@@ -139,6 +141,9 @@ T('frenzy: clean stage-up triggers FEAST FRENZY (+2 yarn, 0.35× time)',
 step(60);
 T('chonk-stages: body width eases toward weight-based target (not instant)',
   game.displayRx > catRx(0) && game.displayRx < catRx(chonkT(game.weightLb)));
+loadLevel(0);
+game.calories = game.level.goal; game.over = null;
+deliver({ cal: 1 }); // force a win → saveBest writes
 T('saves: best stars persisted to localStorage', lsStore.has('chonk-em:best'));
 loadLevel(0);
 fireShot(150, 400);
@@ -163,13 +168,13 @@ T('levels: bounds + 56px spacing respected in every layout', LEVELS.every(L => {
   return true;
 }));
 T('levels: calorie budget winnable (combo-aware effective cal >= 1.5x goal)', LEVELS.every(L => {
-  // model real play: clean deliveries ramp the combo multiplier 1,1,1,2,2,2,3,3,3,4...
+  // model real play: clean deliveries ramp the combo multiplier 1,1,1,2,2,2,3,3,3 (cap x3)
   const cals = L.barrels.filter(b => b.kind === 'snack').map(b => CONTENT[b.content].cal).sort((a, b) => a - b);
   let eff = 0;
-  cals.forEach((c, i) => { eff += c * Math.min(4, 1 + Math.floor(i / 3)); });
+  cals.forEach((c, i) => { eff += c * Math.min(3, 1 + Math.floor(i / 3)); });
   return eff >= L.goal * 1.5;
 }));
-T('levels: goals scale 8→52', LEVELS.map(L => L.goal).join() === '8,12,16,20,24,28,30,34,38,30,32,52');
+T('levels: goals scale 10→52', LEVELS.map(L => L.goal).join() === '10,14,18,22,26,30,30,34,38,30,32,52');
 
 // 10. win path
 game.calories = game.level.goal; // ensure threshold
@@ -194,6 +199,34 @@ const kicked = Math.abs(game.wob.belly.x) > 0;
 step(600);
 T('wobble: belly spring oscillates then settles near rest',
   kicked && Math.abs(game.wob.belly.x) < 0.05 && Math.abs(game.wob.belly.v) < 0.05);
+
+// 12. menu system + pause
+setScreen('menu');
+T('menu: boots to menu screen', game.screen === 'menu');
+T('assets: loader resolves headless with vector fallback', Assets.ready === true && Assets.get('cat-0') === null);
+uiAction('levels');
+render();
+T('menu: LEVELS opens level select with 12 buttons',
+  game.screen === 'levels' && game.uiButtons.filter(b => b.id.startsWith('level:')).length === 12);
+uiAction('back');
+T('menu: BACK returns to menu', game.screen === 'menu');
+uiAction('howto');
+render();
+T('menu: HOW TO opens', game.screen === 'howto' && game.uiButtons.some(b => b.id === 'back'));
+store.set('unlocked', 1);
+uiAction('levels');
+uiAction('level:5');
+T('menu: locked level tap is ignored', game.screen === 'levels');
+uiAction('level:0');
+T('menu: unlocked level starts play', game.screen === 'game' && game.levelIndex === 0 && game.level !== null);
+game.paused = true;
+fireShot(150, 400);
+const psx = game.shots[0].x;
+step(30);
+T('pause: world frozen while paused', game.shots.length === 1 && game.shots[0].x === psx);
+game.paused = false;
+step(30);
+T('pause: world resumes after unpause', game.shots[0].x !== psx);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

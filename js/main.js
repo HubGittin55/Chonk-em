@@ -48,8 +48,8 @@ const STAGES = [
 // (body half-width is now weight-driven: catRx(chonkT(weightLb)))
 
 // ---- Lifetime weight system: the cat keeps its chonk between levels ----
-const LB_PER_CAL = 0.4, START_LB = 5.0, MAX_VIS_LB = 30, MAX_LB = 40;
-const LB_MILESTONES = [10, 15, 20, 25, 30];
+const LB_PER_CAL = 0.2, START_LB = 5.0, MAX_VIS_LB = 60, MAX_LB = 80;
+const LB_MILESTONES = [10, 20, 30, 40, 50, 60, 70, 80];
 const chonkT = (lb) => Math.max(0, Math.min(1, (lb - START_LB) / (MAX_VIS_LB - START_LB)));
 const catRx = (t) => 62 + t * 88; // body half-width from chonk factor
 
@@ -67,6 +67,7 @@ function saveBest(idx, stars, cal) {
 
 const game = {
   levelIndex: 0, level: null,
+  screen: 'menu', paused: false, uiButtons: [], // menu | howto | levels | game
   balls: 0, shots: [], items: [], barrels: [], particles: [],
   multiShots: 0, slowT: 0, magnetT: 0, bridgeT: 0, shotsFired: 0,
   calories: 0, stage: 0, combo: 0, mult: 1,
@@ -109,6 +110,7 @@ function loadLevel(i) {
   game.displayRx = catRx(chonkT(game.weightLb));
   game.timeScale = 1; game.frenzy = 0;
   game.misses = 0; game.veggies = 0; game.stageMisses = 0; game.stageVeggies = 0;
+  game.paused = false; refreshPause();
   hideOverlay();
 }
 
@@ -124,7 +126,11 @@ function wobbleImpulse(part, amt) {
   if (part === 'belly') { game.jiggle = w.x; game.jiggleV = w.v; } // legacy mirror
 }
 
-const LB_MSGS = { 10: 'DOUBLE DIGITS!', 15: 'CERTIFIED CHONK!', 20: '20 LB CLUB!', 25: 'ABSOLUTE TERRITORY!', 30: 'MAXIMUM CHONK!' };
+const LB_MSGS = {
+  10: 'DOUBLE DIGITS!', 20: '20 LB CLUB!', 30: 'CERTIFIED CHONK!',
+  40: 'FORTY AND FLOURISHING!', 50: 'HALFWAY TO A HUNDRED!',
+  60: 'MAXIMUM FLOOF!', 70: 'SEVENTY?!', 80: '80 LB — LEGENDARY MASS!',
+};
 function checkLbMilestones(before, after) {
   for (const m of LB_MILESTONES) {
     if (before < m && after >= m) {
@@ -242,8 +248,8 @@ function deliver(item) {
   }
   const before = game.stage;
 
-  // Combo calorie multiplier: every 3 clean deliveries bumps it, cap ×4.
-  game.mult = Math.min(4, 1 + Math.floor(game.combo / 3));
+  // Combo calorie multiplier: every 3 clean deliveries bumps it, cap ×3.
+  game.mult = Math.min(3, 1 + Math.floor(game.combo / 3));
   const gained = item.cal > 0 ? item.cal * game.mult : item.cal;
 
   game.calories = Math.max(0, game.calories + gained);
@@ -321,6 +327,8 @@ function endGame(win) {
     if (game.misses === 0 && game.veggies === 0) n++;
     stars = '★'.repeat(n) + '☆'.repeat(3 - n);
     saveBest(game.levelIndex, n, game.calories);
+    const u = Math.min(LEVELS.length, Math.max(store.get('unlocked', 1), game.levelIndex + 2));
+    store.set('unlocked', u);
     AudioSys.win();
   } else {
     AudioSys.lose();
@@ -343,6 +351,13 @@ function hideOverlay() { overlay.classList.add('hidden'); }
 
 function tick(dt) {
   game.time += dt;
+
+  // Menus and pause: age popups only, freeze the world.
+  if (game.screen !== 'game' || game.paused) {
+    for (const p of game.popups) p.t += dt;
+    game.popups = game.popups.filter(p => p.t < 1.3);
+    return;
+  }
 
   // Real-time UI timers (unaffected by slow-mo)
   for (const p of game.popups) p.t += dt;
@@ -406,9 +421,181 @@ function tick(dt) {
   if (!game.over && game.balls <= 0 && !game.shots.length && game.items.length === 0) endGame(false);
 }
 
+/* ---------------- menu system ---------------- */
+
+const pauseBtn = document.getElementById('pauseBtn');
+const menuBtn = document.getElementById('menuBtn');
+
+function refreshPause() { pauseBtn.textContent = game.paused ? '▶' : '⏸'; }
+pauseBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (game.screen !== 'game' || game.over) return;
+  game.paused = !game.paused;
+  refreshPause();
+});
+menuBtn.addEventListener('click', () => setScreen('menu'));
+
+function setScreen(s) {
+  game.screen = s;
+  game.uiButtons = [];
+  if (s !== 'game') {
+    pauseBtn.classList.add('hidden');
+    game.paused = false; refreshPause(); hideOverlay();
+  } else {
+    pauseBtn.classList.remove('hidden');
+  }
+}
+
+function unlockedCount() { return Math.min(LEVELS.length, Math.max(1, store.get('unlocked', 1))); }
+function firstIncomplete() { return Math.min(unlockedCount(), LEVELS.length) - 1; }
+function totalStars() {
+  const best = store.get('best', {});
+  return Object.values(best).reduce((s, b) => s + (b.stars || 0), 0);
+}
+
+function uiButton(id, cx, y, w, h, label, sub, disabled) {
+  const x = cx - w / 2;
+  ctx.fillStyle = disabled ? 'rgba(120,100,80,0.35)' : 'rgba(255,250,240,0.94)';
+  ctx.strokeStyle = disabled ? 'rgba(120,100,80,0.5)' : '#8a5f33';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 18); ctx.fill(); ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = disabled ? '#8a7a66' : '#5b3a1e';
+  ctx.font = 'bold 24px system-ui, sans-serif';
+  ctx.fillText(label, cx, y + (sub ? 30 : 42));
+  if (sub) {
+    ctx.font = '600 15px system-ui, sans-serif';
+    ctx.fillStyle = disabled ? '#8a7a66' : '#8a6a45';
+    ctx.fillText(sub, cx, y + 52);
+  }
+  game.uiButtons.push({ id, x, y, w, h, disabled: !!disabled });
+}
+
+function handleUiTap(p) {
+  for (const b of game.uiButtons) {
+    if (!b.disabled && p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
+      uiAction(b.id);
+      return;
+    }
+  }
+}
+
+function uiAction(id) {
+  AudioSys.init();
+  if (id === 'play') { loadLevel(firstIncomplete()); setScreen('game'); }
+  else if (id === 'levels') setScreen('levels');
+  else if (id === 'howto') setScreen('howto');
+  else if (id === 'back') setScreen('menu');
+  else if (id.startsWith('level:')) {
+    const i = +id.slice(6);
+    if (i < unlockedCount()) { loadLevel(i); setScreen('game'); }
+  }
+}
+
+function drawMenu() {
+  drawBackground();
+  game.uiButtons = [];
+  const bob = Math.sin(game.time * 2) * 6;
+  const logo = Assets.get('logo');
+  ctx.textAlign = 'center';
+  if (logo) {
+    ctx.drawImage(logo, W / 2 - 260, 80 + bob, 520, 180);
+  } else {
+    ctx.font = 'bold 76px system-ui, sans-serif';
+    ctx.lineWidth = 10; ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillStyle = '#e8712b';
+    ctx.strokeText("CHONK'EM", W / 2, 175 + bob);
+    ctx.fillText("CHONK'EM", W / 2, 175 + bob);
+    ctx.font = '600 20px system-ui, sans-serif';
+    ctx.fillStyle = '#5b3a1e';
+    ctx.fillText('a peggle-style cat-feeding frenzy', W / 2, 215 + bob);
+  }
+  const ni = firstIncomplete();
+  uiButton('play', W / 2, 330, 320, 68, '▶  PLAY', 'level ' + (ni + 1) + ': ' + LEVELS[ni].name);
+  uiButton('levels', W / 2, 414, 320, 68, '🗺  LEVELS', unlockedCount() + ' of ' + LEVELS.length + ' unlocked');
+  uiButton('howto', W / 2, 498, 320, 68, '❓  HOW TO PLAY', 'learn the sacred art');
+  // your actual cat, chilling on the menu
+  Cats.drawMain(ctx, W / 2, 800, {
+    t: chonkT(game.weightLb),
+    wob: { belly: { x: 0 }, cheek: { x: 0 }, tail: { x: 0 } },
+    nomT: 0, face: 'normal', time: game.time,
+  });
+  ctx.font = '600 17px system-ui, sans-serif';
+  ctx.fillStyle = '#5b3a1e';
+  ctx.fillText('⚖ ' + game.weightLb.toFixed(1) + ' lb   ·   ★ ' + totalStars() + '/' + (LEVELS.length * 3), W / 2, 878);
+}
+
+function drawHowTo() {
+  drawBackground();
+  game.uiButtons = [];
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#5b3a1e';
+  ctx.font = 'bold 40px system-ui, sans-serif';
+  ctx.fillText('HOW TO PLAY', W / 2, 130);
+  const lines = [
+    '🧶 Drag or tap to aim, release to launch yarn',
+    '🛢 Burst barrels — snacks drop onto the belt',
+    '🍖 Snacks ride the belt left, into the bowl',
+    '🕳 Mind the gap! Fallen loot is lost',
+    '🥦 Veggies are betrayal: −calories, combo reset',
+    '🔥 Chain clean deliveries for combo multipliers',
+    '⭐ Bridge, slow-mo & magnet barrels help out',
+    '🐱 Feed the cat. Make it chonk.',
+  ];
+  ctx.font = '600 19px system-ui, sans-serif';
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, 215 + i * 42));
+  uiButton('back', W / 2, 700, 240, 60, '← BACK');
+}
+
+function drawLevelSelect() {
+  drawBackground();
+  game.uiButtons = [];
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#5b3a1e';
+  ctx.font = 'bold 40px system-ui, sans-serif';
+  ctx.fillText('SELECT LEVEL', W / 2, 105);
+  const best = store.get('best', {});
+  const u = unlockedCount();
+  const cols = 3, cw = 170, ch = 120, gy = 150, rowStep = 134;
+  LEVELS.forEach((L, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    const cx = W / 2 + (col - 1) * cw, cy = gy + row * rowStep;
+    const locked = i >= u;
+    const stars = (best[i] || {}).stars || 0;
+    ctx.fillStyle = locked ? 'rgba(120,100,80,0.25)' : 'rgba(255,250,240,0.94)';
+    ctx.strokeStyle = locked ? 'rgba(120,100,80,0.5)' : '#8a5f33';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.roundRect(cx - 78, cy, 156, ch, 14); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = locked ? '#8a7a66' : '#5b3a1e';
+    ctx.font = 'bold 32px system-ui, sans-serif';
+    ctx.fillText(locked ? '🔒' : String(i + 1), cx, cy + 44);
+    ctx.font = '600 13px system-ui, sans-serif';
+    ctx.fillStyle = locked ? '#8a7a66' : '#8a6a45';
+    ctx.fillText(locked ? 'locked' : L.name, cx, cy + 68);
+    if (!locked) {
+      ctx.font = '17px system-ui, sans-serif';
+      ctx.fillStyle = '#e8a020';
+      ctx.fillText('★'.repeat(stars) + '☆'.repeat(3 - stars), cx, cy + 96);
+    }
+    game.uiButtons.push({ id: 'level:' + i, x: cx - 78, y: cy, w: 156, h: ch, disabled: locked });
+  });
+  uiButton('back', W / 2, 722, 240, 58, '← BACK');
+}
+
+function drawPaused() {
+  ctx.fillStyle = 'rgba(43,33,24,0.55)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 54px system-ui, sans-serif';
+  ctx.fillText('PAUSED', W / 2, H / 2 - 10);
+  ctx.font = '600 20px system-ui, sans-serif';
+  ctx.fillText('tap ⏸ to resume', W / 2, H / 2 + 34);
+}
+
 /* ---------------- rendering ---------------- */
 
-function drawBackground() {
+function drawBackgroundVector() {
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, '#f9ecd8');
   g.addColorStop(0.7, '#f0d5ae');
@@ -478,7 +665,14 @@ function drawBackground() {
     }
   }
 
-  // Vignette
+}
+
+function drawBackground() {
+  // Image asset (Blarmo's art) or the procedural kitchen
+  const bgIm = Assets.get('bg');
+  if (bgIm) ctx.drawImage(bgIm, 0, 0, W, H);
+  else drawBackgroundVector();
+  // Vignette over either
   const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.42, W / 2, H / 2, H * 0.72);
   v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(60,35,10,0.14)');
   ctx.fillStyle = v;
@@ -608,6 +802,9 @@ function drawFrenzy() {
 }
 
 function render() {
+  if (game.screen === 'menu') { drawMenu(); return; }
+  if (game.screen === 'howto') { drawHowTo(); return; }
+  if (game.screen === 'levels') { drawLevelSelect(); return; }
   drawBackground();
   drawBarrels(ctx, game.barrels, game.time);
   Conveyor.draw(ctx, game.bridgeT > 0);
@@ -616,7 +813,7 @@ function render() {
   drawBall();
   drawParticles(ctx);
   Cats.drawShooter(ctx, SHOOT.x, SHOOT.y, game.aimAng, !game.shots.length && game.balls > 0 && !game.over);
-  Cats.drawMain(ctx, 252, 806, {
+  Cats.drawMain(ctx, 200, 806, {
     t: chonkT(game.weightLb), wob: game.wob,
     nomT: game.nomT, face: game.face, time: game.time,
   });
@@ -625,6 +822,7 @@ function render() {
   drawFrenzy();
   drawPopups();
   drawHint();
+  if (game.paused) drawPaused();
 }
 
 /* ---------------- boot ---------------- */
@@ -642,7 +840,8 @@ refreshMute();
 game.weightLb = store.get('weight', START_LB);
 
 Input.init({
-  canAim: () => !game.over && !game.shots.length && game.balls > 0,
+  canAim: () => game.screen === 'game' && !game.paused && !game.over && !game.shots.length && game.balls > 0,
+  onUiTap: (p) => handleUiTap(p),
   onAimStart: (p) => { game.aim = p; game.aimAng = aimAngleFor(p.x, p.y); },
   onAimMove: (p) => { if (game.aim) { game.aim = p; game.aimAng = aimAngleFor(p.x, p.y); } },
   onAimEnd: (p) => {
@@ -655,7 +854,8 @@ Input.init({
   },
 });
 
-loadLevel(0);
+game.weightLb = store.get('weight', START_LB);
+setScreen('menu');
 
 let last = performance.now(), acc = 0;
 const STEP = 1 / 120;
@@ -668,4 +868,5 @@ function frame(now) {
   render();
   requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+// Boot once art has been attempted (missing files fall back to vector).
+Assets.load().finally(() => requestAnimationFrame(frame));

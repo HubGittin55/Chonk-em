@@ -39,6 +39,14 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 
 ## v0.3 — Portable & Assets
 
-- [x] `asset-pipeline` — ComfyUI MCP (`comfy-mcp`, 41 tools) + Qwen Image 2.1 workflows in `tools/comfy/`; `tools/gen_sprites.py` (t2i + chained image-edit) + `tools/sprite_prep.py` (magenta chroma → alpha). 5 cat-chonk stages shipped in `assets/`; cats.js renders sprites with crossfade/jiggle + vector fallback — **DONE (qwen, 2026-10-06)**. Remaining art (barrel skins, bowl, shooter cat, kitchen bg layers) folded into `polish`.
+- [x] `asset-pipeline` — generated sprite assets (owner is standing up a GPU1 image-gen MCP server with alpha-channel output). Plan: generate PNGs (cat parts, barrel skins, loot icons, background layers) → `assets/` → swap `drawImage` into cats.js/barrels.js/main.js behind the existing draw calls, keeping vector rendering as fallback if an asset 404s. DESIGN.md "drawn in code" rule needs an amendment once the pipeline proves out — propose via branch. — **DONE (stunkus, PR #2)**: js/assets.js loader (2.5 s timeout, null → vector fallback), assets/SPEC.md brief, drawImage wired into drawMain (cat-0…4), drawShooter, drawBackground, drawBarrels, bowl, yarn, menu logo.
 - [ ] `pwa` — manifest, service worker, icons, offline
 - [ ] `mobile-polish` — touch tuning, safe areas, DPR scaling, narrow-screen layout
+
+## v0.2++ — Menu, balance & art pipeline (stunkus, 2026-10-05) — PR #2
+
+- [x] `bowl-fix` — bowl moved under the belt's left end (BOWL_X 100→60, owner bug report); cat follows (x 252→200) — **DONE (stunkus)**
+- [x] `difficulty` — combo multiplier cap ×4→×3, −2 balls/−1 par on levels 1–8, +2 goal on levels 1–6 (owner: "fairly easy") — **DONE (stunkus)**
+- [x] `weight-80` — cap 40→80 lb, gain 0.4→0.2 lb/cal, visual max 60 lb, milestones every 10 lb (owner: cat maxed too fast) — **DONE (stunkus)**
+- [x] `menu-system` — title menu (your actual cat chills on it), level select with stars/locks/unlock progression, how-to screen, pause button — **DONE (stunkus)**
+- [x] `asset-pipeline` — implemented as queued in v0.3 above; see that entry — **DONE (stunkus)**

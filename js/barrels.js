@@ -14,6 +14,55 @@ const CONTENT = {
   magnet:   { cal:  0, icon: '⭐', name: 'Magnet',      grav: 0.80, drift: 30, power: 'magnet' },
 };
 
+function drawBarrelBody(ctx, b, r) {
+// Wooden body with light from upper-left
+const g = ctx.createRadialGradient(b.x - r * 0.4, b.y - r * 0.45, r * 0.25, b.x, b.y, r);
+g.addColorStop(0, '#c99257'); g.addColorStop(0.6, '#a9743c'); g.addColorStop(1, '#7c5225');
+ctx.fillStyle = g;
+ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 7); ctx.fill();
+
+// Staves: full-face grain lines
+ctx.save();
+ctx.beginPath(); ctx.arc(b.x, b.y, r - 1, 0, 7); ctx.clip();
+ctx.strokeStyle = 'rgba(96,60,26,0.5)'; ctx.lineWidth = 1.5;
+for (const sx of [-0.66, -0.33, 0, 0.33, 0.66]) {
+  ctx.beginPath();
+  ctx.moveTo(b.x + r * sx, b.y - r);
+  ctx.quadraticCurveTo(b.x + r * sx * 1.35, b.y, b.x + r * sx, b.y + r);
+  ctx.stroke();
+}
+// Knot
+ctx.strokeStyle = 'rgba(96,60,26,0.4)';
+ctx.beginPath(); ctx.ellipse(b.x + r * 0.45, b.y + r * 0.35, 3.5, 2.2, 0.6, 0, 7); ctx.stroke();
+ctx.restore();
+
+// Iron hoops (top + bottom bands, with rivets)
+ctx.strokeStyle = '#5a5f68'; ctx.lineWidth = 5;
+for (const hy of [-r * 0.62, r * 0.62]) {
+  const half = Math.sqrt(Math.max(0, r * r - hy * hy));
+  ctx.beginPath();
+  ctx.moveTo(b.x - half, b.y + hy);
+  ctx.lineTo(b.x + half, b.y + hy);
+  ctx.stroke();
+}
+ctx.strokeStyle = 'rgba(230,235,245,0.5)'; ctx.lineWidth = 1.5;
+for (const hy of [-r * 0.62, r * 0.62]) {
+  const half = Math.sqrt(Math.max(0, r * r - hy * hy));
+  ctx.beginPath();
+  ctx.moveTo(b.x - half + 3, b.y + hy - 1.5);
+  ctx.lineTo(b.x + half - 3, b.y + hy - 1.5);
+  ctx.stroke();
+}
+
+// Rim
+ctx.strokeStyle = '#5f3d18'; ctx.lineWidth = 3.5;
+ctx.beginPath(); ctx.arc(b.x, b.y, r - 1.5, 0, 7); ctx.stroke();
+// Specular sheen
+ctx.fillStyle = 'rgba(255,240,210,0.22)';
+ctx.beginPath(); ctx.ellipse(b.x - r * 0.38, b.y - r * 0.42, r * 0.34, r * 0.2, -0.6, 0, 7); ctx.fill();
+
+}
+
 function drawBarrels(ctx, barrels, time) {
   for (const b of barrels) {
     if (b.cleared) continue;
@@ -24,51 +73,11 @@ function drawBarrels(ctx, barrels, time) {
     ctx.fillStyle = 'rgba(60,35,10,0.16)';
     ctx.beginPath(); ctx.ellipse(b.x + 3, b.y + 5, r, r * 0.92, 0, 0, 7); ctx.fill();
 
-    // Wooden body with light from upper-left
-    const g = ctx.createRadialGradient(b.x - r * 0.4, b.y - r * 0.45, r * 0.25, b.x, b.y, r);
-    g.addColorStop(0, '#c99257'); g.addColorStop(0.6, '#a9743c'); g.addColorStop(1, '#7c5225');
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 7); ctx.fill();
-
-    // Staves: full-face grain lines
-    ctx.save();
-    ctx.beginPath(); ctx.arc(b.x, b.y, r - 1, 0, 7); ctx.clip();
-    ctx.strokeStyle = 'rgba(96,60,26,0.5)'; ctx.lineWidth = 1.5;
-    for (const sx of [-0.66, -0.33, 0, 0.33, 0.66]) {
-      ctx.beginPath();
-      ctx.moveTo(b.x + r * sx, b.y - r);
-      ctx.quadraticCurveTo(b.x + r * sx * 1.35, b.y, b.x + r * sx, b.y + r);
-      ctx.stroke();
-    }
-    // Knot
-    ctx.strokeStyle = 'rgba(96,60,26,0.4)';
-    ctx.beginPath(); ctx.ellipse(b.x + r * 0.45, b.y + r * 0.35, 3.5, 2.2, 0.6, 0, 7); ctx.stroke();
-    ctx.restore();
-
-    // Iron hoops (top + bottom bands, with rivets)
-    ctx.strokeStyle = '#5a5f68'; ctx.lineWidth = 5;
-    for (const hy of [-r * 0.62, r * 0.62]) {
-      const half = Math.sqrt(Math.max(0, r * r - hy * hy));
-      ctx.beginPath();
-      ctx.moveTo(b.x - half, b.y + hy);
-      ctx.lineTo(b.x + half, b.y + hy);
-      ctx.stroke();
-    }
-    ctx.strokeStyle = 'rgba(230,235,245,0.5)'; ctx.lineWidth = 1.5;
-    for (const hy of [-r * 0.62, r * 0.62]) {
-      const half = Math.sqrt(Math.max(0, r * r - hy * hy));
-      ctx.beginPath();
-      ctx.moveTo(b.x - half + 3, b.y + hy - 1.5);
-      ctx.lineTo(b.x + half - 3, b.y + hy - 1.5);
-      ctx.stroke();
-    }
-
-    // Rim
-    ctx.strokeStyle = '#5f3d18'; ctx.lineWidth = 3.5;
-    ctx.beginPath(); ctx.arc(b.x, b.y, r - 1.5, 0, 7); ctx.stroke();
-    // Specular sheen
-    ctx.fillStyle = 'rgba(255,240,210,0.22)';
-    ctx.beginPath(); ctx.ellipse(b.x - r * 0.38, b.y - r * 0.42, r * 0.34, r * 0.2, -0.6, 0, 7); ctx.fill();
+    // Image asset (Blarmo's art) or procedural vector body
+    const bkey = b.kind === 'veggie' ? 'barrel-veggie' : b.kind === 'power' ? 'barrel-power' : 'barrel-snack';
+    const bim = Assets.get(bkey);
+    if (bim) ctx.drawImage(bim, b.x - 26, b.y - 26, 52, 52);
+    else drawBarrelBody(ctx, b, r);
 
     // Contents badge — labeled, not a slot machine
     ctx.fillStyle = 'rgba(0,0,0,0.18)';

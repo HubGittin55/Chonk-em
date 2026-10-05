@@ -3,18 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>CHONK 'EM — v0.1 prototype</title>
+<title>CHONK'EM</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div id="wrap">
   <canvas id="game"></canvas>
   <button id="mute" title="toggle sound">🔊</button>
+  <button id="pauseBtn" class="hidden" title="pause">⏸</button>
   <div id="overlay" class="hidden">
     <h2 id="overlay-title"></h2>
     <p id="overlay-sub"></p>
     <button id="retry">Retry</button>
     <button id="next" class="hidden">Next Level →</button>
+    <button id="menuBtn">Menu</button>
   </div>
 </div>
 <script src="js/audio.js"></script>
@@ -24,6 +26,7 @@
 <script src="js/conveyor.js"></script>
 <script src="js/cats.js"></script>
 <script src="js/input.js"></script>
+<script src="js/assets.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

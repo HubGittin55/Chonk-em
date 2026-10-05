@@ -5,12 +5,12 @@ to the same entry. Format is in COLLAB.md. If it's not in this file (or in git h
 
 ---
 
-## Handoff — sprite pipeline + cat-chonk stages — qwen, 2026-10-06
-Done: ComfyUI MCP installed (`pi mcp add comfy-mcp`, 41 tools, spawns in new pi sessions). Workflows in `tools/comfy/`. `tools/gen_sprites.py` (t2i base + chained image-edit for style consistency) + `tools/sprite_prep.py` (magenta chroma → true alpha, despill, trim). Five cat-chonk stages generated on the 3090 → `assets/cat_stage0..4.png` (RGBA, ~420px, 4.5MB). cats.js renders sprites: crossfade by chonkT, jiggle squash, nom bob; Stunkus's vector cat remains the fallback (404-safe; Node has no Image → smoke stays vector).
-Files: assets/cat_stage*.png, tools/gen_sprites.py, tools/sprite_prep.py, tools/comfy/*, js/cats.js, TASKS.md
-How to verify: `node tools/smoke.js` → 35/35. Play: cat is the generated white chonk, morphing through 5 stages as weight climbs, belly squash on delivery.
-**Sprite conventions for future art** (barrels, bowl, shooter cat, kitchen): 1024×1024, solid magenta #FF00FF bg, no scenery/shadow on bg, limb-count constraints IN the prompt — image-edit chains add legs (stage 1 shipped with six; fixed with "EXACTLY four limbs" + negative prompt). Prep via sprite_prep into `assets/<part>_<variant>.png`, keep vector fallbacks.
-Review (stunkus): —
+## Handoff — menu + balance + bowl-fix + weight-80 + asset-pipeline (PR #2) — stunkus, 2026-10-05
+Done: menu system (title / level-select / how-to, unlock progression, pause), bowl tucked under the belt's left end (BOWL_X 60, cat x 200), difficulty pass (combo cap ×3, −2 balls/−1 par L1–8, +2 goal L1–6), weight retune (80 lb cap, 0.2 lb/cal, visual max 60, milestones every 10 lb), asset pipeline per the v0.3 queue (js/assets.js + SPEC.md, drawImage wired with vector fallback in cats/barrels/conveyor/main).
+Files: js/main.js, js/cats.js, js/barrels.js, js/conveyor.js, js/input.js, js/levels.js, js/assets.js (new), assets/SPEC.md (new), index.html, css/style.css, tools/smoke.js, TASKS.md, DESIGN.md
+How to verify: `node tools/smoke.js` → 44/44. Open index.html → menu with your cat; LEVELS shows locks/stars; PLAY starts first incomplete level; ⏸ freezes the world.
+Next: `barrel-types` (armored + mystery) is still unclaimed — good pickup. Then `hazards`.
+Open questions: cat sprite anchoring (drawMain sprite branch) is a guess until Blarmo's PNGs land — expect one tuning pass. Single PR covers 5 tasks (owner asked for the batch in one go; COLLAB small-diff guideline waived per owner directive).
 
 ---
 

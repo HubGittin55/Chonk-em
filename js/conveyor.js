@@ -6,7 +6,7 @@
 const Conveyor = {
   BELT_Y: 700,
   SPEED: 130,    // px/s, leftward
-  BOWL_X: 100,
+  BOWL_X: 60,    // tucked under the belt's left end — items ride off the end into it
   BOWL_Y: 744,
   LEFT: 40, RIGHT: 560,      // belt extent
   GAP_L: 440, GAP_R: 540,    // static gap — learnable miss zone
@@ -59,8 +59,10 @@ const Conveyor = {
       ctx.beginPath(); ctx.roundRect(this.GAP_L - 6, by - 17, this.GAP_R - this.GAP_L + 12, 11, 4); ctx.stroke();
     }
 
-    // Bowl
+    // Bowl — image asset or vector
     const bx = this.BOWL_X, wy = this.BOWL_Y;
+    const bowlIm = Assets.get('bowl');
+    if (bowlIm) { ctx.drawImage(bowlIm, bx - 80, wy - 78, 160, 100); return; }
     ctx.fillStyle = 'rgba(0,0,0,0.15)';
     ctx.beginPath(); ctx.ellipse(bx, wy + 22, 52, 10, 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#d94f3d';

@@ -6,9 +6,9 @@ const LEVELS = [
 
   {
     name: 'First Breakfast',
-    balls: 10,
-    par: 7, // 3 stars needs: win + shots <= par + zero misses/veggies
-    goal: 8, // calories to win
+    balls: 8,
+    par: 6, // 3 stars needs: win + shots <= par + zero misses/veggies
+    goal: 10, // calories to win
     barrels: [
       { x: 150, y: 220, kind: 'snack',  content: 'kibble'   },
       { x: 300, y: 200, kind: 'snack',  content: 'salmon'   },
@@ -28,9 +28,9 @@ const LEVELS = [
 
   {
     name: "Pyramid Pounce",
-    balls: 12,
-    par: 8,
-    goal: 12,
+    balls: 10,
+    par: 7,
+    goal: 14,
     barrels: [
       { x: 300, y: 180, kind: "snack", content: "tuna" },
       { x: 240, y: 240, kind: "snack", content: "salmon" },
@@ -53,9 +53,9 @@ const LEVELS = [
   },
   {
     name: "Diamond Darts",
-    balls: 13,
-    par: 9,
-    goal: 16,
+    balls: 11,
+    par: 8,
+    goal: 18,
     barrels: [
       { x: 300, y: 180, kind: "snack", content: "tuna" },
       { x: 240, y: 240, kind: "snack", content: "salmon" },
@@ -78,9 +78,9 @@ const LEVELS = [
   },
   {
     name: "Zigzag Zoom",
-    balls: 14,
-    par: 10,
-    goal: 20,
+    balls: 12,
+    par: 9,
+    goal: 22,
     barrels: [
       { x: 62, y: 180, kind: "snack", content: "tuna" },
       { x: 180, y: 180, kind: "snack", content: "salmon" },
@@ -106,9 +106,9 @@ const LEVELS = [
   },
   {
     name: "Hexagon Hunt",
-    balls: 15,
-    par: 11,
-    goal: 24,
+    balls: 13,
+    par: 10,
+    goal: 26,
     barrels: [
       { x: 300, y: 240, kind: "snack", content: "tuna" },
       { x: 240, y: 210, kind: "snack", content: "salmon" },
@@ -135,9 +135,9 @@ const LEVELS = [
   },
   {
     name: "Diagonal Dash",
-    balls: 16,
-    par: 12,
-    goal: 28,
+    balls: 14,
+    par: 11,
+    goal: 30,
     barrels: [
       { x: 62, y: 180, kind: "snack", content: "tuna" },
       { x: 180, y: 220, kind: "snack", content: "salmon" },
@@ -161,7 +161,7 @@ const LEVELS = [
 
   {
     name: 'Twin Peaks',
-    balls: 16, par: 12, goal: 30,
+    balls: 14, par: 12, goal: 30,
     barrels: [
       { x: 180, y: 180, kind: 'snack', content: 'tuna' },
       { x: 420, y: 180, kind: 'snack', content: 'tuna' },
@@ -187,7 +187,7 @@ const LEVELS = [
 
   {
     name: 'The Gauntlet',
-    balls: 17, par: 13, goal: 34,
+    balls: 15, par: 13, goal: 34,
     barrels: [
       { x: 300, y: 180, kind: 'snack', content: 'tuna' },
       { x: 300, y: 260, kind: 'snack', content: 'tuna' },

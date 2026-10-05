@@ -13,9 +13,12 @@ const Input = {
     canvas.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       AudioSys.init();
+      const p = toLogical(e);
       if (hooks.canAim()) {
-        hooks.onAimStart(toLogical(e));
+        hooks.onAimStart(p);
         try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
+      } else if (hooks.onUiTap) {
+        hooks.onUiTap(p);
       }
     });
     canvas.addEventListener('pointermove', (e) => {
