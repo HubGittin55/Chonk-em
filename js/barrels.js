@@ -20,6 +20,22 @@ function drawBarrels(ctx, barrels, time) {
     const c = CONTENT[b.content];
     const r = b.r;
 
+    // Generated barrel skin (AoT style), vector fallback below
+    if (typeof Assets !== 'undefined' && Assets.ok('barrel_' + b.content)) {
+      const im = Assets.imgs['barrel_' + b.content];
+      const s = r * 2.75;
+      ctx.drawImage(im, b.x - s / 2, b.y - s / 2, s, s);
+      if (b.kind === 'power') { // dashed gold ring
+        ctx.strokeStyle = b.kind === 'power' ? '#ef6c00' : '#2e7d32';
+        ctx.lineWidth = 2.5;
+        ctx.save();
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.arc(b.x, b.y, 16.5, time * 1.5, time * 1.5 + Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+      continue;
+    }
+
     // Drop shadow
     ctx.fillStyle = 'rgba(60,35,10,0.16)';
     ctx.beginPath(); ctx.ellipse(b.x + 3, b.y + 5, r, r * 0.92, 0, 0, 7); ctx.fill();

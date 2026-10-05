@@ -131,7 +131,7 @@ loadLevel(0);
 deliver({ cal: 1 }); deliver({ cal: 1 }); deliver({ cal: 1 }); deliver({ cal: 1 });
 T('combos: after 3 clean deliveries, 4th+ earns ×2 calories', game.combo === 4 && game.mult === 2);
 T('jiggle: delivery kicks the belly spring', game.jiggleV > 0);
-game.calories = 7; game.stageMisses = 0; game.stageVeggies = 0;
+game.calories = 11; game.stageMisses = 0; game.stageVeggies = 0;
 const ballsBefore = game.balls;
 deliver({ cal: 1 }); // clean stage-up → FEAST FRENZY
 T('frenzy: clean stage-up triggers FEAST FRENZY (+2 yarn, 0.35× time)',

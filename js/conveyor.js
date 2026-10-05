@@ -61,6 +61,11 @@ const Conveyor = {
 
     // Bowl
     const bx = this.BOWL_X, wy = this.BOWL_Y;
+    if (typeof Assets !== 'undefined' && Assets.ok('bowl')) {
+      const im = Assets.imgs.bowl, w = 118, h = w * (im.height / im.width);
+      ctx.drawImage(im, bx - w / 2, wy - h / 2, w, h);
+      return;
+    }
     ctx.fillStyle = 'rgba(0,0,0,0.15)';
     ctx.beginPath(); ctx.ellipse(bx, wy + 22, 52, 10, 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#d94f3d';

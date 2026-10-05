@@ -39,18 +39,22 @@ const SHOOT = { x: 300, y: 86 };
 const BALL_SPEED = 640, BALL_R = 10;
 const ITEM_GRAV = 1150;
 const STAGES = [
-  { at: 0,  name: 'Scrawny' },
-  { at: 8,  name: 'Healthy' },
-  { at: 18, name: 'Chubby' },
-  { at: 32, name: 'Chonky' },
-  { at: 50, name: 'ABSOLUTE UNIT' },
+  { at: 0,   name: 'Scrawny' },
+  { at: 12,  name: 'Chonklet' },
+  { at: 38,  name: 'Chunky' },
+  { at: 63,  name: 'Chonky' },
+  { at: 88,  name: 'Big Chonk' },
+  { at: 113, name: 'Heavyweight' },
+  { at: 138, name: 'Massive' },
+  { at: 163, name: 'Colossal' },
+  { at: 188, name: 'ABSOLUTE UNIT' },
 ];
 // (body half-width is now weight-driven: catRx(chonkT(weightLb)))
 
 // ---- Lifetime weight system: the cat keeps its chonk between levels ----
-const LB_PER_CAL = 0.4, START_LB = 5.0, MAX_VIS_LB = 30, MAX_LB = 40;
-const LB_MILESTONES = [10, 15, 20, 25, 30];
-const chonkT = (lb) => Math.max(0, Math.min(1, (lb - START_LB) / (MAX_VIS_LB - START_LB)));
+const LB_PER_CAL = 0.4, START_LB = 5.0, MAX_VIS_LB = 80, MAX_LB = 90;
+const LB_MILESTONES = [10, 20, 30, 40, 50, 60, 70, 80];
+const chonkT = (lb) => Math.max(0, Math.min(1, (lb - 10) / (MAX_VIS_LB - 10)));
 const catRx = (t) => 62 + t * 88; // body half-width from chonk factor
 
 // localStorage helpers (best stars, settings)
@@ -90,6 +94,7 @@ function loadLevel(i) {
   const L = LEVELS[i];
   game.levelIndex = i;
   game.level = L;
+  game.catVar = Math.floor(Math.random() * 4); // which cat shows up at the bowl this level
   game.particles = [];
   nextBtn.classList.add('hidden');
   game.balls = L.balls;
@@ -124,7 +129,7 @@ function wobbleImpulse(part, amt) {
   if (part === 'belly') { game.jiggle = w.x; game.jiggleV = w.v; } // legacy mirror
 }
 
-const LB_MSGS = { 10: 'DOUBLE DIGITS!', 15: 'CERTIFIED CHONK!', 20: '20 LB CLUB!', 25: 'ABSOLUTE TERRITORY!', 30: 'MAXIMUM CHONK!' };
+const LB_MSGS = { 10: 'DOUBLE DIGITS!', 20: '20 LB CLUB!', 30: 'CERTIFIED CHONK!', 40: 'FAT CITY!', 50: 'HEAVYWEIGHT CHAMPION!', 60: 'WHEELED AWAY!', 70: 'COLOSSAL!', 80: 'ABSOLUTE UNIT!' };
 function checkLbMilestones(before, after) {
   for (const m of LB_MILESTONES) {
     if (before < m && after >= m) {
@@ -409,6 +414,10 @@ function tick(dt) {
 /* ---------------- rendering ---------------- */
 
 function drawBackground() {
+  if (typeof Assets !== 'undefined' && Assets.ok('bg')) {
+    ctx.drawImage(Assets.imgs.bg, 0, 0, W, H);
+    return;
+  }
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, '#f9ecd8');
   g.addColorStop(0.7, '#f0d5ae');
@@ -617,7 +626,7 @@ function render() {
   drawParticles(ctx);
   Cats.drawShooter(ctx, SHOOT.x, SHOOT.y, game.aimAng, !game.shots.length && game.balls > 0 && !game.over);
   Cats.drawMain(ctx, 252, 806, {
-    t: chonkT(game.weightLb), wob: game.wob,
+    t: chonkT(game.weightLb), wob: game.wob, var: game.catVar,
     nomT: game.nomT, face: game.face, time: game.time,
   });
   drawHUD();

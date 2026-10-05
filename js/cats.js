@@ -1,8 +1,30 @@
 'use strict';
-/* Shooter cat + main cat, drawn in code. No assets, no mercy — now with fur,
-   and a main cat whose every part grows at its own rate with lifetime weight. */
+/* Shooter cat + main cat. Vector rendering in code, with generated sprite
+   assets (Qwen Image 2.1 turbo pipeline) layered on top: every draw site
+   falls back to its vector renderer if its asset is missing. */
+
+// Prop sprites (barrels, bowl, yarn, shooter, kitchen bg). Per-key readiness.
+const ASSET_KEYS = ['bowl', 'yarn', 'shooter', 'bg',
+  'barrel_kibble', 'barrel_salmon', 'barrel_tuna', 'barrel_broccoli', 'barrel_celery',
+  'barrel_multi', 'barrel_wide', 'barrel_slow', 'barrel_magnet'];
+const Assets = {
+  imgs: (typeof Image === 'function') ? Object.fromEntries(ASSET_KEYS.map(k => {
+    const im = new Image();
+    im.src = 'assets/' + k + '.png';
+    return [k, im];
+  })) : {},
+  ok(k) {
+    const im = this.imgs[k];
+    return !!(im && im.complete && im.naturalWidth > 0);
+  },
+};
 
 function drawYarn(ctx, x, y, r) {
+  if (Assets.ok('yarn')) {
+    const im = Assets.imgs.yarn, s = r * 2.5;
+    ctx.drawImage(im, x - s / 2, y - s / 2, s, s);
+    return;
+  }
   const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.2, x, y, r);
   g.addColorStop(0, '#ff7a9c');
   g.addColorStop(0.65, '#e84a6f');
@@ -95,25 +117,37 @@ function eyesMain(ctx, hx, hy, ex, face, time) {
 
 // -----------------------------------------------------------------------------
 
-// Generated sprite assets (Qwen Image 2.1, alpha PNGs). Loaded eagerly;
-// if any sprite is missing the vector renderer takes over (asset 404 safe).
+// Generated sprite assets (Qwen Image 2.1 turbo pipeline, alpha PNGs).
+// 4 cat varieties × 8 chonk stages (10→80 lb). If any sprite is missing the
+// vector renderer takes over (asset 404 safe).
+const CAT_VARS = ['cat', 'orange', 'tuxedo', 'calico'];
+const STAGE_LBS = [10, 20, 30, 40, 50, 60, 70, 80];
 const Sprites = {
-  imgs: (typeof Image === 'function') ? [0,1,2,3,4].map(i => {
+  imgs: (typeof Image === 'function') ? CAT_VARS.map(v => STAGE_LBS.map(lb => {
     const im = new Image();
-    im.src = 'assets/cat_stage' + i + '.png';
+    im.src = 'assets/' + v + '_w' + lb + '.png';
     return im;
-  }) : [],
+  })) : [],
   ready: 0,
   init() {
-    this.imgs.forEach(im => im.onload = () => { this.ready++; });
+    this.imgs.forEach(row => row.forEach(im => im.onload = () => { this.ready++; }));
   },
-  ok() { return this.ready === 5; },
+  ok() { return this.ready === CAT_VARS.length * STAGE_LBS.length; },
 };
 if (typeof Image === 'function') Sprites.init();
 
 const Cats = {
   // Shooter cat perched at the top. aimAng in radians (canvas coords), loaded = yarn ready.
   drawShooter(ctx, x, y, aimAng, loaded) {
+    if (Assets.ok('shooter')) {
+      const im = Assets.imgs.shooter, h = 118, w = h * (im.width / im.height);
+      ctx.drawImage(im, x - w / 2, y - 14, w, h);
+      if (loaded) { // glow when a shot is ready
+        ctx.fillStyle = 'rgba(255,220,80,0.5)';
+        ctx.beginPath(); ctx.arc(x - w * 0.42, y + 34, 7 + Math.sin((Date.now() || 0) / 180) * 2, 0, 7); ctx.fill();
+      }
+      return;
+    }
     ctx.save();
     ctx.translate(x, y);
 
@@ -204,8 +238,9 @@ const Cats = {
 
     // ---- Generated-sprite path: crossfade between chonk stages, jiggle squash ----
     if (typeof Image === 'function' && Sprites.ok()) {
-      const pos = t * 4, i = Math.min(4, Math.floor(pos)), f = pos - i;
-      const H = 132 + t * 48;                        // fits belt (700) → floor (880)
+      const row = Sprites.imgs[Math.max(0, Math.min(CAT_VARS.length - 1, cat.var | 0))];
+      const pos = t * (STAGE_LBS.length - 1), i = Math.min(STAGE_LBS.length - 1, Math.floor(pos)), f = pos - i;
+      const H = 122 + t * 58;                        // fits belt (700) → floor (880)
       const sy = (1 + jB * 0.07) * (1 - bob * 0.012);
       const sx = 1 - jB * 0.035;
       const baseY = y + 74;                          // feet anchor
@@ -214,13 +249,13 @@ const Cats = {
       ctx.scale(sx, sy);
       const drawStage = (idx, alpha) => {
         if (alpha <= 0.01) return;
-        const im = Sprites.imgs[idx];
+        const im = row[idx];
         const w = H * (im.width / im.height);
         ctx.globalAlpha = alpha;
         ctx.drawImage(im, -w / 2, -H / 2, w, H);
       };
       drawStage(i, 1 - f);
-      if (f > 0.01) drawStage(Math.min(4, i + 1), f);
+      if (f > 0.01) drawStage(Math.min(STAGE_LBS.length - 1, i + 1), f);
       ctx.globalAlpha = 1;
       ctx.restore();
       void face; void jC; void jT;
