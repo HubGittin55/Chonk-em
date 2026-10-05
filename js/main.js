@@ -45,7 +45,13 @@ const STAGES = [
   { at: 32, name: 'Chonky' },
   { at: 50, name: 'ABSOLUTE UNIT' },
 ];
-const stageRx = (s) => 62 + s * 24; // body half-width per chonk stage
+// (body half-width is now weight-driven: catRx(chonkT(weightLb)))
+
+// ---- Lifetime weight system: the cat keeps its chonk between levels ----
+const LB_PER_CAL = 0.4, START_LB = 5.0, MAX_VIS_LB = 30, MAX_LB = 40;
+const LB_MILESTONES = [10, 15, 20, 25, 30];
+const chonkT = (lb) => Math.max(0, Math.min(1, (lb - START_LB) / (MAX_VIS_LB - START_LB)));
+const catRx = (t) => 62 + t * 88; // body half-width from chonk factor
 
 // localStorage helpers (best stars, settings)
 const store = {
@@ -67,7 +73,9 @@ const game = {
   time: 0, over: null, popups: [],
   nomT: 0, face: 'normal', faceT: 0,
   aim: null, aimAng: null,
-  jiggle: 0, jiggleV: 0, displayRx: stageRx(0),
+  jiggle: 0, jiggleV: 0, displayRx: catRx(0), // jiggle mirrors wob.belly (smoke-test compat)
+  wob: { belly: { x: 0, v: 0 }, cheek: { x: 0, v: 0 }, tail: { x: 0, v: 0 } },
+  weightLb: START_LB,
   timeScale: 1, frenzy: 0,
   misses: 0, veggies: 0, stageMisses: 0, stageVeggies: 0,
 };
@@ -96,7 +104,9 @@ function loadLevel(i) {
   game.over = null;
   game.aim = null; game.aimAng = null;
   game.nomT = 0; game.face = 'normal'; game.faceT = 0;
-  game.jiggle = 0; game.jiggleV = 0; game.displayRx = stageRx(0);
+  game.jiggle = 0; game.jiggleV = 0;
+  game.wob = { belly: { x: 0, v: 0 }, cheek: { x: 0, v: 0 }, tail: { x: 0, v: 0 } };
+  game.displayRx = catRx(chonkT(game.weightLb));
   game.timeScale = 1; game.frenzy = 0;
   game.misses = 0; game.veggies = 0; game.stageMisses = 0; game.stageVeggies = 0;
   hideOverlay();
@@ -104,6 +114,26 @@ function loadLevel(i) {
 
 function addPopup(x, y, text, color) {
   game.popups.push({ x, y, text, color: color || '#fff', t: 0 });
+}
+
+// Multi-spring wobble impulse: part is 'belly' | 'cheek' | 'tail'
+function wobbleImpulse(part, amt) {
+  const w = game.wob[part];
+  if (!w) return;
+  w.v += amt * (REDUCED ? 0.35 : 1);
+  if (part === 'belly') { game.jiggle = w.x; game.jiggleV = w.v; } // legacy mirror
+}
+
+const LB_MSGS = { 10: 'DOUBLE DIGITS!', 15: 'CERTIFIED CHONK!', 20: '20 LB CLUB!', 25: 'ABSOLUTE TERRITORY!', 30: 'MAXIMUM CHONK!' };
+function checkLbMilestones(before, after) {
+  for (const m of LB_MILESTONES) {
+    if (before < m && after >= m) {
+      addPopup(300, 340, '⚖ ' + m + ' lb — ' + LB_MSGS[m], '#6a1b9a');
+      AudioSys.jingle();
+      game.face = 'bliss'; game.faceT = 2.5;
+      wobbleImpulse('belly', 4); wobbleImpulse('cheek', 2);
+    }
+  }
 }
 
 function aimAngleFor(px, py) {
@@ -202,7 +232,7 @@ function deliver(item) {
   if (item.power) {
     game.nomT = 0.6;
     game.face = 'happy'; game.faceT = 1.2;
-    game.jiggleV += 2;
+    wobbleImpulse('cheek', 1.5); wobbleImpulse('belly', 1);
     AudioSys.powerup();
     if (item.power === 'multi')  { game.multiShots = 1;    addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ MULTI-YARN!', '#ef6c00'); }
     if (item.power === 'wide')   { game.bridgeT = 15;      addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ BRIDGE!', '#ef6c00'); }
@@ -219,7 +249,17 @@ function deliver(item) {
   game.calories = Math.max(0, game.calories + gained);
   game.stage = stageFor(game.calories);
   game.nomT = 0.6;
-  game.jiggleV += item.cal > 0 ? 2 + gained * 0.5 : 1.5;
+
+  // Lifetime weight: only real food adds pounds. Veggies never slim the cat.
+  if (gained > 0) {
+    const beforeLb = game.weightLb;
+    game.weightLb = Math.min(MAX_LB, game.weightLb + gained * LB_PER_CAL);
+    store.set('weight', game.weightLb);
+    checkLbMilestones(beforeLb, game.weightLb);
+  }
+  wobbleImpulse('belly', item.cal > 0 ? 1.6 + gained * 0.35 : 1.0);
+  wobbleImpulse('cheek', item.cal > 0 ? 1.2 : 0.5);
+  wobbleImpulse('tail', 0.8);
 
   if (item.cal < 0) {
     game.combo = 0; game.mult = 1;
@@ -256,7 +296,7 @@ function triggerFrenzy() {
   game.timeScale = 0.35;
   game.balls += 2;          // the cat demands MORE
   game.face = 'bliss'; game.faceT = 6;
-  game.jiggleV += 6;
+  wobbleImpulse('belly', 5); wobbleImpulse('cheek', 3); wobbleImpulse('tail', 3);
   addPopup(300, 420, 'FEAST FRENZY! +2 🧶', '#ff6f00');
   AudioSys.frenzy();
 }
@@ -287,7 +327,7 @@ function endGame(win) {
   }
   overlayTitle.textContent = win ? 'CHONK ACHIEVED!' : 'Still scrawny…';
   overlaySub.textContent = win
-    ? `${stars}   ${game.calories} calories — the cat is ${STAGES[game.stage].name}.`
+    ? `${stars}   ${game.calories} calories — the cat is ${STAGES[game.stage].name}, now ${game.weightLb.toFixed(1)} lb!`
     : `${game.calories}/${game.level.goal} calories. The cat demands another try.`;
   if (win && game.levelIndex + 1 < LEVELS.length) {
     nextBtn.textContent = 'Next: ' + LEVELS[game.levelIndex + 1].name + ' →';
@@ -321,10 +361,16 @@ function tick(dt) {
   Conveyor.t += wdt;
   tickParticles(dt);
 
-  // Belly jiggle spring + eased body width
-  game.jiggleV += (-140 * game.jiggle - 9 * game.jiggleV) * wdt;
-  game.jiggle += game.jiggleV * wdt;
-  const targetRx = stageRx(game.stage);
+  // Multi-spring wobble: belly (slow, heavy), cheek (quick), tail (sway).
+  // game.jiggle mirrors the belly spring for smoke-test compatibility.
+  const WOBK = { belly: { k: 90, c: 7 }, cheek: { k: 170, c: 10 }, tail: { k: 130, c: 6.5 } };
+  for (const p of ['belly', 'cheek', 'tail']) {
+    const w = game.wob[p], K = WOBK[p];
+    w.v += (-K.k * w.x - K.c * w.v) * wdt;
+    w.x += w.v * wdt;
+  }
+  game.jiggle = game.wob.belly.x; game.jiggleV = game.wob.belly.v;
+  const targetRx = catRx(chonkT(game.weightLb));
   game.displayRx += (targetRx - game.displayRx) * Math.min(1, dt * 4);
 
   if (game.magnetT > 0) game.magnetT -= dt;
@@ -445,6 +491,9 @@ function drawHUD() {
   ctx.font = 'bold 22px system-ui, sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText('🧶 × ' + game.balls, 24, 36);
+  // Lifetime weight under the yarn count
+  ctx.font = 'bold 19px system-ui, sans-serif';
+  ctx.fillText('⚖ ' + game.weightLb.toFixed(1) + ' lb', 24, 62);
 
   // Chonk meter
   const mw = 230, mx = W / 2 - mw / 2, my = 14;
@@ -567,7 +616,10 @@ function render() {
   drawBall();
   drawParticles(ctx);
   Cats.drawShooter(ctx, SHOOT.x, SHOOT.y, game.aimAng, !game.shots.length && game.balls > 0 && !game.over);
-  Cats.drawMain(ctx, 252, 806, game.displayRx, game.nomT, game.face, game.time, game.jiggle);
+  Cats.drawMain(ctx, 252, 806, {
+    t: chonkT(game.weightLb), wob: game.wob,
+    nomT: game.nomT, face: game.face, time: game.time,
+  });
   drawHUD();
   drawPowerHUD();
   drawFrenzy();
@@ -587,6 +639,7 @@ muteBtn.addEventListener('click', (e) => {
 });
 AudioSys.loadMute();
 refreshMute();
+game.weightLb = store.get('weight', START_LB);
 
 Input.init({
   canAim: () => !game.over && !game.shots.length && game.balls > 0,

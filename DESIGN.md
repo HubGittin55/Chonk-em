@@ -67,9 +67,10 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 - **Bowl** sits at the conveyor's left end, next to the main cat. Veggie in the bowl = negative calories, disgusted cat face, combo reset.
 
 ### 4.5 Main cat
-- Sits left of the playfield beside the bowl, outside the gameplay area. Eats each delivery with a nom animation.
-- Body width = chonk stage (5 stages, ~1.0× → ~2.2×, springy belly jiggle on every delivery).
-- Eyes track falling loot. Blinks. Judges you on veggie deliveries.
+- Sits beside the bowl. Eats each delivery with a nom animation.
+- **Lifetime weight in pounds**, starting at 5.0 lb, +0.4 lb per calorie, persistent across levels (localStorage). Veggies never slim the cat. Milestone popups at 10/15/20/25/30 lb.
+- **Procedural multi-part body** — not one scaling oval. Each part grows at its own rate with weight: belly apron sags and spreads, jowls bloom beside the muzzle, haunches emerge, paws chunk up and splay (pink toe beans past ~30% chonk), tail thickens, the neck vanishes into the loaf. The head barely grows, like a real cat; the ears stay fixed and look adorably small.
+- **Three-spring wobble:** belly (slow, heavy), cheeks (quick), tail (sway) — impulses on every delivery, nom, frenzy, and weight milestone, plus idle breathing.
 
 ### 4.6 Combos & special moments
 - Consecutive bowl deliveries with no misses build a calorie multiplier (×2, ×3…). A miss or a veggie resets it.

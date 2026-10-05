@@ -1,5 +1,6 @@
 'use strict';
-/* Shooter cat + main cat, drawn in code. No assets, no mercy — now with fur. */
+/* Shooter cat + main cat, drawn in code. No assets, no mercy — now with fur,
+   and a main cat whose every part grows at its own rate with lifetime weight. */
 
 function drawYarn(ctx, x, y, r) {
   const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.2, x, y, r);
@@ -55,7 +56,6 @@ function tabby(ctx, cx, cy, rx, ry, stripe) {
 
 function eyesMain(ctx, hx, hy, ex, face, time) {
   // green iris, slit pupil, specular dot; lids for happy/disgust
-  const open = face !== 'happy' && face !== 'bliss' && face !== 'disgust';
   for (const s of [-1, 1]) {
     const exx = hx + s * ex;
     if (face === 'disgust') {
@@ -91,7 +91,6 @@ function eyesMain(ctx, hx, hy, ex, face, time) {
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.beginPath(); ctx.arc(exx - 2, hy - 8, 1.6, 0, 7); ctx.fill();
   }
-  void open;
 }
 
 // -----------------------------------------------------------------------------
@@ -175,59 +174,108 @@ const Cats = {
     ctx.restore();
   },
 
-  // Main cat beside the bowl. rx = eased body half-width, jiggle = spring wobble.
-  // face: normal|happy|bliss|disgust|sad
-  drawMain(ctx, x, y, rx, nomT, face, time, jiggle) {
-    const ry = 58;
-    const j = jiggle || 0;
+  // Main cat beside the bowl.
+  // cat = { t: chonk factor 0..1 from lifetime weight, wob: {belly,cheek,tail} springs,
+  //         nomT, face, time }
+  // Every part grows at its own rate: belly sags, jowls bloom, haunches emerge,
+  // paws chunk and splay, tail thickens — the head barely grows, like a real cat.
+  drawMain(ctx, x, y, cat) {
+    const t = Math.max(0, Math.min(1, cat.t || 0));
+    const wob = cat.wob || { belly: { x: 0 }, cheek: { x: 0 }, tail: { x: 0 } };
+    const nomT = cat.nomT || 0, face = cat.face || 'normal', time = cat.time || 0;
+    const jB = wob.belly.x || 0, jC = wob.cheek.x || 0, jT = wob.tail.x || 0;
+    const breathe = 1 + 0.018 * Math.sin(time * 2.4);
+
+    const rx = 62 + t * 88;
+    const ry = 58 + t * 14;
+    const FUR = '#f2a24b', FUR_D = '#d98a35', CREAM = '#f6b25c';
+
     ctx.save();
     ctx.translate(x, y);
     const bob = nomT > 0 ? Math.abs(Math.sin(nomT * 28)) * 5 : 0;
 
-    // Ground shadow
+    // Ground shadow (spreads with mass)
     ctx.fillStyle = 'rgba(60,35,10,0.18)';
-    ctx.beginPath(); ctx.ellipse(0, ry + 14, rx * 1.05, 12, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, ry + 16 + t * 6, rx * (1.02 + t * 0.06), 12 + t * 4, 0, 0, 7); ctx.fill();
 
-    // Tail (swish, striped tip)
-    const swish = Math.sin(time * 2.2) * 8;
-    ctx.strokeStyle = '#f2a24b'; ctx.lineWidth = 13; ctx.lineCap = 'round';
+    // Tail: thickens with chonk, wobble feeds the swish
+    const swish = Math.sin(time * 2.2) * 8 + jT * 26;
+    const tailW = 13 + t * 9;
+    ctx.strokeStyle = FUR; ctx.lineWidth = tailW; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(rx - 8, 12);
     ctx.quadraticCurveTo(rx + 46, 8, rx + 40, -44 + swish);
     ctx.stroke();
-    ctx.strokeStyle = '#d98a35'; ctx.lineWidth = 13;
+    ctx.strokeStyle = FUR_D; ctx.lineWidth = tailW;
     ctx.beginPath(); ctx.moveTo(rx + 40, -44 + swish); ctx.lineTo(rx + 40, -30 + swish); ctx.stroke();
 
-    // Body: gradient loaf, squash-stretch on jiggle
-    const bg = ctx.createRadialGradient(-rx * 0.25, -ry * 0.35, rx * 0.2, 0, 0, rx * 1.15);
-    bg.addColorStop(0, '#fbc783'); bg.addColorStop(0.6, '#f2a24b'); bg.addColorStop(1, '#dd8f3a');
-    ctx.fillStyle = bg;
-    ctx.beginPath(); ctx.ellipse(0, 0, rx, ry * (1 + j * 0.10), 0, 0, 7); ctx.fill();
-    furEdge(ctx, 0, 0, rx, ry * (1 + j * 0.10), 'rgba(217,138,53,0.75)', Math.min(34, 14 + rx / 6));
-    tabby(ctx, 0, 0, rx, ry * (1 + j * 0.10), 'rgba(200,120,40,0.75)');
-
-    // Belly with jiggle sag
-    const bellyRy = ry * 0.52 * (1 + j * 0.16);
-    const bg2 = ctx.createRadialGradient(0, 26, 4, 0, 22, rx * 0.7);
-    bg2.addColorStop(0, '#fbe6c4'); bg2.addColorStop(1, '#f3cf9a');
-    ctx.fillStyle = bg2;
-    ctx.beginPath(); ctx.ellipse(0, 20 + j * 26, rx * 0.62, bellyRy, 0, 0, 7); ctx.fill();
-
-    // Front paws in front of the loaf
-    ctx.fillStyle = '#f6b25c';
-    for (const s of [-1, 1]) {
-      ctx.beginPath(); ctx.ellipse(s * rx * 0.32, ry * 0.78, 13, 9, 0, 0, 7); ctx.fill();
-      ctx.strokeStyle = 'rgba(200,120,40,0.6)'; ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.moveTo(s * rx * 0.32 - 5, ry * 0.78 + 5); ctx.lineTo(s * rx * 0.32 - 5, ry * 0.78 + 8);
-      ctx.moveTo(s * rx * 0.32, ry * 0.78 + 6); ctx.lineTo(s * rx * 0.32, ry * 0.78 + 9);
-      ctx.stroke();
+    // Haunch (thigh): emerges once there's real chonk, rear side
+    const haunchT = Math.max(0, Math.min(1, (t - 0.15) / 0.35));
+    if (haunchT > 0.01) {
+      const hr = (10 + t * 26) * haunchT;
+      const hg2 = ctx.createRadialGradient(rx * 0.5 - hr * 0.3, ry * 0.4 - hr * 0.3, hr * 0.2, rx * 0.5, ry * 0.4, hr);
+      hg2.addColorStop(0, '#fbc783'); hg2.addColorStop(1, '#e8963f');
+      ctx.fillStyle = hg2;
+      ctx.beginPath(); ctx.arc(rx * 0.52, ry * 0.42, hr, 0, 7); ctx.fill();
+      furEdge(ctx, rx * 0.52, ry * 0.42, hr, hr, 'rgba(217,138,53,0.75)', 12);
+      tabby(ctx, rx * 0.52, ry * 0.42, hr, hr, 'rgba(200,120,40,0.6)');
     }
 
-    // Head (left, toward the bowl)
-    const hx = -rx - 12, hy = -54 + bob;
-    // ears behind head, with fluff
+    // Torso
+    const torsoRy = ry * (1 + jB * 0.05) * breathe;
+    const bg = ctx.createRadialGradient(-rx * 0.25, -torsoRy * 0.35, rx * 0.2, 0, 0, rx * 1.15);
+    bg.addColorStop(0, '#fbc783'); bg.addColorStop(0.6, '#f2a24b'); bg.addColorStop(1, '#dd8f3a');
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.ellipse(0, 0, rx, torsoRy, 0, 0, 7); ctx.fill();
+    furEdge(ctx, 0, 0, rx, torsoRy, 'rgba(217,138,53,0.75)', Math.min(34, 14 + rx / 6));
+    tabby(ctx, 0, 0, rx, torsoRy, 'rgba(200,120,40,0.75)');
+
+    // Belly apron — the chonk showcase: droops lower and rounder with t
+    const bellyCy = 18 + t * 22 + jB * 24;
+    const bellyRx = rx * (0.60 + t * 0.10);
+    const bellyRy = ry * (0.50 + t * 0.22) * (1 + jB * 0.12) * breathe;
+    const bg2 = ctx.createRadialGradient(0, bellyCy - bellyRy * 0.4, 4, 0, bellyCy, bellyRx);
+    bg2.addColorStop(0, '#fbe6c4'); bg2.addColorStop(1, '#f3cf9a');
+    ctx.fillStyle = bg2;
+    ctx.beginPath(); ctx.ellipse(0, bellyCy, bellyRx, bellyRy, 0, 0, 7); ctx.fill();
+
+    // Chest ruff: fluffy cream bib
+    const ruffRx = rx * 0.30, ruffRy = ry * (0.34 + t * 0.10);
+    ctx.fillStyle = '#fbe6c4';
+    ctx.beginPath(); ctx.ellipse(-rx * 0.52, ry * 0.22, ruffRx, ruffRy, 0.25, 0, 7); ctx.fill();
+    furEdge(ctx, -rx * 0.52, ry * 0.22, ruffRx, ruffRy, 'rgba(243,207,154,0.9)', 10);
+
+    // Front paws: chunk up and splay with t; pink toe beans on chonky paws
     for (const s of [-1, 1]) {
-      ctx.fillStyle = '#f6b25c';
+      const px = s * (rx * 0.32 + t * 12), py = ry * 0.78 + t * 6;
+      const prx = 13 + t * 7, pry = 9 + t * 5;
+      const pg = ctx.createRadialGradient(px - 3, py - 3, 2, px, py, prx);
+      pg.addColorStop(0, '#fbc783'); pg.addColorStop(1, '#ef9f45');
+      ctx.fillStyle = pg;
+      ctx.beginPath(); ctx.ellipse(px, py, prx, pry, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(200,120,40,0.6)'; ctx.lineWidth = 1.4;
+      for (const to of [-5, 0, 5]) {
+        ctx.beginPath(); ctx.moveTo(px + to, py + pry - 4); ctx.lineTo(px + to, py + pry - 1); ctx.stroke();
+      }
+      if (t > 0.3) {
+        ctx.fillStyle = '#e88ca0';
+        ctx.beginPath(); ctx.ellipse(px, py + 2, 4.5, 3.5, 0, 0, 7); ctx.fill();
+        for (const to of [-6, 0, 6]) {
+          ctx.beginPath(); ctx.arc(px + to * 0.9, py - 4, 2, 0, 7); ctx.fill();
+        }
+      }
+    }
+
+    // Head: barely grows (like a real cat), sinks toward the loaf as the neck vanishes
+    const hx = -rx - 12 + t * 16, hy = -54 + bob + t * 10;
+    if (t < 0.35) {
+      // visible neck while slim
+      ctx.fillStyle = CREAM;
+      const nw = 20 * (1 - t / 0.35) + 6;
+      ctx.beginPath(); ctx.ellipse(hx + 30, hy + 26, nw, 22, 0.5, 0, 7); ctx.fill();
+    }
+    // Ears: fixed absolute size — adorably small on a chonky head
+    for (const s of [-1, 1]) {
+      ctx.fillStyle = CREAM;
       ctx.beginPath();
       ctx.moveTo(hx + s * 15, hy - 28); ctx.lineTo(hx + s * 30, hy - 56); ctx.lineTo(hx + s * 4, hy - 40);
       ctx.closePath(); ctx.fill();
@@ -235,14 +283,37 @@ const Cats = {
       ctx.beginPath();
       ctx.moveTo(hx + s * 17, hy - 32); ctx.lineTo(hx + s * 25, hy - 47); ctx.lineTo(hx + s * 10, hy - 38);
       ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,235,205,0.8)'; ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(hx + s * 12, hy - 30); ctx.quadraticCurveTo(hx + s * 16, hy - 36, hx + s * 14, hy - 41);
+      ctx.stroke();
     }
     const hg = ctx.createRadialGradient(hx - 10, hy - 12, 6, hx, hy, 42);
     hg.addColorStop(0, '#fbc783'); hg.addColorStop(1, '#ef9f45');
     ctx.fillStyle = hg;
     ctx.beginPath(); ctx.arc(hx, hy, 38, 0, 7); ctx.fill();
     furEdge(ctx, hx, hy, 38, 38, 'rgba(217,138,53,0.7)', 22);
-    // head stripes
-    ctx.strokeStyle = '#d98a35'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+
+    // JOWLS: cheek pouches blooming beside the muzzle — the chonk signature
+    const jowlR = t * 15 + Math.max(0, jC) * 5;
+    if (jowlR > 0.5) {
+      ctx.fillStyle = CREAM;
+      for (const s of [-1, 1]) {
+        ctx.beginPath(); ctx.arc(hx + s * 24, hy + 8, jowlR, 0, 7); ctx.fill();
+      }
+      // cheek tufts
+      ctx.strokeStyle = 'rgba(246,178,92,0.95)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      for (const s of [-1, 1]) for (let k = 0; k < 3; k++) {
+        const yy = hy + 2 + k * 7;
+        ctx.beginPath();
+        ctx.moveTo(hx + s * (24 + jowlR * 0.7), yy);
+        ctx.lineTo(hx + s * (24 + jowlR * 0.7 + 5 + t * 7), yy + 3);
+        ctx.stroke();
+      }
+    }
+
+    // Head stripes
+    ctx.strokeStyle = FUR_D; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
     for (const sx of [-12, -4, 4, 12]) {
       ctx.beginPath();
       ctx.moveTo(hx + sx, hy - 36);
@@ -258,6 +329,12 @@ const Cats = {
     ctx.beginPath();
     ctx.moveTo(hx - 4, hy + 8); ctx.lineTo(hx + 4, hy + 8); ctx.lineTo(hx, hy + 13);
     ctx.closePath(); ctx.fill();
+    // nose wrinkle when disgusted
+    if (face === 'disgust') {
+      ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(hx - 8, hy + 4); ctx.lineTo(hx - 4, hy + 8); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(hx + 8, hy + 4); ctx.lineTo(hx + 4, hy + 8); ctx.stroke();
+    }
 
     // Cheek bulges when nomming
     if (nomT > 0) {
@@ -291,13 +368,13 @@ const Cats = {
       ctx.stroke();
     }
 
-    // Whiskers (curved)
+    // Whiskers (curved, drooping slightly with chonk)
     ctx.strokeStyle = 'rgba(58,42,26,0.55)'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
     for (const s of [-1, 1]) {
       for (const wy of [-2, 6, 14]) {
         ctx.beginPath();
         ctx.moveTo(hx + s * 30, hy + wy);
-        ctx.quadraticCurveTo(hx + s * 45, hy + wy - 6, hx + s * 60, hy + wy - 3);
+        ctx.quadraticCurveTo(hx + s * 45, hy + wy - 6 + t * 4, hx + s * 60, hy + wy - 3 + t * 6);
         ctx.stroke();
       }
     }

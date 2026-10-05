@@ -137,8 +137,8 @@ deliver({ cal: 1 }); // clean stage-up → FEAST FRENZY
 T('frenzy: clean stage-up triggers FEAST FRENZY (+2 yarn, 0.35× time)',
   game.frenzy === 6 && game.balls === ballsBefore + 2 && game.timeScale === 0.35);
 step(60);
-T('chonk-stages: body width eases toward target (not instant)',
-  game.displayRx > stageRx(0) && game.displayRx < stageRx(game.stage));
+T('chonk-stages: body width eases toward weight-based target (not instant)',
+  game.displayRx > catRx(0) && game.displayRx < catRx(chonkT(game.weightLb)));
 T('saves: best stars persisted to localStorage', lsStore.has('chonk-em:best'));
 loadLevel(0);
 fireShot(150, 400);
@@ -150,8 +150,8 @@ AudioSys.toggle();
 T('audio: mute toggle flips state', AudioSys.muted === true);
 AudioSys.toggle();
 
-// 9. level pack (levels 2-6, drafted by qwen-fast, validated here)
-T('levels: 6 levels ship', LEVELS.length === 6);
+// 9. level pack (levels 2-12; 2-6 drafted by qwen-fast, 7-12 by stunkus, validated here)
+T('levels: 12 levels ship', LEVELS.length === 12);
 T('levels: bounds + 56px spacing respected in every layout', LEVELS.every(L => {
   for (let a = 0; a < L.barrels.length; a++) {
     const ba = L.barrels[a];
@@ -162,15 +162,38 @@ T('levels: bounds + 56px spacing respected in every layout', LEVELS.every(L => {
   }
   return true;
 }));
-T('levels: calorie budget winnable (snack cal ≥ 1.5× goal)', LEVELS.every(L =>
-  L.barrels.filter(b => b.kind === 'snack').reduce((s, b) => s + CONTENT[b.content].cal, 0) >= L.goal * 1.5));
-T('levels: goals scale 8→28', LEVELS.map(L => L.goal).join() === '8,12,16,20,24,28');
+T('levels: calorie budget winnable (combo-aware effective cal >= 1.5x goal)', LEVELS.every(L => {
+  // model real play: clean deliveries ramp the combo multiplier 1,1,1,2,2,2,3,3,3,4...
+  const cals = L.barrels.filter(b => b.kind === 'snack').map(b => CONTENT[b.content].cal).sort((a, b) => a - b);
+  let eff = 0;
+  cals.forEach((c, i) => { eff += c * Math.min(4, 1 + Math.floor(i / 3)); });
+  return eff >= L.goal * 1.5;
+}));
+T('levels: goals scale 8→52', LEVELS.map(L => L.goal).join() === '8,12,16,20,24,28,30,34,38,30,32,52');
 
 // 10. win path
 game.calories = game.level.goal; // ensure threshold
 game.over = null;
 deliver({ cal: 1 });
 T('win: reaching goal ends level with win', game.over === 'win');
+
+// 11. weight system + wobble v2 (stunkus full-chonk pass)
+loadLevel(0);
+const w0 = game.weightLb;
+deliver({ cal: 5 });
+T('weight: snack deliveries add pounds to lifetime weight', game.weightLb === w0 + 5 * LB_PER_CAL);
+T('weight: weight persists to localStorage', lsStore.get('chonk-em:weight') === String(game.weightLb));
+const w1 = game.weightLb;
+deliver({ cal: -2 });
+T('weight: veggies never slim the cat', game.weightLb === w1);
+T('wobble: delivery kicks cheek and tail springs too', game.wob.cheek.v > 0 && game.wob.tail.v > 0);
+loadLevel(0);
+wobbleImpulse('belly', 4);
+step(1);
+const kicked = Math.abs(game.wob.belly.x) > 0;
+step(600);
+T('wobble: belly spring oscillates then settles near rest',
+  kicked && Math.abs(game.wob.belly.x) < 0.05 && Math.abs(game.wob.belly.v) < 0.05);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
