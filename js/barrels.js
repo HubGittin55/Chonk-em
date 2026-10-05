@@ -1,12 +1,17 @@
 'use strict';
-/* Barrel contents + barrel rendering. */
+/* Barrel contents + barrel rendering.
+   grav: item gravity multiplier · drift: horizontal wobble accel · power: power-up key. */
 
 const CONTENT = {
-  kibble:   { cal:  1, icon: '🍪', name: 'Kibble'   },
-  salmon:   { cal:  3, icon: '🍣', name: 'Salmon'   },
-  tuna:     { cal:  5, icon: '🥫', name: 'Tuna'     },
-  broccoli: { cal: -2, icon: '🥦', name: 'Broccoli' },
-  celery:   { cal: -1, icon: '🥬', name: 'Celery'   },
+  kibble:   { cal:  1, icon: '🍪', name: 'Kibble',   grav: 1.00, drift:  0  },
+  salmon:   { cal:  3, icon: '🍣', name: 'Salmon',   grav: 0.70, drift: 85  },
+  tuna:     { cal:  5, icon: '🥫', name: 'Tuna',     grav: 1.50, drift:  0  },
+  broccoli: { cal: -2, icon: '🥦', name: 'Broccoli', grav: 1.05, drift:  0  },
+  celery:   { cal: -1, icon: '🥬', name: 'Celery',   grav: 1.00, drift:  0  },
+  multi:    { cal:  0, icon: '⭐', name: 'Multi-Yarn',  grav: 0.80, drift: 30, power: 'multi'  },
+  wide:     { cal:  0, icon: '⭐', name: 'Wide Funnel', grav: 0.80, drift: 30, power: 'wide'   },
+  slow:     { cal:  0, icon: '⭐', name: 'Slow-Mo',     grav: 0.80, drift: 30, power: 'slow'   },
+  magnet:   { cal:  0, icon: '⭐', name: 'Magnet',      grav: 0.80, drift: 30, power: 'magnet' },
 };
 
 function drawBarrels(ctx, barrels, time) {
@@ -34,7 +39,7 @@ function drawBarrels(ctx, barrels, time) {
     // Contents badge — labeled, not a slot machine
     ctx.fillStyle = '#fff8ec';
     ctx.beginPath(); ctx.arc(b.x, b.y, 13, 0, 7); ctx.fill();
-    ctx.strokeStyle = b.kind === 'veggie' ? '#c62828' : '#2e7d32';
+    ctx.strokeStyle = b.kind === 'veggie' ? '#c62828' : b.kind === 'power' ? '#ef6c00' : '#2e7d32';
     ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.arc(b.x, b.y, 13, 0, 7); ctx.stroke();
     ctx.font = '15px serif';

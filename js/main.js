@@ -45,7 +45,8 @@ const STAGES = [
 
 const game = {
   levelIndex: 0, level: null,
-  balls: 0, ball: null, items: [], barrels: [],
+  balls: 0, shots: [], items: [], barrels: [],
+  multiShots: 0, slowT: 0, magnetT: 0,
   calories: 0, stage: 0, combo: 0,
   time: 0, over: null, popups: [],
   nomT: 0, face: 'normal', faceT: 0,
@@ -63,7 +64,8 @@ function loadLevel(i) {
   game.levelIndex = i;
   game.level = L;
   game.balls = L.balls;
-  game.ball = null;
+  game.shots = [];
+  game.multiShots = 0; game.slowT = 0; game.magnetT = 0;
   game.items = [];
   game.popups = [];
   game.barrels = L.barrels.map(b => ({ x: b.x, y: b.y, r: 22, kind: b.kind, content: b.content, cleared: false }));
@@ -90,30 +92,50 @@ function aimAngleFor(px, py) {
 }
 
 function fireShot(px, py) {
-  if (game.over || game.ball || game.balls <= 0) return;
+  if (game.over || game.shots.length || game.balls <= 0) return;
   const ang = aimAngleFor(px, py);
   if (ang == null) return;
-  game.ball = {
-    x: SHOOT.x, y: SHOOT.y + 26,
-    vx: Math.cos(ang) * BALL_SPEED, vy: Math.sin(ang) * BALL_SPEED,
-    r: BALL_R, life: 0, slowT: 0, bounces: 0,
-  };
-  game.balls--;
+  let angs = [ang];
+  if (game.multiShots > 0) { game.multiShots--; angs = [ang - 0.13, ang, ang + 0.13]; }
+  for (const a of angs) {
+    if (game.balls <= 0) break;
+    game.shots.push({
+      x: SHOOT.x, y: SHOOT.y + 26,
+      vx: Math.cos(a) * BALL_SPEED, vy: Math.sin(a) * BALL_SPEED,
+      r: BALL_R, life: 0, slowT: 0, bounces: 0,
+    });
+    game.balls--;
+  }
   AudioSys.pop();
 }
 
 function onBarrelBurst(barrel) {
   const c = CONTENT[barrel.content];
-  addPopup(barrel.x, barrel.y - 28, (c.cal > 0 ? '+' : '') + c.cal, c.cal > 0 ? '#2e7d32' : '#c62828');
+  const label = c.power ? '★' : (c.cal > 0 ? '+' + c.cal : '' + c.cal);
+  addPopup(barrel.x, barrel.y - 28, label, c.power ? '#ef6c00' : c.cal > 0 ? '#2e7d32' : '#c62828');
   AudioSys.burst();
+  const pop = 1 - 0.35 * (c.grav - 1); // heavy loot pops weaker
   game.items.push({
     x: barrel.x, y: barrel.y,
-    vx: (Math.random() - 0.5) * 150, vy: -60 - Math.random() * 90,
-    r: 9, state: 'fall', cal: c.cal, icon: c.icon, t: 0, gone: false,
+    vx: (Math.random() - 0.5) * 150, vy: (-60 - Math.random() * 90) * pop,
+    r: 9, state: 'fall', cal: c.cal, icon: c.icon, name: c.name,
+    grav: c.grav, drift: c.drift, power: c.power || null,
+    t: 0, gone: false,
   });
 }
 
 function deliver(item) {
+  if (item.power) {
+    game.combo++;
+    game.nomT = 0.6;
+    game.face = 'happy'; game.faceT = 1.2;
+    AudioSys.jingle();
+    if (item.power === 'multi')  { game.multiShots = 1;    addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ MULTI-YARN!', '#ef6c00'); }
+    if (item.power === 'wide')   { Funnel.wideT = 15;      addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ WIDE FUNNEL!', '#ef6c00'); }
+    if (item.power === 'slow')   { game.slowT = 5;         addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ SLOW-MO!', '#ef6c00'); }
+    if (item.power === 'magnet') { game.magnetT = 15;      addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ MAGNET!', '#ef6c00'); }
+    return;
+  }
   const before = game.stage;
   game.calories = Math.max(0, game.calories + item.cal);
   game.stage = stageFor(game.calories);
@@ -170,15 +192,18 @@ function tick(dt) {
   if (game.nomT > 0) game.nomT -= dt;
   if (game.faceT > 0) { game.faceT -= dt; if (game.faceT <= 0) game.face = 'normal'; }
 
-  if (game.ball) {
-    const dead = Physics.stepBall(game.ball, dt, game.barrels, onBarrelBurst);
-    if (dead) game.ball = null;
+  if (game.magnetT > 0) game.magnetT -= dt;
+
+  for (let i = game.shots.length - 1; i >= 0; i--) {
+    if (Physics.stepBall(game.shots[i], dt, game.barrels, onBarrelBurst)) game.shots.splice(i, 1);
   }
 
   for (const it of game.items) {
     it.t += dt;
     if (it.state === 'fall') {
-      it.vy += ITEM_GRAV * dt;
+      it.vy += ITEM_GRAV * (it.grav || 1) * dt;
+      if (it.drift) it.vx += Math.sin(it.t * 7) * it.drift * dt;
+      if (game.magnetT > 0) it.vx += Math.sign(Funnel.x - it.x) * 300 * dt;
       it.x += it.vx * dt;
       it.y += it.vy * dt;
       Funnel.tryCatch(it);
@@ -196,7 +221,7 @@ function tick(dt) {
   }
   game.items = game.items.filter(i => !i.gone);
 
-  if (!game.over && game.balls <= 0 && !game.ball && game.items.length === 0) endGame(false);
+  if (!game.over && game.balls <= 0 && !game.shots.length && game.items.length === 0) endGame(false);
 }
 
 /* ---------------- rendering ---------------- */
@@ -242,7 +267,7 @@ function drawHUD() {
 }
 
 function drawPreview() {
-  if (!game.aim || game.ball || game.over || game.balls <= 0) return;
+  if (!game.aim || game.shots.length || game.over || game.balls <= 0) return;
   const ang = aimAngleFor(game.aim.x, game.aim.y);
   if (ang == null) return;
   game.aimAng = ang;
@@ -263,6 +288,10 @@ function drawItems() {
   ctx.font = '22px serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const it of game.items) {
+    if (it.power) { // golden glow for power-ups
+      ctx.fillStyle = 'rgba(255,193,7,0.35)';
+      ctx.beginPath(); ctx.arc(it.x, it.y, 15, 0, 7); ctx.fill();
+    }
     // tiny shadow
     ctx.fillStyle = 'rgba(0,0,0,0.10)';
     ctx.beginPath(); ctx.ellipse(it.x, it.y + 10, 8, 3, 0, 0, 7); ctx.fill();
@@ -272,9 +301,7 @@ function drawItems() {
 }
 
 function drawBall() {
-  if (!game.ball) return;
-  const b = game.ball;
-  drawYarn(ctx, b.x, b.y, b.r + 3);
+  for (const b of game.shots) drawYarn(ctx, b.x, b.y, b.r + 3);
 }
 
 function drawPopups() {
@@ -293,8 +320,21 @@ function drawPopups() {
   ctx.globalAlpha = 1;
 }
 
+function drawPowerHUD() {
+  const bits = [];
+  if (game.multiShots > 0) bits.push('🧶×3 NEXT');
+  if (Funnel.wideT > 0)     bits.push('⭐ WIDE ' + Math.ceil(Funnel.wideT));
+  if (game.slowT > 0)       bits.push('⭐ SLOW ' + Math.ceil(game.slowT));
+  if (game.magnetT > 0)     bits.push('⭐ MAGNET ' + Math.ceil(game.magnetT));
+  if (!bits.length) return;
+  ctx.font = '600 14px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ef6c00';
+  ctx.fillText(bits.join('   ·   '), W / 2, 68);
+}
+
 function drawHint() {
-  if (game.over || game.ball || game.aim || game.balls <= 0) return;
+  if (game.over || game.shots.length || game.aim || game.balls <= 0) return;
   const pulse = 0.55 + 0.25 * Math.sin(game.time * 3);
   ctx.globalAlpha = pulse;
   ctx.fillStyle = '#5b3a1e';
@@ -312,9 +352,10 @@ function render() {
   drawItems();
   drawPreview();
   drawBall();
-  Cats.drawShooter(ctx, SHOOT.x, SHOOT.y, game.aimAng, !game.ball && game.balls > 0 && !game.over);
+  Cats.drawShooter(ctx, SHOOT.x, SHOOT.y, game.aimAng, !game.shots.length && game.balls > 0 && !game.over);
   Cats.drawMain(ctx, 360, 806, game.stage, game.nomT, game.face, game.time);
   drawHUD();
+  drawPowerHUD();
   drawPopups();
   drawHint();
 }
@@ -322,7 +363,7 @@ function render() {
 /* ---------------- boot ---------------- */
 
 Input.init({
-  canAim: () => !game.over && !game.ball && game.balls > 0,
+  canAim: () => !game.over && !game.shots.length && game.balls > 0,
   onAimStart: (p) => { game.aim = p; game.aimAng = aimAngleFor(p.x, p.y); },
   onAimMove: (p) => { if (game.aim) { game.aim = p; game.aimAng = aimAngleFor(p.x, p.y); } },
   onAimEnd: (p) => {
@@ -343,8 +384,10 @@ function frame(now) {
   let dt = (now - last) / 1000;
   last = now;
   dt = Math.min(dt, 0.1);
+  if (game.slowT > 0) game.slowT -= dt; // slow-mo timer runs in real time
+  const scale = game.slowT > 0 ? 0.45 : 1;
   acc += dt;
-  while (acc >= STEP) { tick(STEP); acc -= STEP; }
+  while (acc >= STEP) { tick(STEP * scale); acc -= STEP; }
   render();
   requestAnimationFrame(frame);
 }

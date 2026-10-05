@@ -3,16 +3,19 @@
 
 const Funnel = {
   x: 300, y: 636, half: 48,
-  cx: 300, range: 120, speed: 0.9, t: 0,
+  cx: 300, range: 120, speed: 0.9, t: 0, wideT: 0,
 
   reset(cfg) {
     this.cx = cfg.cx; this.range = cfg.range;
     this.speed = cfg.speed; this.half = cfg.half;
-    this.y = cfg.y; this.t = 0; this.x = cfg.cx;
+    this.y = cfg.y; this.t = 0; this.x = cfg.cx; this.wideT = 0;
   },
+
+  effHalf() { return this.half * (this.wideT > 0 ? 2 : 1); },
 
   update(dt) {
     this.t += dt;
+    if (this.wideT > 0) this.wideT -= dt;
     this.x = this.cx + Math.sin(this.t * this.speed * 2) * this.range;
   },
 
@@ -20,7 +23,7 @@ const Funnel = {
   tryCatch(item) {
     if (item.state !== 'fall' || item.vy <= 0) return false;
     if (item.y > this.y - 8 && item.y < this.y + 34 &&
-        Math.abs(item.x - this.x) < this.half) {
+        Math.abs(item.x - this.x) < this.effHalf()) {
       item.state = 'chute';
       item.vy = 0;
       item.x = this.x + (item.x - this.x) * 0.4;
@@ -31,7 +34,7 @@ const Funnel = {
   },
 
   draw(ctx) {
-    const fx = this.x, fy = this.y, hw = this.half;
+    const fx = this.x, fy = this.y, hw = this.effHalf();
     // Throat shadow
     ctx.fillStyle = 'rgba(0,0,0,0.12)';
     ctx.beginPath();

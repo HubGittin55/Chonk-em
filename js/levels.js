@@ -1,5 +1,5 @@
 'use strict';
-/* Level data. kind: 'snack' | 'veggie'. content keys must exist in CONTENT (barrels.js). */
+/* Level data. kind: 'snack' | 'veggie' | 'power'. content keys must exist in CONTENT (barrels.js). */
 
 const LEVELS = [
   {
@@ -16,6 +16,8 @@ const LEVELS = [
       { x: 365, y: 335, kind: 'snack',  content: 'salmon'   },
       { x: 495, y: 330, kind: 'veggie', content: 'celery'   },
       { x: 180, y: 445, kind: 'snack',  content: 'salmon'   },
+      { x: 62,  y: 445, kind: 'power',  content: 'wide'     },
+      { x: 538, y: 445, kind: 'power',  content: 'multi'    },
       { x: 300, y: 460, kind: 'snack',  content: 'kibble'   },
       { x: 420, y: 445, kind: 'veggie', content: 'broccoli' },
       { x: 300, y: 550, kind: 'snack',  content: 'tuna'     },
