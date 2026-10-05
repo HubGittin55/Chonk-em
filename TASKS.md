@@ -37,7 +37,8 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 - [x] `wobble-v2` — three-spring wobble (belly/cheek/tail, distinct frequencies), impulses on delivery/nom/frenzy/milestones, breathing idle — **DONE (stunkus)**
 - [x] `levels-7-12` (part 2) — Twin Peaks, The Gauntlet, Honeycomb, Veggie Minefield, Power Tower, The Grand Feast; 16–22 barrels each, validated headless — **DONE (stunkus)**. Review note: Veggie Minefield runs 38% veggies (above the 30% guideline) — accepted as intentional theme, goal lowered to 30 to compensate.
 
-## v0.3 — Portable
+## v0.3 — Portable & Assets
 
+- [ ] `asset-pipeline` — generated sprite assets (owner is standing up a GPU1 image-gen MCP server with alpha-channel output). Plan: generate PNGs (cat parts, barrel skins, loot icons, background layers) → `assets/` → swap `drawImage` into cats.js/barrels.js/main.js behind the existing draw calls, keeping vector rendering as fallback if an asset 404s. DESIGN.md "drawn in code" rule needs an amendment once the pipeline proves out — propose via branch.
 - [ ] `pwa` — manifest, service worker, icons, offline
 - [ ] `mobile-polish` — touch tuning, safe areas, DPR scaling, narrow-screen layout
