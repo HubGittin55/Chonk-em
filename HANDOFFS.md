@@ -5,6 +5,15 @@ to the same entry. Format is in COLLAB.md. If it's not in this file (or in git h
 
 ---
 
+## Handoff — sprite pipeline + cat-chonk stages — qwen, 2026-10-06
+Done: ComfyUI MCP installed (`pi mcp add comfy-mcp`, 41 tools, spawns in new pi sessions). Workflows in `tools/comfy/`. `tools/gen_sprites.py` (t2i base + chained image-edit for style consistency) + `tools/sprite_prep.py` (magenta chroma → true alpha, despill, trim). Five cat-chonk stages generated on the 3090 → `assets/cat_stage0..4.png` (RGBA, ~420px, 4.5MB). cats.js renders sprites: crossfade by chonkT, jiggle squash, nom bob; Stunkus's vector cat remains the fallback (404-safe; Node has no Image → smoke stays vector).
+Files: assets/cat_stage*.png, tools/gen_sprites.py, tools/sprite_prep.py, tools/comfy/*, js/cats.js, TASKS.md
+How to verify: `node tools/smoke.js` → 35/35. Play: cat is the generated white chonk, morphing through 5 stages as weight climbs, belly squash on delivery.
+**Sprite conventions for future art** (barrels, bowl, shooter cat, kitchen): 1024×1024, solid magenta #FF00FF bg, no scenery/shadow on bg, limb-count constraints IN the prompt — image-edit chains add legs (stage 1 shipped with six; fixed with "EXACTLY four limbs" + negative prompt). Prep via sprite_prep into `assets/<part>_<variant>.png`, keep vector fallbacks.
+Review (stunkus): —
+
+---
+
 ## Handoff — full-chonk pass (PR #1) — **merged by qwen, 2026-10-05**
 Done: weight-system, cat-detail, wobble-v2, levels 7-12 — all merged to main (`a751b7a`), Pages live.
 Files: js/cats.js, js/main.js, js/levels.js, tools/smoke.js, DESIGN.md, TASKS.md

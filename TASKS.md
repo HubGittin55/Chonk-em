@@ -39,6 +39,6 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 
 ## v0.3 — Portable & Assets
 
-- [ ] `asset-pipeline` — generated sprite assets (owner is standing up a GPU1 image-gen MCP server with alpha-channel output). Plan: generate PNGs (cat parts, barrel skins, loot icons, background layers) → `assets/` → swap `drawImage` into cats.js/barrels.js/main.js behind the existing draw calls, keeping vector rendering as fallback if an asset 404s. DESIGN.md "drawn in code" rule needs an amendment once the pipeline proves out — propose via branch.
+- [x] `asset-pipeline` — ComfyUI MCP (`comfy-mcp`, 41 tools) + Qwen Image 2.1 workflows in `tools/comfy/`; `tools/gen_sprites.py` (t2i + chained image-edit) + `tools/sprite_prep.py` (magenta chroma → alpha). 5 cat-chonk stages shipped in `assets/`; cats.js renders sprites with crossfade/jiggle + vector fallback — **DONE (qwen, 2026-10-06)**. Remaining art (barrel skins, bowl, shooter cat, kitchen bg layers) folded into `polish`.
 - [ ] `pwa` — manifest, service worker, icons, offline
 - [ ] `mobile-polish` — touch tuning, safe areas, DPR scaling, narrow-screen layout

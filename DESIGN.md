@@ -98,7 +98,7 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 
 ## 7. Art direction
 
-- Cute-flat vector style, drawn in code (no asset pipeline for v1). Warm kitchen/pastel backgrounds per level.
+- Cute-flat vector style. v1 was drawn in code; **v0.3+ adds generated sprite assets** (ComfyUI Qwen Image 2.1 pipeline, `tools/gen_sprites.py` + `tools/sprite_prep.py`, magenta-chroma → alpha PNGs in `assets/`) rendered with vector fallback when an asset 404s. Sprites must match the cute-flat look: clean outlines, soft gradients, solid magenta background at generation time. Warm kitchen/pastel backgrounds per level.
 - **Shooter cat:** aiming pose, ears perk on release, yarn ball loaded in paws.
 - **Barrels:** wooden staves with icon badges (fish / broccoli / star / ???).
 - **Main cat:** layered ellipses, width = f(chonk stage), tail swish, disgust face for veggies, bliss face for tuna.
