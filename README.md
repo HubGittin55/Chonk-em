@@ -1,5 +1,7 @@
 # CHONK 'EM
 
+**▶ Play live: https://hubgittin55.github.io/Chonk-em/** (auto-deploys from `main`)
+
 A Peggle-style pachinko feeder: launch snacks, bounce them off cat toys, and feed a scrawny cat into a glorious chonk. Web-first — one codebase runs on mobile and desktop browsers.
 
 - **Design:** [DESIGN.md](DESIGN.md) (source of truth)
