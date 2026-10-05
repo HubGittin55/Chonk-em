@@ -8,7 +8,7 @@
 
 ## 1. High concept
 
-A barrel-bursting feeder. A **shooter cat** perched at the top lobs **yarn balls** into a field of sealed **barrels**. Each barrel bursts open on impact, spilling its contents: tasty **snacks** (various calorie values), nasty **veggies** (negative calories), or the occasional **power-up**. The loot tumbles down into a swaying **funnel**, rides a **conveyor belt** off to the left, and drops into the **main cat's bowl**. The main cat eats everything and visibly widens from scrawny street goblin to glorious loaf.
+A barrel-bursting feeder. A **shooter cat** perched at the top lobs **yarn balls** into a field of sealed **barrels**. Each barrel bursts open on impact, spilling its contents: tasty **snacks** (various calorie values), nasty **veggies** (negative calories), or the occasional **power-up**. The loot tumbles onto a conveyor belt spanning the playfield bottom, rides off to the left, and drops into the **main cat's bowl**. The main cat eats everything and visibly widens from scrawny street goblin to glorious loaf.
 
 Working title: **CHONK 'EM**. Tagline: *"No scrawny cats on my watch."*
 
@@ -17,7 +17,7 @@ Working title: **CHONK 'EM**. Tagline: *"No scrawny cats on my watch."*
 1. **Bursting feels physical.** Cracking a barrel open is the whole fantasy — wood particles, loot spill, the works.
 2. **Chonk is the reward.** The main cat's body is the progress bar. No abstract XP; you *see* the width.
 3. **One-thumb portable.** Fully playable one-handed on a phone, equally good with a mouse. No porting, no separate builds.
-4. **Aim with consequences.** Every barrel you crack is a decision — veggies exist, and the funnel doesn't catch everything.
+4. **Aim with consequences.** Every barrel you crack is a decision — veggies exist, and the belt gap doesn't catch everything.
 
 ## 3. Core loop
 
@@ -52,7 +52,7 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 |---|---|---|
 | Kibble | +1 | Standard fall |
 | Salmon chunk | +3 | Light, drifts a little |
-| Tuna steak | +5 | Heavy — falls fast, funnel timing matters |
+| Tuna steak | +5 | Heavy — falls fast, lands where you aim |
 | Broccoli | −2 | The betrayal |
 | Celery | −1 | Minor betrayal |
 | ★ Multi-yarn | power-up | Next shot fires 3 yarn balls |
@@ -78,7 +78,7 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 
 ### 4.7 Hazards (later levels)
 - **Vacuum cleaner:** patrols beneath the conveyor, eats loot off the belt. Time your shots.
-- **Cucumber:** if a yarn ball hits it, the funnel jumps to a new position (shooter cat got spooked).
+- **Cucumber:** if a yarn ball hits it, the shooter cat gets spooked and loot scatters extra hard (spec TBD — `hazards`).
 
 ## 5. Level structure
 
@@ -101,11 +101,11 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 - **Shooter cat:** aiming pose, ears perk on release, yarn ball loaded in paws.
 - **Barrels:** wooden staves with icon badges (fish / broccoli / star / ???).
 - **Main cat:** layered ellipses, width = f(chonk stage), tail swish, disgust face for veggies, bliss face for tuna.
-- Juice: wood-chip particles on burst, squash-and-stretch on funnel catch, belt animation, tiny screen shake on armored-barrel hits.
+- Juice: wood-chip particles on burst, squash-and-stretch on belt landing, belly jiggle spring, belt animation, tiny screen shake on armored-barrel hits.
 
 ## 8. Audio
 
-- WebAudio, all synthesized (no audio files for v1): barrel burst (wooden knock + pop), funnel *clink*, conveyor hum, nom (filtered noise chomp), veggie disgust mewl, jingle for power-ups, sad meow for lost loot.
+- WebAudio, all synthesized (no audio files for v1): barrel burst (wooden knock + pop), belt clatter, conveyor hum, nom (filtered noise chomp), veggie disgust mewl, jingle for power-ups, sad meow for lost loot.
 - Mute toggle, persisted. Respect `prefers-reduced-motion` for shake/particles.
 
 ## 9. Tech architecture (v1)

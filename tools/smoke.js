@@ -29,7 +29,7 @@ global.localStorage = {
 
 // ---------- boot the game ----------
 const root = path.join(__dirname, '..');
-const files = ['audio', 'physics', 'levels', 'barrels', 'funnel', 'conveyor', 'cats', 'input', 'main'];
+const files = ['audio', 'physics', 'levels', 'barrels', 'conveyor', 'cats', 'input', 'main'];
 const src = files.map(f => fs.readFileSync(path.join(root, 'js', f + '.js'), 'utf8')).join('\n');
 vm.runInThisContext(src, { filename: 'chonk.bundle.js' });
 
@@ -84,7 +84,7 @@ T('fall: tuna falls faster than salmon', tuna.vy > salmon.vy * 1.5);
 T('fall: salmon drifts horizontally, tuna does not', Math.abs(salmon.x - 400) > 1 && Math.abs(tuna.x - 200) < 0.5);
 game.items = [];
 
-// 6. magnet pulls loot toward funnel
+// 6. magnet pulls loot toward the bowl
 game.magnetT = 15;
 game.items = [{ x: 480, y: 400, vx: 0, vy: 100, r: 9, state: 'fall', cal: 1, grav: 1, drift: 0, t: 0, gone: false }];
 step(60);
@@ -150,7 +150,23 @@ AudioSys.toggle();
 T('audio: mute toggle flips state', AudioSys.muted === true);
 AudioSys.toggle();
 
-// 9. win path
+// 9. level pack (levels 2-6, drafted by qwen-fast, validated here)
+T('levels: 6 levels ship', LEVELS.length === 6);
+T('levels: bounds + 56px spacing respected in every layout', LEVELS.every(L => {
+  for (let a = 0; a < L.barrels.length; a++) {
+    const ba = L.barrels[a];
+    if (ba.x < 62 || ba.x > 538 || ba.y < 180 || ba.y > 620) return false;
+    for (let b = a + 1; b < L.barrels.length; b++) {
+      if (Math.hypot(ba.x - L.barrels[b].x, ba.y - L.barrels[b].y) < 56) return false;
+    }
+  }
+  return true;
+}));
+T('levels: calorie budget winnable (snack cal ≥ 1.5× goal)', LEVELS.every(L =>
+  L.barrels.filter(b => b.kind === 'snack').reduce((s, b) => s + CONTENT[b.content].cal, 0) >= L.goal * 1.5));
+T('levels: goals scale 8→28', LEVELS.map(L => L.goal).join() === '8,12,16,20,24,28');
+
+// 10. win path
 game.calories = game.level.goal; // ensure threshold
 game.over = null;
 deliver({ cal: 1 });
