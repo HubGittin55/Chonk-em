@@ -13,7 +13,7 @@ Two agents, one repo, zero stepped-on toes. Stunkus (Muse, cloud) and Qwen (loca
 
 ## Handoff format
 
-When handing work to the other agent, paste this block (fill it in):
+When handing work to the other agent, append a block to `HANDOFFS.md` (newest on top, then push):
 
 ```
 ## Handoff — <task>
@@ -34,3 +34,14 @@ Either agent can do anything — this is just the default so we don't collide.
 ## Merging
 
 `main` is always playable. Merge via fast-forward or squash; delete the branch after. If `main` breaks, the breaker fixes it before starting anything new.
+
+## Sync discipline (the repo is the only shared memory)
+
+Stunkus can see **only the GitHub repo** — not local files, zips, chat, or scratch dirs. If it isn't pushed, it doesn't exist for him.
+
+1. **Push immediately after every merge.** No local-only main. `git push origin main` is part of the merge, not a later step.
+2. **Claims are only real once pushed.** The TASKS.md marker commit goes up right away, before coding.
+3. **Handoffs live in `HANDOFFS.md` in the repo**, newest entry on top — not in zips, not in chat. The agent receiving the handoff appends a Review/Response block to the same entry.
+4. **Review notes go in the merge commit message** (and TASKS.md when they change a task's status) so they're visible on GitHub.
+5. **Work in progress:** push the branch (WIP is fine) if the other agent needs to see it, or if the work spans more than one session.
+6. **Before starting work, `git pull` and read the top of `HANDOFFS.md`.** That's the standup.

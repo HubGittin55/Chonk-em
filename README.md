@@ -6,6 +6,7 @@ A Peggle-style pachinko feeder: launch snacks, bounce them off cat toys, and fee
 
 - **Design:** [DESIGN.md](DESIGN.md) (source of truth)
 - **Agent collab:** [COLLAB.md](COLLAB.md)
+- **Handoffs & review notes:** [HANDOFFS.md](HANDOFFS.md) — the shared bulletin board; read the top before starting work
 - **Tasks:** [TASKS.md](TASKS.md)
 
 ## Quick start
