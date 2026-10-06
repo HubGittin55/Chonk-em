@@ -44,12 +44,12 @@ const step = (n) => { for (let i = 0; i < n; i++) tick(1 / 120); };
 console.log('CHONK-EM smoke test (v0.2 contents-full)');
 
 // 1. boot
-T('boot: level 1 loads with 45 tight barrels (r=11)', game.barrels.length === 45 && game.balls === 31 && game.barrels.every(b => b.r === 11));
+T('boot: level 1 loads with 61 barrels (r=10)', game.barrels.length === 61 && game.balls === 37 && game.barrels.every(b => b.r === 10));
 T('boot: split power barrel present (guaranteed)', game.barrels.some(b => b.kind === 'power' && b.content === 'split'));
 
 // 2. single shot
 fireShot(300, 500);
-T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 30);
+T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 36);
 step(1200); // 10s: ball bursts the center column, then falls out
 T('fire: ball dies out cleanly', game.shots.length === 0);
 
@@ -57,7 +57,7 @@ T('fire: ball dies out cleanly', game.shots.length === 0);
 loadLevel(0);
 game.multiShots = 1;
 fireShot(300, 500);
-T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 28);
+T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 34);
 T('multi: consumed after firing', game.multiShots === 0);
 game.shots = [];
 
@@ -154,27 +154,27 @@ AudioSys.toggle();
 
 // 9. level pack (levels 2-12; 2-6 drafted by qwen-fast, 7-12 by stunkus, validated here)
 T('levels: 12 levels ship', LEVELS.length === 12);
-T('mega levels: L1-5 have 40-55 barrels, L6+ have 60-85', LEVELS.every((L, i) =>
-  i < 5 ? (L.barrels.length >= 40 && L.barrels.length <= 55)
-        : (L.barrels.length >= 60 && L.barrels.length <= 85)));
-T('mega levels: tight hex spacing respected (min dist >= 26px, in bounds)', LEVELS.every(L => {
+T('v0.4 levels: 60-125 barrels, growing by tier', LEVELS.every((L, i) =>
+  L.barrels.length >= 60 && L.barrels.length <= 125 &&
+  (i < 4 ? L.barrels.length <= 84 : L.barrels.length >= 84)));
+T('v0.4 levels: tight hex spacing respected (min dist >= 25px, in bounds)', LEVELS.every(L => {
   for (let a = 0; a < L.barrels.length; a++) {
     const ba = L.barrels[a];
     if (ba.x < 40 || ba.x > 560 || ba.y < 130 || ba.y > 680) return false;
     for (let b = a + 1; b < L.barrels.length; b++) {
-      if (Math.hypot(ba.x - L.barrels[b].x, ba.y - L.barrels[b].y) < 26) return false;
+      if (Math.hypot(ba.x - L.barrels[b].x, ba.y - L.barrels[b].y) < 25) return false;
     }
   }
   return true;
 }));
-T('mega levels: small barrels (r=11 L1-5, r=10 L6+)', LEVELS.every((L, i) => L.r === (i < 5 ? 11 : 10)));
-T('mega levels: layout symmetric about x=300', LEVELS.every(L =>
+T('v0.4 levels: barrels are r=10', LEVELS.every(L => L.r === 10));
+T('v0.4 levels: layout symmetric about x=300', LEVELS.every(L =>
   L.barrels.every(ba => L.barrels.some(bb => Math.abs(bb.x - (600 - ba.x)) < 2 && Math.abs(bb.y - ba.y) < 2))));
-T('mega levels: goal <= 65% of RAW snack calories (winnable with zero combo)', LEVELS.every(L => {
+T('v0.4 levels: goal <= 65% of RAW snack calories (winnable with zero combo)', LEVELS.every(L => {
   const raw = L.barrels.reduce((t, b) => t + (b.kind === 'snack' ? CONTENT[b.content].cal : 0), 0);
   return L.goal <= raw * 0.65;
 }));
-T('mega levels: balls scale with barrels (>= 60% of barrel count)', LEVELS.every(L => L.balls >= L.barrels.length * 0.6));
+T('v0.4 levels: balls = 60% of barrel count', LEVELS.every(L => L.balls === Math.round(L.barrels.length * 0.6)));
 T('levels: calorie budget winnable (combo-aware effective cal >= 1.5x goal)', LEVELS.every(L => {
   // model real play: clean deliveries ramp the combo multiplier 1,1,1,2,2,2,3,3,3,4...
   const cals = L.barrels.filter(b => b.kind === 'snack').map(b => CONTENT[b.content].cal).sort((a, b) => a - b);
@@ -182,7 +182,7 @@ T('levels: calorie budget winnable (combo-aware effective cal >= 1.5x goal)', LE
   cals.forEach((c, i) => { eff += c * Math.min(4, 1 + Math.floor(i / 3)); });
   return eff >= L.goal * 1.5;
 }));
-T('mega levels: goals are the 60%-of-raw set', LEVELS.map(L => L.goal).join() === '58,58,82,76,70,130,92,95,118,59,110,148');
+T('v0.4 levels: goals are the 60%-of-raw set', LEVELS.map(L => L.goal).join() === '37,52,61,43,67,57,62,61,79,87,98,103');
 
 // 10. win path
 game.calories = game.level.goal; // ensure threshold
@@ -195,7 +195,13 @@ T('saves: best stars persisted to localStorage', lsStore.has('chonk-em:best'));
 loadLevel(0);
 const w0 = game.weightLb;
 deliver({ cal: 5 });
-T('weight: snack deliveries add pounds (per-level growth)', game.weightLb === w0 + 5 * game.lbPerCal);
+T('weight: snack deliveries add pounds from RAW cal (per-level growth)', game.weightLb === w0 + 5 * game.lbPerCal);
+T('weight: cap is 100lb with per-level reserve tiers', MAX_LB === 100 && LEVEL_MAX_LB.join() === '50,55,60,65,70,75,80,85,90,95,100,100');
+T('weight: per-level cap binds (L1 cannot exceed 50)', (() => {
+  loadLevel(0); game.weightLb = 49;
+  deliver({ cal: 5 });
+  return game.weightLb <= 50;
+})());
 T('weight: weight persists to localStorage', lsStore.get('chonk-em:weight') === String(game.weightLb));
 const w1 = game.weightLb;
 deliver({ cal: -2 });
@@ -288,6 +294,41 @@ T('armor: first hit cracks, does not burst', didCrack && !didBurst && arm.cracke
 probe.x = 300; probe.y = 290; probe.vx = 0; probe.vy = 300;
 Physics.stepBall(probe, 1/60, [arm], () => { didBurst = true; }, () => { didCrack = true; });
 T('armor: second hit bursts', didBurst && arm.cleared);
+
+// 18. v0.4 features
+T('v0.4: menu API exists and boots open', typeof showMenu === 'function' && typeof hideMenu === 'function' && game.menuOpen === true);
+T('v0.4: 50% of barrels are empty (hollow, no loot flood)', LEVELS.every(L => {
+  const e = L.barrels.filter(b => b.kind === 'empty').length;
+  return Math.abs(e - L.barrels.length / 2) <= 2;
+}));
+T('v0.4: empty barrel burst spawns no item', (() => {
+  loadLevel(0);
+  const before = game.items.length;
+  const eb = game.barrels.find(b => b.kind === 'empty');
+  onBarrelBurst(eb, null);
+  return game.items.length === before;
+})());
+T('v0.4: difficulty setting scales balls and goal', (() => {
+  store.set('difficulty', 'hard'); loadLevel(0);
+  const ok = game.goalNow === Math.round(LEVELS[0].goal * 1.2) && game.balls === Math.round(LEVELS[0].balls * 0.8);
+  store.set('difficulty', 'normal'); loadLevel(0);
+  return ok;
+})());
+T('v0.4: vacuum drawn after the main cat (never hidden)', (() => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'js', 'main.js'), 'utf8');
+  return src.indexOf('Vacuum.draw(ctx, game.vacuum); // after the cat') > src.indexOf('Cats.drawMain(ctx, 252, 806');
+})());
+T('v0.4: vacuum cannot steal from the bowl chute', (() => {
+  const v = Vacuum.create(1);
+  const it = { x: 100, y: 720, vx: 0, vy: 0, r: 9, state: 'belt', cal: 3, gone: false };
+  v.x = 100;
+  Vacuum.tick(v, 1 / 60, [it], () => {});
+  return !it.gone && !it.sucked;
+})());
+T('v0.4: conveyor slats run left with the food', (() => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'js', 'conveyor.js'), 'utf8');
+  return src.includes('40 - (this.t * this.SPEED) % 40');
+})());
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

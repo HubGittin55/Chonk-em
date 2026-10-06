@@ -54,8 +54,14 @@ const STAGES = [
 // (body half-width is now weight-driven: catRx(chonkT(weightLb)))
 
 // ---- Lifetime weight system: the cat keeps its chonk between levels ----
-const LB_PER_CAL = 0.4, START_LB = 5.0, MAX_VIS_LB = 80, MAX_LB = 90;
-const LB_MILESTONES = [10, 20, 30, 40, 50, 60, 70, 80];
+const LB_PER_CAL = 0.4, START_LB = 5.0, MAX_VIS_LB = 80, MAX_LB = 100;
+const LEVEL_MAX_LB = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 100]; // 80+ lb reserved for the late game
+const DIFFS = {
+  easy:   { balls: 1.3, goal: 0.8,  vacuum: 0.8,  label: '😌 Easy' },
+  normal: { balls: 1.0, goal: 1.0,  vacuum: 1.0,  label: '😼 Normal' },
+  hard:   { balls: 0.8, goal: 1.2,  vacuum: 1.25, label: '🙀 Hard' },
+};
+const LB_MILESTONES = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 const chonkT = (lb) => Math.max(0, Math.min(1, (lb - 10) / (MAX_VIS_LB - 10)));
 const catRx = (t) => 62 + t * 88; // body half-width from chonk factor
 
@@ -99,14 +105,19 @@ function loadLevel(i) {
   game.catVar = Math.floor(Math.random() * 4); // which cat shows up at the bowl this level
   game.particles = [];
   nextBtn.classList.add('hidden');
-  game.balls = L.balls;
+  game.diffKey = store.get('difficulty', 'normal');
+  const D = DIFFS[game.diffKey] || DIFFS.normal;
+  game.balls = Math.round(L.balls * D.balls);
+  game.par = Math.round(L.par * D.balls);
+  game.goalNow = Math.round(L.goal * D.goal);
   game.shots = [];
   game.multiShots = 0; game.splitNext = false; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0; game.shotsFired = 0;
-  game.weightLb = START_LB; // size resets every level (owner) — growth spans the quota
-  game.lbPerCal = 75 / Math.max(1, L.goal);
+  game.weightLb = START_LB; // size resets every level (owner)
+  game.levelMaxLb = LEVEL_MAX_LB[i] || MAX_LB;
+  game.lbPerCal = (game.levelMaxLb - START_LB) / Math.max(1, L.goal); // growth arc spans the quota
   game.items = [];
   game.popups = [];
-  game.vacuum = L.vacuum ? Vacuum.create() : null;
+  game.vacuum = L.vacuum ? Vacuum.create((DIFFS[game.diffKey] || DIFFS.normal).vacuum) : null;
   if (game.vacuum) addPopup(W / 2, 330, '⚠ VACUUM PATROL ⚠', '#c62828');
   game.barrels = L.barrels.map(b => ({ x: b.x, y: b.y, r: L.r || 15, kind: b.kind, content: b.content, armor: !!b.armor, cracked: false, cleared: false }));
   game.calories = 0;
@@ -247,6 +258,7 @@ function onBarrelBurst(barrel, ball) {
     AudioSys.pop();
   }
   spawnChips(barrel.x, barrel.y);
+  if (barrel.kind === 'empty') { AudioSys.burst(); return; } // hollow barrel: no loot inside
   const c = CONTENT[barrel.content];
   const label = c.power ? '★' : (c.cal > 0 ? '+' + c.cal : '' + c.cal);
   addPopup(barrel.x, barrel.y - 28, label, c.power ? '#ef6c00' : c.cal > 0 ? '#2e7d32' : '#c62828');
@@ -285,10 +297,11 @@ function deliver(item) {
   game.stage = stageFor(game.calories);
   game.nomT = 0.6;
 
-  // Lifetime weight: only real food adds pounds. Veggies never slim the cat.
-  if (gained > 0) {
+  // Weight from RAW calories only (no combo inflation — no more 20-lb single deliveries).
+  // Veggies never slim the cat. Per-level cap reserves 80+ lb for the late game.
+  if (item.cal > 0) {
     const beforeLb = game.weightLb;
-    game.weightLb = Math.min(MAX_LB, game.weightLb + gained * (game.lbPerCal || LB_PER_CAL));
+    game.weightLb = Math.min(game.levelMaxLb || MAX_LB, MAX_LB, game.weightLb + item.cal * (game.lbPerCal || LB_PER_CAL));
     store.set('weight', game.weightLb);
     checkLbMilestones(beforeLb, game.weightLb);
   }
@@ -323,7 +336,7 @@ function deliver(item) {
     if (cleanStage) triggerFrenzy();
   }
 
-  if (game.calories >= game.level.goal) endGame(true);
+  if (game.calories >= game.goalNow) endGame(true);
 }
 
 function triggerFrenzy() {
@@ -363,7 +376,7 @@ function endGame(win) {
   overlayTitle.textContent = win ? 'CHONK ACHIEVED!' : 'Still scrawny…';
   overlaySub.textContent = win
     ? `${stars}   ${game.calories} calories — the cat is ${STAGES[game.stage].name}, now ${game.weightLb.toFixed(1)} lb!`
-    : `${game.calories}/${game.level.goal} calories. The cat demands another try.`;
+    : `${game.calories}/${game.goalNow} calories. The cat demands another try.`;
   if (win && game.levelIndex + 1 < LEVELS.length) {
     nextBtn.textContent = 'Next: ' + LEVELS[game.levelIndex + 1].name + ' →';
     nextBtn.classList.remove('hidden');
@@ -552,30 +565,31 @@ function drawBackground() {
   ctx.fillRect(0, 0, W, H);
 }
 
-function drawHUD() {
+// High-contrast canvas text: dark outline under bright fill, readable over the kitchen bg.
+function hudText(txt, x, y, size, color, align) {
+  ctx.font = 'bold ' + size + 'px system-ui, sans-serif';
+  ctx.textAlign = align || 'left'; ctx.textBaseline = 'top';
+  ctx.lineWidth = Math.max(2, Math.round(size / 5));
+  ctx.strokeStyle = 'rgba(18,9,4,0.92)';
+  ctx.strokeText(txt, x, y);
+  ctx.fillStyle = color; ctx.fillText(txt, x, y);
   ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = '#5b3a1e';
-  ctx.font = 'bold 22px system-ui, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText('🧶 × ' + game.balls, 24, 36);
-  // Lifetime weight under the yarn count
-  ctx.font = 'bold 19px system-ui, sans-serif';
-  ctx.fillText('⚖ ' + game.weightLb.toFixed(1) + ' lb', 24, 62);
+}
+function drawHUD() {
+  hudText('🧶 × ' + game.balls, 24, 14, 22, '#ffd9a8');
+  hudText('⚖ ' + game.weightLb.toFixed(1) + ' lb', 24, 42, 19, '#ffd9a8');
 
   // Chonk meter
   const mw = 230, mx = W / 2 - mw / 2, my = 14;
   ctx.fillStyle = 'rgba(91,58,30,0.18)';
   ctx.beginPath(); ctx.roundRect(mx, my, mw, 20, 10); ctx.fill();
-  const frac = Math.max(0, Math.min(1, game.calories / game.level.goal));
+  const frac = Math.max(0, Math.min(1, game.calories / game.goalNow));
   if (frac > 0) {
     ctx.fillStyle = '#e8712b';
     ctx.beginPath(); ctx.roundRect(mx, my, mw * frac, 20, 10); ctx.fill();
   }
-  ctx.fillStyle = '#5b3a1e';
-  ctx.font = '600 14px system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(`${STAGES[game.stage].name} · ${game.calories}/${game.level.goal} cal` +
-    (game.mult > 1 ? ` · ×${game.mult}` : ''), W / 2, 50);
+  hudText(`${STAGES[game.stage].name} · ${game.calories}/${game.goalNow} cal` +
+    (game.mult > 1 ? ` · ×${game.mult}` : ''), W / 2, 40, 15, '#ffe9c9', 'center');
 }
 
 function drawPreview() {
@@ -629,8 +643,8 @@ function drawPopups() {
     ctx.globalAlpha = Math.max(0, a);
     ctx.font = 'bold 20px system-ui, sans-serif';
     ctx.fillStyle = p.color;
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(15,8,4,0.9)';
+    ctx.lineWidth = 5;
     const y = p.y - p.t * 46;
     ctx.strokeText(p.text, p.x, y);
     ctx.fillText(p.text, p.x, y);
@@ -684,7 +698,6 @@ function render() {
   drawBackground();
   drawBarrels(ctx, game.barrels, game.time);
   Conveyor.draw(ctx, game.bridgeT > 0);
-  if (game.vacuum) Vacuum.draw(ctx, game.vacuum);
   drawItems();
   drawPreview();
   drawBall();
@@ -694,6 +707,7 @@ function render() {
     t: chonkT(game.weightLb), lb: game.weightLb, wob: game.wob, var: game.catVar,
     nomT: game.nomT, face: game.face, time: game.time,
   });
+  if (game.vacuum) Vacuum.draw(ctx, game.vacuum); // after the cat: never hidden behind the chonk
   drawHUD();
   drawPowerHUD();
   drawFrenzy();
@@ -741,15 +755,26 @@ function showMenu() {
   game.aim = null; game.aimAng = null;
   hideOverlay();
   const b = getBest();
+  const dk = store.get('difficulty', 'normal');
+  const D = DIFFS[dk] || DIFFS.normal;
+  const diffRow = document.getElementById('diffRow');
+  diffRow.innerHTML = '<span>Difficulty:</span>';
+  Object.keys(DIFFS).forEach(k => {
+    const btn = document.createElement('button');
+    btn.textContent = DIFFS[k].label;
+    if (k === dk) btn.className = 'sel';
+    btn.addEventListener('click', (e) => { e.stopPropagation(); store.set('difficulty', k); showMenu(); });
+    diffRow.appendChild(btn);
+  });
   levelGrid.innerHTML = '';
   LEVELS.forEach((L, i) => {
     const btn = document.createElement('button');
     const rec = b[i] || { stars: 0 };
     btn.className = i === game.levelIndex ? 'cur' : '';
     btn.innerHTML = (i + 1) + '. ' + L.name +
-      '<small>goal ' + L.goal + ' cal</small>' +
+      '<small>goal ' + Math.round(L.goal * D.goal) + ' cal</small>' +
       '<span class="stars">' + ('★'.repeat(rec.stars) || '☆☆☆') + '</span>';
-    btn.addEventListener('click', () => { hideMenu(); loadLevel(i); });
+    btn.addEventListener('click', () => { hideMenu(); loadLevel(i); showSplash(i); });
     levelGrid.appendChild(btn);
   });
   menuOverlay.classList.remove('hidden');
@@ -766,6 +791,19 @@ document.getElementById('resetGame').addEventListener('click', (e) => {
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { game.menuOpen ? hideMenu() : showMenu(); }
 });
+
+// Level intro splash card
+function showSplash(i) {
+  const L = LEVELS[i];
+  const D = DIFFS[store.get('difficulty', 'normal')] || DIFFS.normal;
+  document.getElementById('splashTitle').textContent = (i + 1) + '. ' + L.name;
+  document.getElementById('splashSub').textContent =
+    'Goal ' + Math.round(L.goal * D.goal) + ' cal · ' + Math.round(L.balls * D.balls) + ' yarn · ' + D.label;
+  const sp = document.getElementById('levelSplash');
+  sp.classList.remove('hidden');
+  clearTimeout(showSplash._t);
+  showSplash._t = setTimeout(() => sp.classList.add('hidden'), 1800);
+}
 
 showMenu(); // boot into the level select
 
