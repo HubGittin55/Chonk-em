@@ -10,12 +10,12 @@
 
 A barrel-bursting feeder. A **shooter cat** perched at the top lobs **yarn balls** into a field of sealed **barrels**. Each barrel bursts open on impact, spilling its contents: tasty **snacks** (various calorie values), nasty **veggies** (negative calories), or the occasional **power-up**. The loot tumbles onto a conveyor belt spanning the playfield bottom, rides off to the left, and drops into the **main cat's bowl**. The main cat eats everything and visibly widens from scrawny street goblin to glorious loaf.
 
-Working title: **CHONK 'EM**. Tagline: *"No scrawny cats on my watch."*
+Working title: **CHONK 'EM**. Tagline: *"No smol cats on my watch."*
 
 ## 2. Design pillars
 
 1. **Bursting feels physical.** Cracking a barrel open is the whole fantasy — wood particles, loot spill, the works.
-2. **Chonk is the reward.** The main cat's body is the progress bar. No abstract XP; you *see* the width.
+2. **Chonk is the reward.** The main cat's body is the progress bar. There is a weight metric plus you *see* the width.
 3. **One-thumb portable.** Fully playable one-handed on a phone, equally good with a mouse. No porting, no separate builds.
 4. **Aim with consequences.** Every barrel you crack is a decision — veggies exist, and the belt gap doesn't catch everything.
 
@@ -32,7 +32,7 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 ## 4. Moment-to-moment mechanics
 
 ### 4.1 Shooter cat & yarn balls
-- Shooter cat sits top-center, rotates within a ~120° arc, determined little face.
+- Shooter cat sits top-center, rotates within a ~160° arc, determined little face.
 - **Touch:** drag anywhere to aim (slingshot-style), release to fire. **Mouse:** move to aim, click to fire. **Keyboard:** arrows nudge, space fires.
 - Limited yarn balls per level (e.g., 10). Running out = retry.
 - Trajectory preview: short dotted arc (first ~0.5s of flight), not full-path.
@@ -47,6 +47,7 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
   - **Veggie barrel** — spills a veggie. Sometimes guards a snack barrel behind it: crack it carefully and let the veggie fall into the belt gap, or leave it alone.
   - **Power-up barrel** — spills a power-up (see 4.3).
   - **Armored barrel** (later levels) — takes 2 hits, usually guarding the good stuff.
+  - **empty barrel** dozens of barrels are needed for suitably complex levels but we don’t want to flood the screen with food icons.
 
 ### 4.3 Contents: snacks, veggies, power-ups
 | Item | Calories | Behavior |
@@ -63,15 +64,14 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 | ★ Magnet barrel | power-up | Falling contents drift toward the bowl, 15 s |
 
 ### 4.4 Conveyor → bowl *(v0.2 revision — funnel cut, owner directive 2026-10-05)*
-- **Why the funnel got cut:** its sway made every catch a timing coin-flip — random chance, not strategy. Playtest verdict: too hard, not enough decision.
 - **Conveyor belt** spans the bottom of the playfield. Loot that lands on the belt rides left to the bowl. Where loot lands is determined by which barrel you burst and eject velocity — readable, learnable geometry.
-- **Static gap** on the right side of the belt: loot falling through it is lost — sad trombone meow. The gap is fixed per level: aim-with-consequences is preserved as *positioning* strategy, not sway timing.
+- **Static gaps** an empty space on the left and right side of the belt: loot falling through it is lost — sad trombone meow. The gap is fixed per level: aim-with-consequences is preserved as *positioning* strategy, not sway timing.
 - **Bowl** sits at the conveyor's left end, next to the main cat. Veggie in the bowl = negative calories, disgusted cat face, combo reset.
 
 ### 4.5 Main cat
 - Sits beside the bowl. Eats each delivery with a nom animation.
-- **Lifetime weight in pounds**, starting at 5.0 lb, +0.4 lb per calorie, persistent across levels (localStorage). Veggies never slim the cat. Milestone popups at 10/15/20/25/30 lb.
-- **Procedural multi-part body** — not one scaling oval. Each part grows at its own rate with weight: belly apron sags and spreads, jowls bloom beside the muzzle, haunches emerge, paws chunk up and splay (pink toe beans past ~30% chonk), tail thickens, the neck vanishes into the loaf. The head barely grows, like a real cat; the ears stay fixed and look adorably small.
+- **Lifetime weight in pounds**, starting at 5.0 lb, +0.4 lb per calorie, persistent across levels (localStorage). Veggies never slim the cat. Milestone popups at 10/20/30/40/50/60/70/80 lb.
+- **Procedural multi-part body** — not one scaling oval. Each part grows at its own rate with weight: belly apron sags and spreads, jowls bloom beside the muzzle, haunches emerge, paws chunk up, tail thickens, the neck vanishes into the loaf. The head doesn’t grow, like a real cat; the ears stay fixed and look adorably small.
 - **Three-spring wobble:** belly (slow, heavy), cheeks (quick), tail (sway) — impulses on every delivery, nom, frenzy, and weight milestone, plus idle breathing.
 
 ### 4.6 Combos & special moments
