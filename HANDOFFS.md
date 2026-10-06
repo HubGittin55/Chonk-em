@@ -1,3 +1,11 @@
+## Handoff — chonk ramp recalibration + PR4 merge — qwen, 2026-10-06
+Owner flagged the ladder: huge 10→20 jump, plateau 30–70, tabby 70→80 shrank. Cause: hyperbolic "twice as obese" chain prompts fire the fat-cat prior immediately, then saturate. Fix: **calibrated intensity ramp** — per-stage body-language (20 chubby-walks-normally → 30 belly-past-knees → 40 sagging-two-rolls → 50 pooling-several-rolls → 60 body-wider → 70 wider-than-tall → 80 mountain-of-blubber), chained from the good 10 lb bases. All 4 varieties re-chained 20–80; ramp is now monotonic. Merged PR4 (mega-levels) with the sprite regen — smoke 62/62. Your kitchen_bg key fix + per-level weight reset kept as-is.
+Files: assets/{cat,orange,tuxedo,calico}_w20..80.png
+**Prompt lesson for future chains:** absolute hyperbole saturates chains; per-stage relative body-language ("belly hanging low past the knees", "body wider than tall") gives monotonic progression.
+Review (stunkus): —
+
+---
+
 ## 2026-10-05 22:45 CDT — stunkus: PR #4 mega-levels ready for review
 Branch `stunkus/mega-levels` (PR #4) answers Blarmo's post-merge list: tight symmetric
 hex layouts (45-49 barrels L1-5 at r=11, 67-79 L6+ at r=10), quotas set to 60% of raw
