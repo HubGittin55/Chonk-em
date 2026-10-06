@@ -12,7 +12,27 @@ const CONTENT = {
   wide:     { cal:  0, icon: '⭐', name: 'Gap Bridge',  grav: 0.80, drift: 30, power: 'wide'   },
   slow:     { cal:  0, icon: '⭐', name: 'Slow-Mo',     grav: 0.80, drift: 30, power: 'slow'   },
   magnet:   { cal:  0, icon: '⭐', name: 'Magnet',      grav: 0.80, drift: 30, power: 'magnet' },
+  split:    { cal:  0, icon: '⭐', name: 'Split Yarn',  grav: 0.80, drift: 30, power: 'split'  },
 };
+
+// Armor band + cracks drawn over generated skins (vector path inlines its own)
+function drawArmor(ctx, b, r) {
+  if (b.armor) {
+    ctx.strokeStyle = '#3f434b'; ctx.lineWidth = Math.max(3, r * 0.32);
+    ctx.beginPath(); ctx.moveTo(b.x - r * 0.95, b.y); ctx.lineTo(b.x + r * 0.95, b.y); ctx.stroke();
+  }
+  if (b.cracked) {
+    ctx.strokeStyle = 'rgba(30,18,8,0.85)'; ctx.lineWidth = 1.8;
+    for (const [x1, y1, x2, y2, x3, y3] of
+         [[-0.5, -0.8, -0.1, -0.2, -0.4, 0.3], [0.4, -0.7, 0.15, -0.1, 0.5, 0.4]]) {
+      ctx.beginPath();
+      ctx.moveTo(b.x + x1 * r, b.y + y1 * r);
+      ctx.lineTo(b.x + x2 * r, b.y + y2 * r);
+      ctx.lineTo(b.x + x3 * r, b.y + y3 * r);
+      ctx.stroke();
+    }
+  }
+}
 
 function drawBarrels(ctx, barrels, time) {
   for (const b of barrels) {
@@ -26,13 +46,14 @@ function drawBarrels(ctx, barrels, time) {
       const s = r * 2.75;
       ctx.drawImage(im, b.x - s / 2, b.y - s / 2, s, s);
       if (b.kind === 'power') { // dashed gold ring
-        ctx.strokeStyle = b.kind === 'power' ? '#ef6c00' : '#2e7d32';
+        ctx.strokeStyle = '#ef6c00';
         ctx.lineWidth = 2.5;
         ctx.save();
         ctx.setLineDash([3, 3]);
-        ctx.beginPath(); ctx.arc(b.x, b.y, 16.5, time * 1.5, time * 1.5 + Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(b.x, b.y, r + 1.5, time * 1.5, time * 1.5 + Math.PI * 2); ctx.stroke();
         ctx.restore();
       }
+      drawArmor(ctx, b, r);
       continue;
     }
 
@@ -86,23 +107,45 @@ function drawBarrels(ctx, barrels, time) {
     ctx.fillStyle = 'rgba(255,240,210,0.22)';
     ctx.beginPath(); ctx.ellipse(b.x - r * 0.38, b.y - r * 0.42, r * 0.34, r * 0.2, -0.6, 0, 7); ctx.fill();
 
-    // Contents badge — labeled, not a slot machine
+    // Armor band under the badge: tough barrels need 2 hits
+    if (b.armor) {
+      ctx.strokeStyle = '#3f434b'; ctx.lineWidth = Math.max(3, r * 0.32);
+      ctx.beginPath(); ctx.moveTo(b.x - r * 0.95, b.y); ctx.lineTo(b.x + r * 0.95, b.y); ctx.stroke();
+      ctx.strokeStyle = 'rgba(220,225,235,0.6)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(b.x - r * 0.95, b.y - 2); ctx.lineTo(b.x + r * 0.95, b.y - 2); ctx.stroke();
+    }
+
+    // Contents badge — labeled, not a slot machine (scaled to barrel)
+    const br = r * 0.62;
     ctx.fillStyle = 'rgba(0,0,0,0.18)';
-    ctx.beginPath(); ctx.arc(b.x, b.y + 2, 13.5, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(b.x, b.y + 2, br + 0.5, 0, 7); ctx.fill();
     ctx.fillStyle = b.kind === 'power' ? '#ffe9b8' : '#fff8ec';
-    ctx.beginPath(); ctx.arc(b.x, b.y, 13, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(b.x, b.y, br, 0, 7); ctx.fill();
     ctx.strokeStyle = b.kind === 'veggie' ? '#c62828' : b.kind === 'power' ? '#ef6c00' : '#2e7d32';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(b.x, b.y, 13, 0, 7); ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(b.x, b.y, br, 0, 7); ctx.stroke();
     if (b.kind === 'power') { // dashed gold ring
       ctx.save();
       ctx.setLineDash([3, 3]);
-      ctx.beginPath(); ctx.arc(b.x, b.y, 16.5, time * 1.5, time * 1.5 + Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(b.x, b.y, r + 1.5, time * 1.5, time * 1.5 + Math.PI * 2); ctx.stroke();
       ctx.restore();
     }
-    ctx.font = '15px serif';
+    ctx.font = Math.max(9, Math.round(r * 0.72)) + 'px serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(c.icon, b.x, b.y + 1);
+
+    // Cracks after the first hit on armored barrels
+    if (b.cracked) {
+      ctx.strokeStyle = 'rgba(30,18,8,0.85)'; ctx.lineWidth = 1.8;
+      for (const [x1, y1, x2, y2, x3, y3] of
+           [[-0.5, -0.8, -0.1, -0.2, -0.4, 0.3], [0.4, -0.7, 0.15, -0.1, 0.5, 0.4], [-0.1, 0.9, 0.1, 0.4, -0.2, 0.1]]) {
+        ctx.beginPath();
+        ctx.moveTo(b.x + x1 * r, b.y + y1 * r);
+        ctx.lineTo(b.x + x2 * r, b.y + y2 * r);
+        ctx.lineTo(b.x + x3 * r, b.y + y3 * r);
+        ctx.stroke();
+      }
+    }
   }
   ctx.textBaseline = 'alphabetic';
 }

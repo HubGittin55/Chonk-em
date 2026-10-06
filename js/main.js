@@ -38,16 +38,18 @@ fitCanvas();
 const SHOOT = { x: 300, y: 86 };
 const BALL_SPEED = 640, BALL_R = 10;
 const ITEM_GRAV = 1150;
+// Exponential stage thresholds (~2.3x per stage): each size-up costs
+// dramatically more calories than the last (owner directive).
 const STAGES = [
-  { at: 0,   name: 'Scrawny' },
-  { at: 12,  name: 'Chonklet' },
-  { at: 38,  name: 'Chunky' },
-  { at: 63,  name: 'Chonky' },
-  { at: 88,  name: 'Big Chonk' },
-  { at: 113, name: 'Heavyweight' },
-  { at: 138, name: 'Massive' },
-  { at: 163, name: 'Colossal' },
-  { at: 188, name: 'ABSOLUTE UNIT' },
+  { at: 0,    name: 'Scrawny' },
+  { at: 25,   name: 'Chonklet' },
+  { at: 60,   name: 'Chunky' },
+  { at: 140,  name: 'Chonky' },
+  { at: 320,  name: 'Big Chonk' },
+  { at: 730,  name: 'Heavyweight' },
+  { at: 1650, name: 'Massive' },
+  { at: 3750, name: 'Colossal' },
+  { at: 8500, name: 'ABSOLUTE UNIT' },
 ];
 // (body half-width is now weight-driven: catRx(chonkT(weightLb)))
 
@@ -99,10 +101,12 @@ function loadLevel(i) {
   nextBtn.classList.add('hidden');
   game.balls = L.balls;
   game.shots = [];
-  game.multiShots = 0; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0; game.shotsFired = 0;
+  game.multiShots = 0; game.splitNext = false; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0; game.shotsFired = 0;
   game.items = [];
   game.popups = [];
-  game.barrels = L.barrels.map(b => ({ x: b.x, y: b.y, r: 22, kind: b.kind, content: b.content, cleared: false }));
+  game.vacuum = L.vacuum ? Vacuum.create() : null;
+  if (game.vacuum) addPopup(W / 2, 330, '⚠ VACUUM PATROL ⚠', '#c62828');
+  game.barrels = L.barrels.map(b => ({ x: b.x, y: b.y, r: 15, kind: b.kind, content: b.content, armor: !!b.armor, cracked: false, cleared: false }));
   game.calories = 0;
   game.stage = 0;
   game.combo = 0; game.mult = 1;
@@ -110,7 +114,7 @@ function loadLevel(i) {
   game.aim = null; game.aimAng = null;
   game.nomT = 0; game.face = 'normal'; game.faceT = 0;
   game.jiggle = 0; game.jiggleV = 0;
-  game.wob = { belly: { x: 0, v: 0 }, cheek: { x: 0, v: 0 }, tail: { x: 0, v: 0 } };
+  game.wob = { belly: { x: 0, v: 0 }, cheek: { x: 0, v: 0 }, tail: { x: 0, v: 0 }, sub: { x: 0, v: 0 } };
   game.displayRx = catRx(chonkT(game.weightLb));
   game.timeScale = 1; game.frenzy = 0;
   game.misses = 0; game.veggies = 0; game.stageMisses = 0; game.stageVeggies = 0;
@@ -125,7 +129,8 @@ function addPopup(x, y, text, color) {
 function wobbleImpulse(part, amt) {
   const w = game.wob[part];
   if (!w) return;
-  w.v += amt * (REDUCED ? 0.35 : 1);
+  const chonkScale = part === 'belly' ? 1 + chonkT(game.weightLb) * 1.5 : 1;
+  w.v += amt * chonkScale * (REDUCED ? 0.35 : 1);
   if (part === 'belly') { game.jiggle = w.x; game.jiggleV = w.v; } // legacy mirror
 }
 
@@ -157,11 +162,13 @@ function fireShot(px, py) {
   if (game.multiShots > 0) { game.multiShots--; angs = [ang - 0.13, ang, ang + 0.13]; }
   for (const a of angs) {
     if (game.balls <= 0) break;
-    game.shots.push({
+    const nb = {
       x: SHOOT.x, y: SHOOT.y + 26,
       vx: Math.cos(a) * BALL_SPEED, vy: Math.sin(a) * BALL_SPEED,
       r: BALL_R, life: 0, slowT: 0, bounces: 0,
-    });
+    };
+    if (game.splitNext && game.shots.length === 0) { nb.splitArmed = true; game.splitNext = false; }
+    game.shots.push(nb);
     game.balls--;
     game.shotsFired++;
   }
@@ -216,7 +223,27 @@ function drawParticles(ctx) {
   ctx.globalAlpha = 1;
 }
 
-function onBarrelBurst(barrel) {
+function onBarrelCrack(barrel) {
+  addPopup(barrel.x, barrel.y - 28, 'CRACKED!', '#78909c');
+  AudioSys.tink();
+}
+
+function onBarrelBurst(barrel, ball) {
+  // Split-yarn: the armed ball divides into three on its first burst
+  if (ball && ball.splitArmed && !ball.splitDone) {
+    ball.splitDone = true;
+    const sp = Math.hypot(ball.vx, ball.vy) || BALL_SPEED;
+    const base = Math.atan2(ball.vy, ball.vx);
+    for (const da of [-0.5, 0.5]) {
+      game.shots.push({
+        x: ball.x, y: ball.y,
+        vx: Math.cos(base + da) * sp * 0.92, vy: Math.sin(base + da) * sp * 0.92,
+        r: ball.r, life: 0, slowT: 0, bounces: 0,
+      });
+    }
+    addPopup(ball.x, ball.y - 24, 'SPLIT!', '#7b1fa2');
+    AudioSys.pop();
+  }
   spawnChips(barrel.x, barrel.y);
   const c = CONTENT[barrel.content];
   const label = c.power ? '★' : (c.cal > 0 ? '+' + c.cal : '' + c.cal);
@@ -243,6 +270,7 @@ function deliver(item) {
     if (item.power === 'wide')   { game.bridgeT = 15;      addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ BRIDGE!', '#ef6c00'); }
     if (item.power === 'slow')   { game.slowT = 5;         addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ SLOW-MO!', '#ef6c00'); }
     if (item.power === 'magnet') { game.magnetT = 15;      addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ MAGNET!', '#ef6c00'); }
+    if (item.power === 'split')  { game.splitNext = true;  addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ SPLIT YARN!', '#ef6c00'); }
     return;
   }
   const before = game.stage;
@@ -368,13 +396,17 @@ function tick(dt) {
 
   // Multi-spring wobble: belly (slow, heavy), cheek (quick), tail (sway).
   // game.jiggle mirrors the belly spring for smoke-test compatibility.
-  const WOBK = { belly: { k: 90, c: 7 }, cheek: { k: 170, c: 10 }, tail: { k: 130, c: 6.5 } };
+  const WOBK = { belly: { k: 26, c: 3.6 }, cheek: { k: 55, c: 5 }, tail: { k: 40, c: 3.4 } };
   for (const p of ['belly', 'cheek', 'tail']) {
     const w = game.wob[p], K = WOBK[p];
     w.v += (-K.k * w.x - K.c * w.v) * wdt;
     w.x += w.v * wdt;
   }
   game.jiggle = game.wob.belly.x; game.jiggleV = game.wob.belly.v;
+  // sub-belly: slow secondary wobble lagging the main belly spring
+  const sb = game.wob.sub, bw = game.wob.belly;
+  sb.v += (-14 * (sb.x - bw.x * 0.6) - 2.2 * sb.v) * wdt;
+  sb.x += sb.v * wdt;
   const targetRx = catRx(chonkT(game.weightLb));
   game.displayRx += (targetRx - game.displayRx) * Math.min(1, dt * 4);
 
@@ -382,7 +414,7 @@ function tick(dt) {
   if (game.bridgeT > 0) game.bridgeT -= dt;
 
   for (let i = game.shots.length - 1; i >= 0; i--) {
-    if (Physics.stepBall(game.shots[i], wdt, game.barrels, onBarrelBurst)) game.shots.splice(i, 1);
+    if (Physics.stepBall(game.shots[i], wdt, game.barrels, onBarrelBurst, onBarrelCrack)) game.shots.splice(i, 1);
   }
 
   for (const it of game.items) {
@@ -393,9 +425,28 @@ function tick(dt) {
       if (game.magnetT > 0) it.vx += Math.sign(Conveyor.BOWL_X - it.x) * 300 * wdt;
       it.x += it.vx * wdt;
       it.y += it.vy * wdt;
-      if (it.y >= Conveyor.BELT_Y && it.vy > 0 && Conveyor.onBelt(it.x, game.bridgeT > 0)) {
-        it.state = 'belt'; it.y = Conveyor.BELT_Y; it.vy = 0;
-        AudioSys.catch();
+      // Food bounces off barrels but NEVER breaks them (burst is yarn-only).
+      Physics.bounceItem(it, game.barrels);
+      // Side walls
+      if (it.x < 20) { it.x = 20; it.vx = Math.abs(it.vx) * 0.5; }
+      if (it.x > 580) { it.x = 580; it.vx = -Math.abs(it.vx) * 0.5; }
+      // Belt: bounce a couple of times, then settle and ride
+      if (it.y >= Conveyor.BELT_Y && it.vy > 0 && !it.sucked && Conveyor.onBelt(it.x, game.bridgeT > 0)) {
+        if (it.vy > 110) {
+          it.y = Conveyor.BELT_Y;
+          it.vy = -it.vy * 0.45;
+          it.vx *= 0.7;
+          it.bounces = (it.bounces || 0) + 1;
+        } else {
+          it.state = 'belt'; it.y = Conveyor.BELT_Y; it.vy = 0;
+          AudioSys.catch();
+        }
+      }
+      // Tile floor: missed food bounces, then it's lost
+      if (it.state === 'fall' && it.y >= 853 && it.vy > 0) {
+        it.bounces = (it.bounces || 0) + 1;
+        if (it.bounces >= 3 || it.vy < 90) { it.gone = true; loseItem(it); }
+        else { it.y = 853; it.vy = -it.vy * 0.35; it.vx *= 0.6; }
       }
       if (it.y > H + 40 && !it.gone) { it.gone = true; loseItem(it); }
     } else if (it.state === 'belt') {
@@ -407,6 +458,11 @@ function tick(dt) {
     }
   }
   game.items = game.items.filter(i => !i.gone);
+
+  if (game.vacuum) Vacuum.tick(game.vacuum, wdt, game.items, (x, y, it) => {
+    addPopup(x, y - 22, 'VACUUM\'D!', '#7b1fa2');
+    spawnCrumbs(x, y);
+  });
 
   if (!game.over && game.balls <= 0 && !game.shots.length && game.items.length === 0) endGame(false);
 }
@@ -620,13 +676,14 @@ function render() {
   drawBackground();
   drawBarrels(ctx, game.barrels, game.time);
   Conveyor.draw(ctx, game.bridgeT > 0);
+  if (game.vacuum) Vacuum.draw(ctx, game.vacuum);
   drawItems();
   drawPreview();
   drawBall();
   drawParticles(ctx);
   Cats.drawShooter(ctx, SHOOT.x, SHOOT.y, game.aimAng, !game.shots.length && game.balls > 0 && !game.over);
   Cats.drawMain(ctx, 252, 806, {
-    t: chonkT(game.weightLb), wob: game.wob, var: game.catVar,
+    t: chonkT(game.weightLb), lb: game.weightLb, wob: game.wob, var: game.catVar,
     nomT: game.nomT, face: game.face, time: game.time,
   });
   drawHUD();

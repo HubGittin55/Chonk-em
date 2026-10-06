@@ -121,7 +121,16 @@ function eyesMain(ctx, hx, hy, ex, face, time) {
 // 4 cat varieties × 8 chonk stages (10→80 lb). If any sprite is missing the
 // vector renderer takes over (asset 404 safe).
 const CAT_VARS = ['cat', 'orange', 'tuxedo', 'calico'];
-const STAGE_LBS = [10, 20, 30, 40, 50, 60, 70, 80];
+const STAGE_LBS = [10, 20, 30, 40, 50, 60, 70, 80]; // sprite files on disk
+// Exponential weight thresholds selecting each sprite: every size-up costs
+// ~1.35x the pounds of the last — widely spaced, exponential (owner directive).
+// In calories (@0.4 lb/cal from 10 lb): 0, 7.5, 19, 34, 54, 81, 117, 175.
+const STAGE_AT_LB = [10, 13, 17.5, 23.5, 31.5, 42.5, 57, 80];
+function stageIdxForLb(lb) {
+  let st = 0;
+  for (let i = 0; i < STAGE_AT_LB.length; i++) if (lb >= STAGE_AT_LB[i]) st = i;
+  return st;
+}
 const Sprites = {
   imgs: (typeof Image === 'function') ? CAT_VARS.map(v => STAGE_LBS.map(lb => {
     const im = new Image();
@@ -231,32 +240,30 @@ const Cats = {
   // paws chunk and splay, tail thickens — the head barely grows, like a real cat.
   drawMain(ctx, x, y, cat) {
     const t = Math.max(0, Math.min(1, cat.t || 0));
-    const wob = cat.wob || { belly: { x: 0 }, cheek: { x: 0 }, tail: { x: 0 } };
+    const wob = cat.wob || { belly: { x: 0 }, cheek: { x: 0 }, tail: { x: 0 }, sub: { x: 0 } };
     const nomT = cat.nomT || 0, face = cat.face || 'normal', time = cat.time || 0;
     const jB = wob.belly.x || 0, jC = wob.cheek.x || 0, jT = wob.tail.x || 0;
     const bob = nomT > 0 ? Math.abs(Math.sin(nomT * 28)) * 5 : 0;
 
-    // ---- Generated-sprite path: crossfade between chonk stages, jiggle squash ----
+    // ---- Generated-sprite path: HARD stage cut (no crossfade — owner: crossfade ghosts),
+    // squash-and-stretch jiggle with lagging sub-belly, pop on size-up ----
     if (typeof Image === 'function' && Sprites.ok()) {
       const row = Sprites.imgs[Math.max(0, Math.min(CAT_VARS.length - 1, cat.var | 0))];
-      const pos = t * (STAGE_LBS.length - 1), i = Math.min(STAGE_LBS.length - 1, Math.floor(pos)), f = pos - i;
-      const H = 122 + t * 58;                        // fits belt (700) → floor (880)
-      const sy = (1 + jB * 0.07) * (1 - bob * 0.012);
-      const sx = 1 - jB * 0.035;
+      const idx = stageIdxForLb(cat.lb != null ? cat.lb : 10 + t * 70);
+      if (idx !== Cats._lastIdx) { Cats._lastIdx = idx; Cats._popT0 = cat.time || 0; }
+      const popAge = (cat.time || 0) - (Cats._popT0 || 0);
+      const popE = Math.sin(Math.max(0, Math.min(1, 1 - popAge / 0.28)) * Math.PI);
+      const H = 122 + (idx / (STAGE_LBS.length - 1)) * 58;   // stepped height, no ghost blend
+      const jS = (wob.sub && wob.sub.x) || 0;
+      const sy = (1 + jB * 0.13 + jS * 0.06 + popE * 0.10) * (1 - bob * 0.012);
+      const sx = 1 - jB * 0.06 - jS * 0.03 - popE * 0.08;
       const baseY = y + 74;                          // feet anchor
       ctx.save();
       ctx.translate(x, baseY - H * sy / 2 - bob);
       ctx.scale(sx, sy);
-      const drawStage = (idx, alpha) => {
-        if (alpha <= 0.01) return;
-        const im = row[idx];
-        const w = H * (im.width / im.height);
-        ctx.globalAlpha = alpha;
-        ctx.drawImage(im, -w / 2, -H / 2, w, H);
-      };
-      drawStage(i, 1 - f);
-      if (f > 0.01) drawStage(Math.min(STAGE_LBS.length - 1, i + 1), f);
-      ctx.globalAlpha = 1;
+      const im = row[idx];
+      const w = H * (im.width / im.height);
+      ctx.drawImage(im, -w / 2, -H / 2, w, H);
       ctx.restore();
       void face; void jC; void jT;
       return;
