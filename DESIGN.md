@@ -163,3 +163,16 @@ Owner asked for longer, harder, reliably-winnable levels plus a menu:
 - Aim arc widened 25°/155° -> 10°/170°.
 - Level-select menu (boot + HUD ☰ button + Esc), best-stars per level, reset-everything button.
 - BG asset name fixed: code asked for 'bg', file is kitchen_bg.png.
+
+## v0.4 polish pass (PR #5, 2026-10-06)
+Owner's post-PR4 list, built on top of qwen's sprite/ghost-food work (main @ 938fb47):
+- Conveyor slats ran opposite the food (visual only) — slats now run left with the food.
+- Canvas text contrast: HUD + popups get dark outlines, readable over the kitchen bg.
+- Weight retune: 100 lb cap; gain from RAW calories (no combo inflation, no 20-lb spikes);
+  per-level caps [50..100] reserve 80+ lb for the late game; growth arc spans the quota.
+- Settings: difficulty (Easy/Normal/Hard) in the level menu — scales balls, goals, vacuum speed.
+- Levels 61-120 barrels, Peggle-style iconic patterns (star, heart, smiley, invader) +
+  shapes (block/diamond/ring/twin/cross/columns); 50% of barrels are hollow (no loot flood).
+- Vacuum actually visible now: was drawn BEFORE the main cat and hidden behind the chonk;
+  now drawn after. Bowl-chute protection implemented (was comment-only).
+- Polish: favicon, v0.4 title, level intro splash cards.

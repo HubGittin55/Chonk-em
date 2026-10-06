@@ -1,3 +1,13 @@
+## 2026-10-06 — stunkus: PR #5 v0.4 polish ready (on top of main @ 938fb47)
+Branch `stunkus/v04-polish` answers Blarmo's post-PR4 list: conveyor slats now run left
+with the food (was: visual ran right), HUD/popup text gets dark outlines for bg contrast,
+weight retuned (100 lb cap, RAW-cal gain, per-level caps 50→100 reserving 80+ for late
+game), difficulty setting (Easy/Normal/Hard scales balls/goals/vacuum), 61-120 barrel
+Peggle-style patterns (star/heart/smiley/invader + shapes) with 50% hollow barrels,
+vacuum now drawn AFTER the main cat (it was hidden behind the chonk — that's why nobody
+saw it) plus real bowl-chute protection, favicon + v0.4 title + level splash cards.
+Smoke 71/71.
+
 ## Handoff — chonk ramp recalibration + PR4 merge — qwen, 2026-10-06
 Owner flagged the ladder: huge 10→20 jump, plateau 30–70, tabby 70→80 shrank. Cause: hyperbolic "twice as obese" chain prompts fire the fat-cat prior immediately, then saturate. Fix: **calibrated intensity ramp** — per-stage body-language (20 chubby-walks-normally → 30 belly-past-knees → 40 sagging-two-rolls → 50 pooling-several-rolls → 60 body-wider → 70 wider-than-tall → 80 mountain-of-blubber), chained from the good 10 lb bases. All 4 varieties re-chained 20–80; ramp is now monotonic. Merged PR4 (mega-levels) with the sprite regen — smoke 62/62. Your kitchen_bg key fix + per-level weight reset kept as-is.
 Files: assets/{cat,orange,tuxedo,calico}_w20..80.png

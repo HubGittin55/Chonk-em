@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>CHONK 'EM — v0.1 prototype</title>
+<title>CHONK 'EM — v0.4</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐱</text></svg>">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -19,10 +20,15 @@
   <div id="menuOverlay">
     <h1>CHONK &rsquo;EM</h1>
     <p class="sub">pick a level &middot; fatten the cat</p>
+    <div id="diffRow"></div>
     <div id="levelGrid"></div>
     <button id="resetGame">&#128465; reset everything</button>
   </div>
   <button id="menuBtn" title="level select">&#9776;</button>
+  <div id="levelSplash" class="hidden">
+    <h2 id="splashTitle"></h2>
+    <p id="splashSub"></p>
+  </div>
 </div>
 <script src="js/audio.js"></script>
 <script src="js/physics.js"></script>

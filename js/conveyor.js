@@ -34,7 +34,7 @@ const Conveyor = {
       ctx.beginPath(); ctx.roundRect(a, by - 13, b - a, 26, 13); ctx.fill();
       // Moving slats
       ctx.strokeStyle = '#7a7a85'; ctx.lineWidth = 3;
-      const off = (this.t * this.SPEED) % 40;
+      const off = 40 - (this.t * this.SPEED) % 40; // slats run left, with the food
       ctx.save();
       ctx.beginPath(); ctx.roundRect(a, by - 13, b - a, 26, 13); ctx.clip();
       for (let x = a - 40 + off; x < b; x += 40) {

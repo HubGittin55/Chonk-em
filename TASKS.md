@@ -53,3 +53,14 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 - [x] kitchen_bg asset name fix
 - [ ] mystery barrels (unclaimed)
 - [ ] cucumber (unclaimed)
+
+## PR #5 — v0.4 polish (stunkus, 2026-10-06, on top of main @ 938fb47)
+- [x] conveyor slat direction fix
+- [x] text contrast (HUD/popups outlined)
+- [x] weight retune: 100lb cap, raw-cal gain, per-level reserve tiers
+- [x] settings menu + difficulty
+- [x] 61-120 barrel iconic patterns, 50% hollow barrels
+- [x] vacuum visible (draw order) + chute protection
+- [x] favicon, v0.4 title, level splash
+- [ ] mystery barrels (unclaimed)
+- [ ] cucumber (unclaimed)

@@ -14,19 +14,22 @@ const Vacuum = {
   MOUTH_Y: 740,    // mouth height: just under the belt line
   BODY_Y: 792,
 
-  create() {
-    return { x: 300, dir: Math.random() < 0.5 ? -1 : 1, t: Math.random() * 6.28, eaten: 0 };
+  create(speedMul) {
+    return { x: 300, dir: Math.random() < 0.5 ? -1 : 1, t: Math.random() * 6.28, eaten: 0,
+             speedMul: speedMul || 1 };
   },
 
   // wdt: world dt (slow-mo aware). onEaten(x, y, item) fires effects in main.js.
   tick(v, wdt, items, onEaten) {
     v.t += wdt;
-    v.x += v.dir * Vacuum.SPEED * wdt;
+    v.x += v.dir * Vacuum.SPEED * (v.speedMul || 1) * wdt;
     if (v.x <= Vacuum.MIN_X) { v.x = Vacuum.MIN_X; v.dir = 1; }
     else if (v.x >= Vacuum.MAX_X) { v.x = Vacuum.MAX_X; v.dir = -1; }
     const mx = v.x, my = Vacuum.MOUTH_Y;
     for (const it of items) {
       if (it.gone || (it.state !== 'fall' && it.state !== 'belt')) continue;
+      // bowl drop chute: once loot reaches the bowl it's the cat's, vacuum can't steal it
+      if (typeof Conveyor !== 'undefined' && Math.abs(it.x - Conveyor.BOWL_X) < 44 && it.y > Conveyor.BELT_Y - 40) continue;
       const dx = mx - it.x, dy = my - it.y;
       const d = Math.hypot(dx, dy);
       // escaped the suction cone — allowed to land on the belt again

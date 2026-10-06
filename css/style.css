@@ -74,3 +74,24 @@ body {
   background: rgba(255, 255, 255, 0.8); border: none; cursor: pointer;
 }
 #menuBtn:active { transform: scale(0.92); }
+
+#diffRow {
+  display: flex; gap: 8px; align-items: center; justify-content: center;
+  margin-bottom: 14px; font-size: 14px; color: #ffd9a8;
+}
+#diffRow button {
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  border: 2px solid #6b4a2f; background: #3d2c1e; color: #fff; font-size: 13px;
+}
+#diffRow button.sel { border-color: #ffb14e; background: #54402a; }
+#levelSplash {
+  position: absolute; inset: 0; z-index: 9;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: rgba(43, 33, 24, 0.72); color: #fff; text-align: center;
+  pointer-events: none; border-radius: 8px;
+  transition: opacity 0.4s;
+}
+#levelSplash.hidden { display: none; }
+#levelSplash h2 { font-size: 40px; color: #ffb14e; letter-spacing: 1px; }
+#levelSplash p { font-size: 17px; opacity: 0.9; margin-top: 8px; }
