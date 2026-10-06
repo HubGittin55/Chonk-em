@@ -11,12 +11,12 @@ const ctxStub = new Proxy({ canvas: {} }, {
 });
 const elStub = () => ({
   addEventListener: () => {}, classList: { add: () => {}, remove: () => {} },
-  textContent: '', style: {}, width: 0, height: 0,
+  textContent: '', innerHTML: '', style: {}, width: 0, height: 0,
   getContext: () => ctxStub,
   getBoundingClientRect: () => ({ left: 0, top: 0, width: 600, height: 900 }),
-  setPointerCapture: () => {},
+  setPointerCapture: () => {}, appendChild: () => {}, click: () => {},
 });
-global.document = { getElementById: () => elStub() };
+global.document = { getElementById: () => elStub(), createElement: () => elStub() };
 global.window = { addEventListener: () => {}, devicePixelRatio: 1 };
 global.requestAnimationFrame = () => {};
 global.CanvasRenderingContext2D = function () {};
@@ -44,13 +44,12 @@ const step = (n) => { for (let i = 0; i < n; i++) tick(1 / 120); };
 console.log('CHONK-EM smoke test (v0.2 contents-full)');
 
 // 1. boot
-T('boot: level 1 loads with 32 small barrels (r=15)', game.barrels.length === 32 && game.balls === 18 && game.barrels.every(b => b.r === 15));
-T('boot: power barrels present', game.barrels.some(b => b.kind === 'power' && b.content === 'wide') &&
-  game.barrels.some(b => b.kind === 'power' && b.content === 'multi'));
+T('boot: level 1 loads with 45 tight barrels (r=11)', game.barrels.length === 45 && game.balls === 31 && game.barrels.every(b => b.r === 11));
+T('boot: split power barrel present (guaranteed)', game.barrels.some(b => b.kind === 'power' && b.content === 'split'));
 
 // 2. single shot
 fireShot(300, 500);
-T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 17);
+T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 30);
 step(1200); // 10s: ball bursts the center column, then falls out
 T('fire: ball dies out cleanly', game.shots.length === 0);
 
@@ -58,7 +57,7 @@ T('fire: ball dies out cleanly', game.shots.length === 0);
 loadLevel(0);
 game.multiShots = 1;
 fireShot(300, 500);
-T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 15);
+T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 28);
 T('multi: consumed after firing', game.multiShots === 0);
 game.shots = [];
 
@@ -155,16 +154,27 @@ AudioSys.toggle();
 
 // 9. level pack (levels 2-12; 2-6 drafted by qwen-fast, 7-12 by stunkus, validated here)
 T('levels: 12 levels ship', LEVELS.length === 12);
-T('levels: bounds + 78px spacing respected in every layout', LEVELS.every(L => {
+T('mega levels: L1-5 have 40-55 barrels, L6+ have 60-85', LEVELS.every((L, i) =>
+  i < 5 ? (L.barrels.length >= 40 && L.barrels.length <= 55)
+        : (L.barrels.length >= 60 && L.barrels.length <= 85)));
+T('mega levels: tight hex spacing respected (min dist >= 26px, in bounds)', LEVELS.every(L => {
   for (let a = 0; a < L.barrels.length; a++) {
     const ba = L.barrels[a];
-    if (ba.x < 62 || ba.x > 538 || ba.y < 150 || ba.y > 660) return false;
+    if (ba.x < 40 || ba.x > 560 || ba.y < 130 || ba.y > 680) return false;
     for (let b = a + 1; b < L.barrels.length; b++) {
-      if (Math.hypot(ba.x - L.barrels[b].x, ba.y - L.barrels[b].y) < 78) return false;
+      if (Math.hypot(ba.x - L.barrels[b].x, ba.y - L.barrels[b].y) < 26) return false;
     }
   }
   return true;
 }));
+T('mega levels: small barrels (r=11 L1-5, r=10 L6+)', LEVELS.every((L, i) => L.r === (i < 5 ? 11 : 10)));
+T('mega levels: layout symmetric about x=300', LEVELS.every(L =>
+  L.barrels.every(ba => L.barrels.some(bb => Math.abs(bb.x - (600 - ba.x)) < 2 && Math.abs(bb.y - ba.y) < 2))));
+T('mega levels: goal <= 65% of RAW snack calories (winnable with zero combo)', LEVELS.every(L => {
+  const raw = L.barrels.reduce((t, b) => t + (b.kind === 'snack' ? CONTENT[b.content].cal : 0), 0);
+  return L.goal <= raw * 0.65;
+}));
+T('mega levels: balls scale with barrels (>= 60% of barrel count)', LEVELS.every(L => L.balls >= L.barrels.length * 0.6));
 T('levels: calorie budget winnable (combo-aware effective cal >= 1.5x goal)', LEVELS.every(L => {
   // model real play: clean deliveries ramp the combo multiplier 1,1,1,2,2,2,3,3,3,4...
   const cals = L.barrels.filter(b => b.kind === 'snack').map(b => CONTENT[b.content].cal).sort((a, b) => a - b);
@@ -172,7 +182,7 @@ T('levels: calorie budget winnable (combo-aware effective cal >= 1.5x goal)', LE
   cals.forEach((c, i) => { eff += c * Math.min(4, 1 + Math.floor(i / 3)); });
   return eff >= L.goal * 1.5;
 }));
-T('levels: goals rebalanced for spread layouts', LEVELS.map(L => L.goal).join() === '93,94,166,118,137,137,132,72,148,82,121,99');
+T('mega levels: goals are the 60%-of-raw set', LEVELS.map(L => L.goal).join() === '58,58,82,76,70,130,92,95,118,59,110,148');
 
 // 10. win path
 game.calories = game.level.goal; // ensure threshold
@@ -185,7 +195,7 @@ T('saves: best stars persisted to localStorage', lsStore.has('chonk-em:best'));
 loadLevel(0);
 const w0 = game.weightLb;
 deliver({ cal: 5 });
-T('weight: snack deliveries add pounds to lifetime weight', game.weightLb === w0 + 5 * LB_PER_CAL);
+T('weight: snack deliveries add pounds (per-level growth)', game.weightLb === w0 + 5 * game.lbPerCal);
 T('weight: weight persists to localStorage', lsStore.get('chonk-em:weight') === String(game.weightLb));
 const w1 = game.weightLb;
 deliver({ cal: -2 });
@@ -269,15 +279,14 @@ T('split: first burst divides the ball (1→3)', game.shots.length === n0 + 2 &&
 
 // 17. armored barrels need 2 hits
 loadLevel(0);
-const arm = game.barrels.find(b => b.armor);
-T('armor: level ships armored barrels', !!arm);
-arm.x = 300; arm.y = 300;
+T('armor: level ships armored barrels', game.barrels.some(b => b.armor));
+const arm = { x: 300, y: 300, r: 11, kind: 'snack', content: 'kibble', armor: true, cracked: false, cleared: false, wob: 0, wobV: 0 };
 const probe = { x: 300, y: 290, vx: 0, vy: 300, r: 10, life: 0, slowT: 0, bounces: 0 };
 let didCrack = false, didBurst = false;
-Physics.stepBall(probe, 1/60, game.barrels, () => { didBurst = true; }, () => { didCrack = true; });
+Physics.stepBall(probe, 1/60, [arm], () => { didBurst = true; }, () => { didCrack = true; });
 T('armor: first hit cracks, does not burst', didCrack && !didBurst && arm.cracked && !arm.cleared);
 probe.x = 300; probe.y = 290; probe.vx = 0; probe.vy = 300;
-Physics.stepBall(probe, 1/60, game.barrels, () => { didBurst = true; }, () => { didCrack = true; });
+Physics.stepBall(probe, 1/60, [arm], () => { didBurst = true; }, () => { didCrack = true; });
 T('armor: second hit bursts', didBurst && arm.cleared);
 
 console.log(`\n${pass} passed, ${fail} failed`);
