@@ -102,11 +102,13 @@ function loadLevel(i) {
   game.balls = L.balls;
   game.shots = [];
   game.multiShots = 0; game.splitNext = false; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0; game.shotsFired = 0;
+  game.weightLb = START_LB; // size resets every level (owner) — growth spans the quota
+  game.lbPerCal = 75 / Math.max(1, L.goal);
   game.items = [];
   game.popups = [];
   game.vacuum = L.vacuum ? Vacuum.create() : null;
   if (game.vacuum) addPopup(W / 2, 330, '⚠ VACUUM PATROL ⚠', '#c62828');
-  game.barrels = L.barrels.map(b => ({ x: b.x, y: b.y, r: 15, kind: b.kind, content: b.content, armor: !!b.armor, cracked: false, cleared: false }));
+  game.barrels = L.barrels.map(b => ({ x: b.x, y: b.y, r: L.r || 15, kind: b.kind, content: b.content, armor: !!b.armor, cracked: false, cleared: false }));
   game.calories = 0;
   game.stage = 0;
   game.combo = 0; game.mult = 1;
@@ -150,7 +152,7 @@ function aimAngleFor(px, py) {
   const dx = px - SHOOT.x, dy = py - SHOOT.y;
   if (dy < 30) return null;
   let ang = Math.atan2(dy, dx);
-  const lo = 25 * Math.PI / 180, hi = 155 * Math.PI / 180;
+  const lo = 10 * Math.PI / 180, hi = 170 * Math.PI / 180;
   return Math.max(lo, Math.min(hi, ang));
 }
 
@@ -286,7 +288,7 @@ function deliver(item) {
   // Lifetime weight: only real food adds pounds. Veggies never slim the cat.
   if (gained > 0) {
     const beforeLb = game.weightLb;
-    game.weightLb = Math.min(MAX_LB, game.weightLb + gained * LB_PER_CAL);
+    game.weightLb = Math.min(MAX_LB, game.weightLb + gained * (game.lbPerCal || LB_PER_CAL));
     store.set('weight', game.weightLb);
     checkLbMilestones(beforeLb, game.weightLb);
   }
@@ -470,8 +472,8 @@ function tick(dt) {
 /* ---------------- rendering ---------------- */
 
 function drawBackground() {
-  if (typeof Assets !== 'undefined' && Assets.ok('bg')) {
-    ctx.drawImage(Assets.imgs.bg, 0, 0, W, H);
+  if (typeof Assets !== 'undefined' && Assets.ok('kitchen_bg')) {
+    ctx.drawImage(Assets.imgs.kitchen_bg, 0, 0, W, H);
     return;
   }
   const g = ctx.createLinearGradient(0, 0, 0, H);
@@ -708,7 +710,7 @@ refreshMute();
 game.weightLb = store.get('weight', START_LB);
 
 Input.init({
-  canAim: () => !game.over && !game.shots.length && game.balls > 0,
+  canAim: () => !game.over && !game.menuOpen && !game.shots.length && game.balls > 0,
   onAimStart: (p) => { game.aim = p; game.aimAng = aimAngleFor(p.x, p.y); },
   onAimMove: (p) => { if (game.aim) { game.aim = p; game.aimAng = aimAngleFor(p.x, p.y); } },
   onAimEnd: (p) => {
@@ -723,9 +725,48 @@ Input.init({
 
 loadLevel(0);
 
+// ---- level select menu + reset ----
+game.menuOpen = false;
+const menuOverlay = document.getElementById('menuOverlay');
+const levelGrid = document.getElementById('levelGrid');
+function getBest() { return store.get('best', {}); }
+function showMenu() {
+  game.menuOpen = true;
+  game.aim = null; game.aimAng = null;
+  hideOverlay();
+  const b = getBest();
+  levelGrid.innerHTML = '';
+  LEVELS.forEach((L, i) => {
+    const btn = document.createElement('button');
+    const rec = b[i] || { stars: 0 };
+    btn.className = i === game.levelIndex ? 'cur' : '';
+    btn.innerHTML = (i + 1) + '. ' + L.name +
+      '<small>goal ' + L.goal + ' cal</small>' +
+      '<span class="stars">' + ('★'.repeat(rec.stars) || '☆☆☆') + '</span>';
+    btn.addEventListener('click', () => { hideMenu(); loadLevel(i); });
+    levelGrid.appendChild(btn);
+  });
+  menuOverlay.classList.remove('hidden');
+}
+function hideMenu() { game.menuOpen = false; menuOverlay.classList.add('hidden'); }
+document.getElementById('menuBtn').addEventListener('click', (e) => { e.stopPropagation(); showMenu(); });
+document.getElementById('resetGame').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (confirm('Reset CHONK\'EM? This wipes best stars and the cat\'s saved weight.')) {
+    Object.keys(localStorage).filter(k => k.startsWith('chonk-em:')).forEach(k => localStorage.removeItem(k));
+    location.reload();
+  }
+});
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { game.menuOpen ? hideMenu() : showMenu(); }
+});
+
+showMenu(); // boot into the level select
+
 let last = performance.now(), acc = 0;
 const STEP = 1 / 120;
 function frame(now) {
+  if (game.menuOpen) { render(); requestAnimationFrame(frame); return; }
   let dt = (now - last) / 1000;
   last = now;
   dt = Math.min(dt, 0.1);

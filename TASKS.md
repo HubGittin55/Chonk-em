@@ -43,3 +43,13 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 - [x] `asset-pipeline` — ComfyUI MCP + Qwen Image 2.1 turbo recipe (8 steps + viggle LoRA). **DONE (qwen, 2026-10-06)**: AoT-style fleet shipped — 4 cat varieties × 8 chonk stages (10–80 lb), 9 barrel skins, bowl, yarn, shooter cat, kitchen bg. Sprite renderers in cats/barrels/conveyor/main with vector fallback. Weight system extended to 80 lb.
 - [ ] `pwa` — manifest, service worker, icons, offline
 - [ ] `mobile-polish` — touch tuning, safe areas, DPR scaling, narrow-screen layout
+
+## PR #4 — mega levels (stunkus, 2026-10-05)
+- [x] tight hex layouts 45-79 barrels, r=10/11
+- [x] goals = 60% raw (winnable, verified)
+- [x] cat resets per level, growth spans quota
+- [x] level select menu + reset button
+- [x] aim arc 10°/170°
+- [x] kitchen_bg asset name fix
+- [ ] mystery barrels (unclaimed)
+- [ ] cucumber (unclaimed)

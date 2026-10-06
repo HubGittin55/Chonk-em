@@ -38,3 +38,39 @@ body {
   background: rgba(255, 255, 255, 0.8); border: none; cursor: pointer;
 }
 #mute:active { transform: scale(0.92); }
+
+#menuOverlay {
+  position: absolute; inset: 0; z-index: 10;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-start;
+  background: rgba(43, 33, 24, 0.94); color: #fff;
+  border-radius: 8px; padding: 28px 18px; overflow-y: auto;
+}
+#menuOverlay.hidden { display: none; }
+#menuOverlay h1 { font-size: 44px; letter-spacing: 2px; color: #ffb14e; }
+#menuOverlay .sub { font-size: 15px; opacity: 0.75; margin: 4px 0 18px; }
+#levelGrid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 10px; width: 100%; max-width: 480px;
+}
+#levelGrid button {
+  padding: 12px 6px; border: 2px solid #6b4a2f; border-radius: 10px;
+  background: #3d2c1e; color: #fff; cursor: pointer;
+  font-size: 14px; font-weight: bold;
+}
+#levelGrid button small { display: block; font-weight: normal; font-size: 11px; opacity: 0.7; margin-top: 3px; }
+#levelGrid button .stars { color: #ffcf4d; font-size: 12px; }
+#levelGrid button:active { transform: scale(0.95); border-color: #ffb14e; }
+#levelGrid button.cur { border-color: #ffb14e; background: #54402a; }
+#resetGame {
+  margin-top: 22px; font-size: 14px; padding: 10px 26px;
+  border-radius: 999px; border: 1px solid #8a5a3a;
+  background: transparent; color: #e8a37c; cursor: pointer;
+}
+#menuBtn {
+  position: absolute; top: 10px; left: 10px; z-index: 5;
+  font-size: 20px; line-height: 1;
+  width: 42px; height: 42px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.8); border: none; cursor: pointer;
+}
+#menuBtn:active { transform: scale(0.92); }
