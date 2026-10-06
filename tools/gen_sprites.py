@@ -203,9 +203,6 @@ def food():
         out = t2i(prompt, seed=6100 + i)
         fetch(*out, f'assets/raw/food_{key}.png')
         prep(f'assets/raw/food_{key}.png', f'assets/food_{key}.png', 48)
-        from PIL import Image
-        im = Image.open(f'assets/food_{key}.png').convert('RGBA')
-        im.quantize(colors=128, method=Image.FASTOCTREE).save(f'assets/food_{key}.png', optimize=True)
         print(f'food {key} done')
     print('FOOD DONE')
 
