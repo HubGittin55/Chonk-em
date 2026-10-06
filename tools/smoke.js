@@ -44,7 +44,7 @@ const step = (n) => { for (let i = 0; i < n; i++) tick(1 / 120); };
 console.log('CHONK-EM smoke test (v0.2 contents-full)');
 
 // 1. boot
-T('boot: level 1 loads with 33 barrels (incl. 2 power)', game.barrels.length === 33 && game.balls === 18);
+T('boot: level 1 loads with 32 small barrels (r=15)', game.barrels.length === 32 && game.balls === 18 && game.barrels.every(b => b.r === 15));
 T('boot: power barrels present', game.barrels.some(b => b.kind === 'power' && b.content === 'wide') &&
   game.barrels.some(b => b.kind === 'power' && b.content === 'multi'));
 
@@ -96,8 +96,9 @@ game.magnetT = 0; game.items = [];
 
 // 7. full chain: shot bursts a barrel; magnet-assisted loot gets caught
 loadLevel(0);
-const target = game.barrels.find(b => b.x === 300 && b.y === 200);
-fireShot(300, 300); // straight down at center column
+const target = game.barrels.reduce((a, b) =>
+  (Math.hypot(b.x - 300, b.y - 220) < Math.hypot(a.x - 300, a.y - 220) ? b : a));
+fireShot(target.x, 300); // straight down at the top-center barrel
 let burst = false;
 for (let i = 0; i < 120 * 4; i++) { tick(1 / 120); if (target.cleared) break; }
 T('chain: shot bursts barrel', target.cleared);
@@ -134,7 +135,7 @@ loadLevel(0);
 deliver({ cal: 1 }); deliver({ cal: 1 }); deliver({ cal: 1 }); deliver({ cal: 1 });
 T('combos: after 3 clean deliveries, 4th+ earns ×2 calories', game.combo === 4 && game.mult === 2);
 T('jiggle: delivery kicks the belly spring', game.jiggleV > 0);
-game.calories = 11; game.stageMisses = 0; game.stageVeggies = 0;
+game.calories = 24; game.stageMisses = 0; game.stageVeggies = 0;
 const ballsBefore = game.balls;
 deliver({ cal: 1 }); // clean stage-up → FEAST FRENZY
 T('frenzy: clean stage-up triggers FEAST FRENZY (+2 yarn, 0.35× time)',
@@ -154,12 +155,12 @@ AudioSys.toggle();
 
 // 9. level pack (levels 2-12; 2-6 drafted by qwen-fast, 7-12 by stunkus, validated here)
 T('levels: 12 levels ship', LEVELS.length === 12);
-T('levels: bounds + 56px spacing respected in every layout', LEVELS.every(L => {
+T('levels: bounds + 78px spacing respected in every layout', LEVELS.every(L => {
   for (let a = 0; a < L.barrels.length; a++) {
     const ba = L.barrels[a];
-    if (ba.x < 62 || ba.x > 538 || ba.y < 180 || ba.y > 620) return false;
+    if (ba.x < 62 || ba.x > 538 || ba.y < 150 || ba.y > 660) return false;
     for (let b = a + 1; b < L.barrels.length; b++) {
-      if (Math.hypot(ba.x - L.barrels[b].x, ba.y - L.barrels[b].y) < 56) return false;
+      if (Math.hypot(ba.x - L.barrels[b].x, ba.y - L.barrels[b].y) < 78) return false;
     }
   }
   return true;
@@ -171,7 +172,7 @@ T('levels: calorie budget winnable (combo-aware effective cal >= 1.5x goal)', LE
   cals.forEach((c, i) => { eff += c * Math.min(4, 1 + Math.floor(i / 3)); });
   return eff >= L.goal * 1.5;
 }));
-T('levels: goals scale 96→217 (extreme)', LEVELS.map(L => L.goal).join() === '96,145,195,208,177,217,154,101,165,94,161,143');
+T('levels: goals rebalanced for spread layouts', LEVELS.map(L => L.goal).join() === '93,94,166,118,137,137,132,72,148,82,121,99');
 
 // 10. win path
 game.calories = game.level.goal; // ensure threshold
@@ -237,6 +238,47 @@ game.items.push({ x: 490, y: 700, vx: 0, vy: 300, r: 9, state: 'fall', cal: 3, t
 const misses0 = game.misses;
 step(600);
 T('food: missed food bounces on floor, then lost', game.items.length === 0 && game.misses > misses0);
+
+// 15. cat physics: exponential stages, hard cuts, slow wobble
+T('cat: stageIdxForLb spans 0..7 across 10..80 lb',
+  stageIdxForLb(10) === 0 && stageIdxForLb(80) === 7 && stageIdxForLb(12.9) === 0 && stageIdxForLb(13) === 1);
+T('cat: stage thresholds are exponential (~1.35x)',
+  (() => { const d = []; for (let i = 1; i < STAGE_AT_LB.length; i++) d.push(STAGE_AT_LB[i] - STAGE_AT_LB[i-1]);
+    return d.every((v, i) => i === 0 || v > d[i-1]); })());
+T('cat: STAGES flavor thresholds are exponential',
+  STAGES.every((st, i) => i < 2 || st.at > STAGES[i-1].at * 2));
+loadLevel(0);
+wobbleImpulse('belly', 4);
+step(60); // 0.5s — slow springs should still be wobbling hard
+T('cat: slow wobble still oscillating at 0.5s (lazy jiggle)', Math.abs(game.wob.belly.x) > 0.05);
+T('cat: sub-belly lags the main spring', Math.abs(game.wob.sub.x) > 0.001);
+step(1200);
+T('cat: wobble settles eventually', Math.abs(game.wob.belly.x) < 0.05 && Math.abs(game.wob.belly.v) < 0.05);
+
+// 16. split-yarn powerup
+loadLevel(0);
+deliver({ power: 'split' });
+T('split: delivery arms the next shot', game.splitNext === true);
+fireShot(300, 500);
+T('split: fired ball carries the split charge', game.shots.some(b => b.splitArmed));
+const armed = game.shots.find(b => b.splitArmed);
+armed.x = 300; armed.y = 300; armed.vx = 0; armed.vy = 400;
+const n0 = game.shots.length;
+onBarrelBurst(game.barrels[0], armed);
+T('split: first burst divides the ball (1→3)', game.shots.length === n0 + 2 && armed.splitDone === true);
+
+// 17. armored barrels need 2 hits
+loadLevel(0);
+const arm = game.barrels.find(b => b.armor);
+T('armor: level ships armored barrels', !!arm);
+arm.x = 300; arm.y = 300;
+const probe = { x: 300, y: 290, vx: 0, vy: 300, r: 10, life: 0, slowT: 0, bounces: 0 };
+let didCrack = false, didBurst = false;
+Physics.stepBall(probe, 1/60, game.barrels, () => { didBurst = true; }, () => { didCrack = true; });
+T('armor: first hit cracks, does not burst', didCrack && !didBurst && arm.cracked && !arm.cleared);
+probe.x = 300; probe.y = 290; probe.vx = 0; probe.vy = 300;
+Physics.stepBall(probe, 1/60, game.barrels, () => { didBurst = true; }, () => { didCrack = true; });
+T('armor: second hit bursts', didBurst && arm.cleared);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

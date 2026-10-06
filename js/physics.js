@@ -6,7 +6,7 @@ const Physics = {
   REST: 0.72,  // wall restitution
 
   // Returns true when the ball is dead.
-  stepBall(ball, dt, barrels, onBurst) {
+  stepBall(ball, dt, barrels, onBurst, onCrack) {
     const P = Physics;
     ball.vy += P.GRAV * dt;
     ball.x += ball.vx * dt;
@@ -19,7 +19,8 @@ const Physics = {
     if (ball.x > R - ball.r) { ball.x = R - ball.r; ball.vx = -Math.abs(ball.vx) * P.REST; ball.bounces++; }
     if (ball.y < T + ball.r) { ball.y = T + ball.r; ball.vy = Math.abs(ball.vy) * P.REST; ball.bounces++; }
 
-    // Barrel hits: burst it, reflect, lose energy (chaining costs speed).
+    // Barrel hits: reflect, lose energy (chaining costs speed).
+    // Armored barrels need 2 hits — the first only cracks them.
     for (const b of barrels) {
       if (b.cleared) continue;
       const dx = ball.x - b.x, dy = ball.y - b.y;
@@ -31,10 +32,15 @@ const Physics = {
         ball.vy = (ball.vy - 2 * dot * ny) * 0.8;
         ball.x = b.x + nx * min;
         ball.y = b.y + ny * min;
-        b.cleared = true;
-        b.popT = 0;
         ball.bounces++;
-        onBurst(b);
+        if (b.armor && !b.cracked) {
+          b.cracked = true;
+          onCrack(b);
+        } else {
+          b.cleared = true;
+          b.popT = 0;
+          onBurst(b, ball);
+        }
       }
     }
 
