@@ -4,7 +4,7 @@
    falls back to its vector renderer if its asset is missing. */
 
 // Prop sprites (barrels, bowl, yarn, shooter, kitchen bg). Per-key readiness.
-const ASSET_KEYS = ['bowl', 'yarn', 'shooter', 'bg',
+const ASSET_KEYS = ['bowl', 'yarn', 'shooter', 'kitchen_bg',
   'barrel_kibble', 'barrel_salmon', 'barrel_tuna', 'barrel_broccoli', 'barrel_celery',
   'barrel_multi', 'barrel_wide', 'barrel_slow', 'barrel_magnet'];
 const Assets = {
