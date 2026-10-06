@@ -184,9 +184,68 @@ def props():
     print('kitchen bg done')
     print('PROPS DONE')
 
+def food():
+    ITEMS = {
+      'kibble':   'a small pile of golden-brown kibble pellets, some scattered',
+      'salmon':   'a pink-orange salmon fillet with white flakes',
+      'tuna':     'a plump blue tuna fish',
+      'broccoli': 'a green broccoli head with thick stalk',
+      'celery':   'three long green celery stalks',
+      'multi':    'a glowing golden five-point star radiating light',
+      'wide':     'a golden stone bridge arch emblem glowing warm',
+      'slow':     'an antique brass pocket clock with glowing hands',
+      'magnet':   'a red horseshoe magnet crackling with blue sparks',
+    }
+    for i, (key, desc) in enumerate(ITEMS.items()):
+        prompt = ('Game asset sprite. A single crisp icon of ' + desc +
+          ', bold dark Attack on Titan anime linework, gritty cel shading, thick cream-colored outline ring around the item for visibility, '
+          'centered, isolated on solid pure magenta background, no scenery, no gradient, no shadow')
+        out = t2i(prompt, seed=6100 + i)
+        fetch(*out, f'assets/raw/food_{key}.png')
+        prep(f'assets/raw/food_{key}.png', f'assets/food_{key}.png', 48)
+        from PIL import Image
+        im = Image.open(f'assets/food_{key}.png').convert('RGBA')
+        im.quantize(colors=128, method=Image.FASTOCTREE).save(f'assets/food_{key}.png', optimize=True)
+        print(f'food {key} done')
+    print('FOOD DONE')
+
+def tabby_gray():
+    global NEG
+    NEG = ('basic, simple, 3D, duplicated limbs, duplicated legs, six legs, more than four legs, too many eyes, multiple heads, '
+           'skinny, thin, small, tiny, frail, background scenery, gradient background, shadow on the background, photorealistic, text, watermark, multiple cats, '
+           'tan fur, brown fur, orange fur, ginger fur, yellow fur, warm beige fur')
+    RAMP = {
+     20: 'a chubby cat, round belly slightly low to the ground, plump cheeks, walks normally, clearly healthy not enormous',
+     30: 'a clearly fat cat, round belly hanging low past the knees, one soft fat roll, full jowls, sturdy legs',
+     40: 'a fat cat, heavy belly sagging toward the ground, two fat rolls, thick double chin, legs noticeably short under the load',
+     50: 'a very fat cat, big soft belly pooling near the ground, several fat rolls, wide body, waddling build, small stubby legs',
+     60: 'a huge fat cat, enormous belly spreading near the ground, body clearly wider than a normal cat, tiny legs, strained posture',
+     70: 'an enormous fat cat, body wider than tall, massive belly spreading on the ground, huge fat rolls, tiny legs',
+     80: 'the most enormous chonker imaginable, a mountain of blubber, body far wider than tall, belly pooling on the ground, tiny stubby legs barely visible under the mass',
+    }
+    prev = 10
+    for lb in [20,30,40,50,60,70,80]:
+        prompt = ('Game asset sprite. This cat is a COOL GRAY tabby and must stay gray: silver-gray fur with dark charcoal stripes, pale cream belly and paws. '
+                  'NOT tan, NOT brown, NOT orange, NOT beige. '
+                  f'Transform this cat into {RAMP[lb]}. Make it clearly fatter and heavier than the input cat, one full chonk stage heavier. '
+                  'Keep EXACTLY the same Attack on Titan bold-linework anime style, line weight, gray tabby markings, '
+                  'side-view pose facing left, solid magenta background. EXACTLY four legs, two front two back.')
+        out = edit(f'chonkem_cat_w{prev}.png', prompt, seed=11000 + lb)
+        fetch(*out, f'assets/raw/cat_w{lb}.png')
+        shutil.copy(f'assets/raw/cat_w{lb}.png', os.path.expanduser(f'~/ComfyUI/input/chonkem_cat_w{lb}.png'))
+        subprocess.run([sys.executable, 'tools/sprite_prep.py', f'assets/raw/cat_w{lb}.png', f'assets/cat_w{lb}.png', '--height', '512'], check=True)
+        from PIL import Image
+        im = Image.open(f'assets/cat_w{lb}.png').convert('RGBA')
+        im.quantize(colors=128, method=Image.FASTOCTREE).save(f'assets/cat_w{lb}.png', optimize=True)
+        print(f'gray tabby {lb}lb done')
+        prev = lb
+    print('GRAY LOCK DONE')
+
 if __name__ == '__main__':
     job = sys.argv[1] if len(sys.argv) > 1 else 'cats'
     if job == 'cats': cats()
     elif job == 'props': props()
+    elif job == 'food': food()
+    elif job == 'tabby': tabby_gray()
     elif job in VARIETIES: ladder(job, VARIETIES[job], 10)
     else: sys.exit(f'unknown job: {job}')

@@ -6,7 +6,9 @@
 // Prop sprites (barrels, bowl, yarn, shooter, kitchen bg). Per-key readiness.
 const ASSET_KEYS = ['bowl', 'yarn', 'shooter', 'kitchen_bg',
   'barrel_kibble', 'barrel_salmon', 'barrel_tuna', 'barrel_broccoli', 'barrel_celery',
-  'barrel_multi', 'barrel_wide', 'barrel_slow', 'barrel_magnet'];
+  'barrel_multi', 'barrel_wide', 'barrel_slow', 'barrel_magnet',
+  'food_kibble', 'food_salmon', 'food_tuna', 'food_broccoli', 'food_celery',
+  'food_multi', 'food_wide', 'food_slow', 'food_magnet'];
 const Assets = {
   imgs: (typeof Image === 'function') ? Object.fromEntries(ASSET_KEYS.map(k => {
     const im = new Image();

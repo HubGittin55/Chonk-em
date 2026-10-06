@@ -255,7 +255,7 @@ function onBarrelBurst(barrel, ball) {
   game.items.push({
     x: barrel.x, y: barrel.y,
     vx: (Math.random() - 0.5) * 150, vy: (-60 - Math.random() * 90) * pop,
-    r: 9, state: 'fall', cal: c.cal, icon: c.icon, name: c.name,
+    r: 9, state: 'fall', cal: c.cal, icon: c.icon, name: c.name, content: barrel.content,
     grav: c.grav, drift: c.drift, power: c.power || null,
     t: 0, gone: false,
   });
@@ -601,12 +601,18 @@ function drawItems() {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const it of game.items) {
     if (it.power) { // golden glow for power-ups
-      ctx.fillStyle = 'rgba(255,193,7,0.35)';
-      ctx.beginPath(); ctx.arc(it.x, it.y, 15, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,193,7,0.45)';
+      ctx.beginPath(); ctx.arc(it.x, it.y, 17, 0, 7); ctx.fill();
     }
     // tiny shadow
     ctx.fillStyle = 'rgba(0,0,0,0.10)';
     ctx.beginPath(); ctx.ellipse(it.x, it.y + 10, 8, 3, 0, 0, 7); ctx.fill();
+    const key = 'food_' + it.content;
+    if (typeof Assets !== 'undefined' && Assets.ok(key)) {
+      const im = Assets.imgs[key], s = 40;
+      ctx.drawImage(im, it.x - s / 2, it.y - s / 2, s, s);
+      continue;
+    }
     ctx.fillText(it.icon, it.x, it.y);
   }
   ctx.textBaseline = 'alphabetic';
