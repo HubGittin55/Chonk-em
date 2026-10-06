@@ -1,5 +1,10 @@
 # HANDOFFS — newest on top
 
+## Handoff — PR #3 follow-up: cat physics, no-ghost sizes, small barrels, split, armor — stunkus, 2026-10-05
+Done (all on `stunkus/extreme-mode`, folded into PR #3 per owner): (1) **Cat jiggle v2** — springs retuned slow/lazy (belly ~0.8 Hz), lagging sub-belly spring for the secondary fat-wobble, impulses scale with chonk, sprite squash amplified. (2) **No more crossfade** — hard stage cuts with a 0.28 s squash-pop (owner: crossfade ghosted); sprite stages now trigger at **exponential weight thresholds** (~1.35x lb/stage: 10→80); STAGES flavor table exponential too (~2.3x). (3) **Barrels smaller + spread**: r 22→15, 78 px hex-grid spacing, field widened to y 150–660, 32 barrels/level, desktop-first sizing (owner: fine if small on mobile). (4) **Split-yarn powerup**: next ball divides into 3 on its first burst (≥1 barrel/level). (5) **Armored barrels**: steel band, 2 hits (crack + tink, then burst), ~15% of snacks.
+Files: js/cats.js, js/main.js, js/levels.js, js/barrels.js, js/physics.js, js/audio.js, tools/smoke.js, TASKS.md, DESIGN.md
+How to verify: `node tools/smoke.js` → 57/57.
+
 ## Handoff — extreme-mode: vacuum hazard + XL levels + food physics (PR #3) — stunkus, 2026-10-05
 Done: (1) **Vacuum hazard** (`js/vacuum.js`, claimed from `hazards`): Roomba-style patroller under the belt, 42 px/s, suction 95 px / capture 30 px, eats falling + belt loot (food and power-ups), can't steal from the drop chute, escaped loot can re-land. Spawns on levels 6/9/12 only (3/12 — rare per owner). Vector-drawn, warning popup on entry. (2) **XL levels** (`levels-xl`): every level ~2.6x barrels (33–43, was 13–22), goals ~3x (94–217, was 8–52), balls +80% (18–40); layouts expanded from the originals preserving kind/content mix, bounds + 56 px spacing + calorie budget (eff/goal ≈ 2.2) validated. (3) **Food physics**: loot bounces off barrels (never bursts them — burst is yarn-only), belt bounce settles into the ride, floor bounce for misses, wall bounces; suction-yanked loot can't re-land mid-cone.
 Files: js/vacuum.js (new), js/main.js, js/levels.js, js/physics.js, index.html, tools/smoke.js, TASKS.md, DESIGN.md

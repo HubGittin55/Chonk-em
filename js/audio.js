@@ -42,6 +42,7 @@ const AudioSys = {
   },
 
   pop()    { this.tone(420 + Math.random() * 140, 0.08, 'triangle', 0.10); },
+  tink()   { this.tone(1350 + Math.random() * 500, 0.07, 'square', 0.06, 2100); },
   burst()  { this.tone(170, 0.12, 'square', 0.08, 90); this.tone(620 + Math.random() * 220, 0.10, 'sine', 0.10, 900); },
   catch()  { this.tone(880, 0.07, 'sine', 0.07, 1200); },
   nom()    { this.tone(210, 0.09, 'sawtooth', 0.07, 110); setTimeout(() => this.tone(170, 0.10, 'sawtooth', 0.07, 90), 95); },

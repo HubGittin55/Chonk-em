@@ -39,7 +39,8 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 - A yarn ball **survives bursting barrels**, losing ~25% speed per burst — chaining 2–4 barrels in one shot is the skill ceiling. It dies when slow or after N bounces.
 
 ### 4.2 Barrels (the pegs)
-- Round wooden barrels. **One hit → burst**: wood particles, contents eject with a small random pop velocity.
+- Round wooden barrels, **small** (r=15, desktop-first sizing). **One hit → burst**: wood particles, contents eject with a small random pop velocity.
+- **Armored barrels** (steel band, ~15% of snacks): need **2 hits** — first hit cracks them (tink + crack lines), second bursts.
 - Contents are **labeled, not random**: snack barrels carry a fish icon, veggie barrels a broccoli icon, power-up barrels a star. Aiming stays a real decision. Later levels add **mystery barrels (???)** for chaos.
 - Barrel types:
   - **Snack barrel** — spills a snack (see 4.3).
@@ -49,6 +50,7 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 
 ### 4.3 Contents: snacks, veggies, power-ups
 | Item | Calories | Behavior |
+| Split Yarn | ★ power-up | Next yarn ball divides into 3 on its first burst |
 |---|---|---|
 | Kibble | +1 | Standard fall |
 | Salmon chunk | +3 | Light, drifts a little |
@@ -81,7 +83,11 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 - **Vacuum cleaner (shipped, extreme-mode):** a Roomba-style unit patrols slowly (42 px/s) beneath the conveyor on levels 6, 9 and 12 only — rare by design. Suction radius 95 px yanks falling and belt-riding loot (food AND power-ups) into its mouth; anything within 30 px is eaten. Loot already in the bowl's drop chute is safe. Yanked loot that escapes the suction cone can re-land on the belt. Warning popup on level start. Time your shots.
 - **Cucumber:** if a yarn ball hits it, the shooter cat gets spooked and loot scatters extra hard (spec TBD — `hazards`).
 
-### 4.8 Food physics
+### 4.8 Cat jiggle physics
+- Three springs (belly/cheek/tail) tuned slow and lazy (belly ~0.8 Hz) with a lagging sub-belly spring for the secondary fat-wobble. Impulses scale with chonk — fatter cat, bigger jiggle. Sprite squash-and-stretch amplified accordingly.
+- **No crossfade between sizes** — hard stage cuts with a 0.28 s squash-pop on size-up (crossfade looked ghostly). Sprite stages trigger at **exponential weight thresholds** (~1.35x lb per stage); per-level stage names also exponential (~2.3x cal per stage).
+
+### 4.9 Food physics
 - Loot is a real physical object: gravity per item, bounce off uncleared barrels (restitution 0.5 — food NEVER bursts barrels, burst is yarn-only), side-wall bounces, belt bounces (settles and rides after 2–3 hops), tile-floor bounces for missed food (3 bounces, then lost). Suction-yanked loot can't re-land until it escapes the vacuum's cone.
 
 ## 5. Level structure
