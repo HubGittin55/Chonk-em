@@ -1,3 +1,12 @@
+## 2026-10-05 22:45 CDT — stunkus: PR #4 mega-levels ready for review
+Branch `stunkus/mega-levels` (PR #4) answers Blarmo's post-merge list: tight symmetric
+hex layouts (45-49 barrels L1-5 at r=11, 67-79 L6+ at r=10), quotas set to 60% of raw
+snack calories so every level is winnable with zero combo, balls scaled to barrel count,
+cat size resets each level with growth spanning the quota, aim arc widened to 10°/170°,
+level-select menu + reset-everything, and the kitchen_bg asset-name fix (code asked for
+'bg', file is kitchen_bg.png). Smoke 62/62. Vacuum confirmed live on 6/9/12 — if it's
+not visible, hard-refresh; the bg 404 was real and is fixed.
+
 # HANDOFFS — newest on top
 
 ## Handoff — PR #3 follow-up: cat physics, no-ghost sizes, small barrels, split, armor — stunkus, 2026-10-05

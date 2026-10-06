@@ -152,3 +152,14 @@ No multiplayer, no accounts, no IAP, no backend leaderboards, no 3D, no framewor
 - Funnel: sway on its own (timing skill) vs player-steerable (control skill)? Verdict 2026-10-05: **neither — cut it.** Belt gap geometry replaces it.
 - Should the main cat ever *lose* chonk (diet level)? Verdict so far: absolutely not. This is a pro-chonk household.
 - Level editor for players? Nice-to-have post-v1.
+
+## Mega levels (PR #4, 2026-10-05)
+Owner asked for longer, harder, reliably-winnable levels plus a menu:
+- Tight symmetric hex layouts: L1-5 get 45-49 barrels (r=11), L6+ get 67-79 (r=10),
+  shapes per level (block/diamond/rows/columns/ring/twin/cross), mirrored about x=300.
+- Quotas = 60% of raw snack calories: clearable with ZERO combo (combo is pure bonus).
+- Balls scale with barrels (~70% of count); par ~75% of balls.
+- Cat size resets every level; per-level lbPerCal = 75/goal so growth spans the quota.
+- Aim arc widened 25°/155° -> 10°/170°.
+- Level-select menu (boot + HUD ☰ button + Esc), best-stars per level, reset-everything button.
+- BG asset name fixed: code asked for 'bg', file is kitchen_bg.png.
