@@ -1,4 +1,4 @@
-# CHONK 'EM
+# CHONK 'EM — v0.4
 
 **▶ Play live: https://hubgittin55.github.io/Chonk-em/** (auto-deploys from `main`)
 

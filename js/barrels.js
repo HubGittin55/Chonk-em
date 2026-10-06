@@ -37,7 +37,7 @@ function drawArmor(ctx, b, r) {
 function drawBarrels(ctx, barrels, time) {
   for (const b of barrels) {
     if (b.cleared) continue;
-    const c = CONTENT[b.content];
+    const c = CONTENT[b.content] || {};
     const r = b.r;
 
     // Generated barrel skin (AoT style), vector fallback below
@@ -61,9 +61,10 @@ function drawBarrels(ctx, barrels, time) {
     ctx.fillStyle = 'rgba(60,35,10,0.16)';
     ctx.beginPath(); ctx.ellipse(b.x + 3, b.y + 5, r, r * 0.92, 0, 0, 7); ctx.fill();
 
-    // Wooden body with light from upper-left
+    // Wooden body with light from upper-left (hollow gray for empty barrels)
     const g = ctx.createRadialGradient(b.x - r * 0.4, b.y - r * 0.45, r * 0.25, b.x, b.y, r);
-    g.addColorStop(0, '#c99257'); g.addColorStop(0.6, '#a9743c'); g.addColorStop(1, '#7c5225');
+    if (b.kind === 'empty') { g.addColorStop(0, '#a8a8b0'); g.addColorStop(0.6, '#84848e'); g.addColorStop(1, '#5e5e66'); }
+    else { g.addColorStop(0, '#c99257'); g.addColorStop(0.6, '#a9743c'); g.addColorStop(1, '#7c5225'); }
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 7); ctx.fill();
 
@@ -117,6 +118,14 @@ function drawBarrels(ctx, barrels, time) {
 
     // Contents badge — labeled, not a slot machine (scaled to barrel)
     const br = r * 0.62;
+    if (b.kind === 'empty') {
+      // hollow: dashed gray ring, nothing inside
+      ctx.strokeStyle = 'rgba(70,70,80,0.75)'; ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.arc(b.x, b.y, br, 0, 7); ctx.stroke();
+      ctx.setLineDash([]);
+      continue;
+    }
     ctx.fillStyle = 'rgba(0,0,0,0.18)';
     ctx.beginPath(); ctx.arc(b.x, b.y + 2, br + 0.5, 0, 7); ctx.fill();
     ctx.fillStyle = b.kind === 'power' ? '#ffe9b8' : '#fff8ec';
