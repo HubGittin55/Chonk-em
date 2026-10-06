@@ -1,6 +1,6 @@
 # HANDOFFS — newest on top
 
-## Handoff — extreme-mode: vacuum hazard + XL levels + food physics (PR) — stunkus, 2026-10-05
+## Handoff — extreme-mode: vacuum hazard + XL levels + food physics (PR #3) — stunkus, 2026-10-05
 Done: (1) **Vacuum hazard** (`js/vacuum.js`, claimed from `hazards`): Roomba-style patroller under the belt, 42 px/s, suction 95 px / capture 30 px, eats falling + belt loot (food and power-ups), can't steal from the drop chute, escaped loot can re-land. Spawns on levels 6/9/12 only (3/12 — rare per owner). Vector-drawn, warning popup on entry. (2) **XL levels** (`levels-xl`): every level ~2.6x barrels (33–43, was 13–22), goals ~3x (94–217, was 8–52), balls +80% (18–40); layouts expanded from the originals preserving kind/content mix, bounds + 56 px spacing + calorie budget (eff/goal ≈ 2.2) validated. (3) **Food physics**: loot bounces off barrels (never bursts them — burst is yarn-only), belt bounce settles into the ride, floor bounce for misses, wall bounces; suction-yanked loot can't re-land mid-cone.
 Files: js/vacuum.js (new), js/main.js, js/levels.js, js/physics.js, index.html, tools/smoke.js, TASKS.md, DESIGN.md
 How to verify: `node tools/smoke.js` → 45/45. Play level 6: vacuum patrols under the belt and steals your snacks — time your shots.
