@@ -102,6 +102,8 @@ function loadLevel(i) {
   game.multiShots = 0; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0; game.shotsFired = 0;
   game.items = [];
   game.popups = [];
+  game.vacuum = L.vacuum ? Vacuum.create() : null;
+  if (game.vacuum) addPopup(W / 2, 330, '⚠ VACUUM PATROL ⚠', '#c62828');
   game.barrels = L.barrels.map(b => ({ x: b.x, y: b.y, r: 22, kind: b.kind, content: b.content, cleared: false }));
   game.calories = 0;
   game.stage = 0;
@@ -393,9 +395,28 @@ function tick(dt) {
       if (game.magnetT > 0) it.vx += Math.sign(Conveyor.BOWL_X - it.x) * 300 * wdt;
       it.x += it.vx * wdt;
       it.y += it.vy * wdt;
-      if (it.y >= Conveyor.BELT_Y && it.vy > 0 && Conveyor.onBelt(it.x, game.bridgeT > 0)) {
-        it.state = 'belt'; it.y = Conveyor.BELT_Y; it.vy = 0;
-        AudioSys.catch();
+      // Food bounces off barrels but NEVER breaks them (burst is yarn-only).
+      Physics.bounceItem(it, game.barrels);
+      // Side walls
+      if (it.x < 20) { it.x = 20; it.vx = Math.abs(it.vx) * 0.5; }
+      if (it.x > 580) { it.x = 580; it.vx = -Math.abs(it.vx) * 0.5; }
+      // Belt: bounce a couple of times, then settle and ride
+      if (it.y >= Conveyor.BELT_Y && it.vy > 0 && !it.sucked && Conveyor.onBelt(it.x, game.bridgeT > 0)) {
+        if (it.vy > 110) {
+          it.y = Conveyor.BELT_Y;
+          it.vy = -it.vy * 0.45;
+          it.vx *= 0.7;
+          it.bounces = (it.bounces || 0) + 1;
+        } else {
+          it.state = 'belt'; it.y = Conveyor.BELT_Y; it.vy = 0;
+          AudioSys.catch();
+        }
+      }
+      // Tile floor: missed food bounces, then it's lost
+      if (it.state === 'fall' && it.y >= 853 && it.vy > 0) {
+        it.bounces = (it.bounces || 0) + 1;
+        if (it.bounces >= 3 || it.vy < 90) { it.gone = true; loseItem(it); }
+        else { it.y = 853; it.vy = -it.vy * 0.35; it.vx *= 0.6; }
       }
       if (it.y > H + 40 && !it.gone) { it.gone = true; loseItem(it); }
     } else if (it.state === 'belt') {
@@ -407,6 +428,11 @@ function tick(dt) {
     }
   }
   game.items = game.items.filter(i => !i.gone);
+
+  if (game.vacuum) Vacuum.tick(game.vacuum, wdt, game.items, (x, y, it) => {
+    addPopup(x, y - 22, 'VACUUM\'D!', '#7b1fa2');
+    spawnCrumbs(x, y);
+  });
 
   if (!game.over && game.balls <= 0 && !game.shots.length && game.items.length === 0) endGame(false);
 }
@@ -620,6 +646,7 @@ function render() {
   drawBackground();
   drawBarrels(ctx, game.barrels, game.time);
   Conveyor.draw(ctx, game.bridgeT > 0);
+  if (game.vacuum) Vacuum.draw(ctx, game.vacuum);
   drawItems();
   drawPreview();
   drawBall();

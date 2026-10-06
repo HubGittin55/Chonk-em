@@ -29,7 +29,7 @@ global.localStorage = {
 
 // ---------- boot the game ----------
 const root = path.join(__dirname, '..');
-const files = ['audio', 'physics', 'levels', 'barrels', 'conveyor', 'cats', 'input', 'main'];
+const files = ['audio', 'physics', 'levels', 'barrels', 'conveyor', 'vacuum', 'cats', 'input', 'main'];
 const src = files.map(f => fs.readFileSync(path.join(root, 'js', f + '.js'), 'utf8')).join('\n');
 vm.runInThisContext(src, { filename: 'chonk.bundle.js' });
 
@@ -44,13 +44,13 @@ const step = (n) => { for (let i = 0; i < n; i++) tick(1 / 120); };
 console.log('CHONK-EM smoke test (v0.2 contents-full)');
 
 // 1. boot
-T('boot: level 1 loads with 13 barrels (incl. 2 power)', game.barrels.length === 13 && game.balls === 10);
+T('boot: level 1 loads with 33 barrels (incl. 2 power)', game.barrels.length === 33 && game.balls === 18);
 T('boot: power barrels present', game.barrels.some(b => b.kind === 'power' && b.content === 'wide') &&
   game.barrels.some(b => b.kind === 'power' && b.content === 'multi'));
 
 // 2. single shot
 fireShot(300, 500);
-T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 9);
+T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 17);
 step(1200); // 10s: ball bursts the center column, then falls out
 T('fire: ball dies out cleanly', game.shots.length === 0);
 
@@ -58,7 +58,7 @@ T('fire: ball dies out cleanly', game.shots.length === 0);
 loadLevel(0);
 game.multiShots = 1;
 fireShot(300, 500);
-T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 7);
+T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 15);
 T('multi: consumed after firing', game.multiShots === 0);
 game.shots = [];
 
@@ -74,6 +74,8 @@ T('power multi: next shot armed', game.multiShots === 1);
 game.multiShots = 0; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0;
 
 // 5. distinct fall behaviors: tuna (heavy) outpaces salmon (light+drift)
+// (clear barrels: this tests fall physics, barrel bounce is covered in section 14)
+game.barrels.forEach(b => b.cleared = true);
 game.items = [
   { x: 200, y: 300, vx: 0, vy: 0, r: 9, state: 'fall', cal: 5, grav: CONTENT.tuna.grav,   drift: CONTENT.tuna.drift,   t: 0, gone: false },
   { x: 400, y: 300, vx: 0, vy: 0, r: 9, state: 'fall', cal: 3, grav: CONTENT.salmon.grav, drift: CONTENT.salmon.drift, t: 0, gone: false },
@@ -85,6 +87,7 @@ T('fall: salmon drifts horizontally, tuna does not', Math.abs(salmon.x - 400) > 
 game.items = [];
 
 // 6. magnet pulls loot toward the bowl
+game.barrels.forEach(b => b.cleared = true);
 game.magnetT = 15;
 game.items = [{ x: 480, y: 400, vx: 0, vy: 100, r: 9, state: 'fall', cal: 1, grav: 1, drift: 0, t: 0, gone: false }];
 step(60);
@@ -139,7 +142,6 @@ T('frenzy: clean stage-up triggers FEAST FRENZY (+2 yarn, 0.35× time)',
 step(60);
 T('chonk-stages: body width eases toward weight-based target (not instant)',
   game.displayRx > catRx(0) && game.displayRx < catRx(chonkT(game.weightLb)));
-T('saves: best stars persisted to localStorage', lsStore.has('chonk-em:best'));
 loadLevel(0);
 fireShot(150, 400);
 T('stars/par: shotsFired counts balls launched', game.shotsFired === 1);
@@ -169,13 +171,14 @@ T('levels: calorie budget winnable (combo-aware effective cal >= 1.5x goal)', LE
   cals.forEach((c, i) => { eff += c * Math.min(4, 1 + Math.floor(i / 3)); });
   return eff >= L.goal * 1.5;
 }));
-T('levels: goals scale 8→52', LEVELS.map(L => L.goal).join() === '8,12,16,20,24,28,30,34,38,30,32,52');
+T('levels: goals scale 96→217 (extreme)', LEVELS.map(L => L.goal).join() === '96,145,195,208,177,217,154,101,165,94,161,143');
 
 // 10. win path
 game.calories = game.level.goal; // ensure threshold
 game.over = null;
 deliver({ cal: 1 });
 T('win: reaching goal ends level with win', game.over === 'win');
+T('saves: best stars persisted to localStorage', lsStore.has('chonk-em:best'));
 
 // 11. weight system + wobble v2 (stunkus full-chonk pass)
 loadLevel(0);
@@ -194,6 +197,46 @@ const kicked = Math.abs(game.wob.belly.x) > 0;
 step(600);
 T('wobble: belly spring oscillates then settles near rest',
   kicked && Math.abs(game.wob.belly.x) < 0.05 && Math.abs(game.wob.belly.v) < 0.05);
+
+// 13. vacuum hazard (extreme-mode)
+loadLevel(0);
+T('vacuum: absent on non-flagged levels', game.vacuum === null);
+loadLevel(5); // Diagonal Dash — flagged
+T('vacuum: spawns on flagged levels', game.vacuum !== null && game.vacuum.x >= 70 && game.vacuum.x <= 530);
+const vx0 = game.vacuum.x, vd0 = game.vacuum.dir;
+step(60);
+T('vacuum: patrols slowly left/right', Math.abs(game.vacuum.x - vx0) > 1 && Math.abs(game.vacuum.x - vx0) < 60);
+game.vacuum.x = 529; game.vacuum.dir = 1; step(60);
+T('vacuum: bounces off the right wall', game.vacuum.dir === -1 && game.vacuum.x <= 530);
+game.vacuum.x = 300; game.vacuum.dir = 1;
+game.items.push({ x: 300, y: 700, vx: 0, vy: 0, r: 9, state: 'fall', cal: 3, t: 0, gone: false });
+game.items.push({ x: 320, y: 700, vx: 0, vy: 0, r: 9, state: 'belt', cal: 5, t: 0, gone: false });
+const farItem = { x: 550, y: 700, vx: 0, vy: 0, r: 9, state: 'belt', cal: 3, t: 0, gone: false };
+game.items.push(farItem);
+const eaten0 = game.vacuum.eaten;
+step(60);
+T('vacuum: hoovers nearby fall + belt loot', game.vacuum.eaten >= eaten0 + 2);
+T('vacuum: ignores distant loot', !farItem.gone);
+T('vacuum: only 3 of 12 levels flagged', LEVELS.filter(L => L.vacuum).length === 3);
+
+// 14. food physics: bounce, never burst
+loadLevel(0);
+const bb = game.barrels.find(b => !b.cleared);
+game.items.push({ x: bb.x, y: bb.y - 40, vx: 0, vy: 200, r: 9, state: 'fall', cal: 3, t: 0, gone: false });
+const clearedBefore = game.barrels.filter(b => b.cleared).length;
+step(40);
+T('food: bounces off barrels without bursting them',
+  game.barrels.filter(b => b.cleared).length === clearedBefore);
+loadLevel(0);
+const fi = { x: 200, y: 600, vx: 0, vy: 50, r: 9, state: 'fall', cal: 3, t: 0, gone: false };
+game.items.push(fi);
+step(240);
+T('food: belt bounce settles into belt ride', fi.bounces > 0 && (fi.state === 'belt' || fi.gone));
+loadLevel(0);
+game.items.push({ x: 490, y: 700, vx: 0, vy: 300, r: 9, state: 'fall', cal: 3, t: 0, gone: false }); // over the gap
+const misses0 = game.misses;
+step(600);
+T('food: missed food bounces on floor, then lost', game.items.length === 0 && game.misses > misses0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

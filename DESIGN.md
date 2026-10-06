@@ -78,8 +78,11 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 - Callouts: "BARREL BURST!", "BANK!", "NOM!", "BROCCOLI?!"
 
 ### 4.7 Hazards (later levels)
-- **Vacuum cleaner:** patrols beneath the conveyor, eats loot off the belt. Time your shots.
+- **Vacuum cleaner (shipped, extreme-mode):** a Roomba-style unit patrols slowly (42 px/s) beneath the conveyor on levels 6, 9 and 12 only — rare by design. Suction radius 95 px yanks falling and belt-riding loot (food AND power-ups) into its mouth; anything within 30 px is eaten. Loot already in the bowl's drop chute is safe. Yanked loot that escapes the suction cone can re-land on the belt. Warning popup on level start. Time your shots.
 - **Cucumber:** if a yarn ball hits it, the shooter cat gets spooked and loot scatters extra hard (spec TBD — `hazards`).
+
+### 4.8 Food physics
+- Loot is a real physical object: gravity per item, bounce off uncleared barrels (restitution 0.5 — food NEVER bursts barrels, burst is yarn-only), side-wall bounces, belt bounces (settles and rides after 2–3 hops), tile-floor bounces for missed food (3 bounces, then lost). Suction-yanked loot can't re-land until it escapes the vacuum's cone.
 
 ## 5. Level structure
 

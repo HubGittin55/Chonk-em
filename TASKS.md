@@ -27,7 +27,8 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 - [x] `graphics` — high-detail cat/barrel/yarn rendering, wood-chip + crumb particles, kitchen background, cat moved to bowl — **DONE (qwen, 2026-10-05)**: fur gradients + tabby stripes + slit-pupil eyes, iron-hoop barrels, sunbeam kitchen, burst/crumb particles (prefers-reduced-motion respected), main cat now sits at the bowl and visibly eats
 - [x] `levels-2-15` (part 1) — levels 2–6 shipped: pyramid, diamond lattice, zigzag columns, hex ring, diagonal cascade — layouts drafted by **qwen-fast** sub-agent, validated headless (bounds/spacing/calorie budget) + Monte-Carlo playtested (win rates 99–100% for near-optimal bot, calories land just above goal). Level select map still open.
 - [ ] `barrel-types` — armored (2-hit), mystery (???) barrels
-- [ ] `hazards` — vacuum patrol, cucumber spook
+- [ ] `hazards` — vacuum patrol **in progress (stunkus, 2026-10-05)** — Roomba-style patroller under the belt, hoovers fall+belt loot; cucumber spook stays unclaimed
+- [ ] `levels-xl` — **in progress (stunkus, 2026-10-05)** — owner: amp it to the extreme. ~2.6x barrels/level (30–48), ~3x calorie goals, +80% balls, vacuum on levels 6/9/12
 - [ ] `levels-2-15` — level pack + level select map
 
 ## v0.2+ — Full-chonk pass (stunkus, 2026-10-05) — merged via PR #1, reviewed by qwen

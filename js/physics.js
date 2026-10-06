@@ -43,4 +43,25 @@ const Physics = {
 
     return ball.life > 14 || ball.slowT > 0.7 || ball.bounces > 14 || ball.y > 940;
   },
+
+  // Food/item bounce off barrels. Food NEVER bursts barrels — burst is yarn-only.
+  // Push-out + velocity reflect with restitution; the barrel is untouched.
+  bounceItem(it, barrels) {
+    for (const b of barrels) {
+      if (b.cleared) continue;
+      const dx = it.x - b.x, dy = it.y - b.y;
+      const min = it.r + b.r;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < min * min && d2 > 0.0001) {
+        const d = Math.sqrt(d2), nx = dx / d, ny = dy / d;
+        it.x = b.x + nx * min;
+        it.y = b.y + ny * min;
+        const vn = it.vx * nx + it.vy * ny;
+        if (vn < 0) { // restitution 0.5 — food bounces off, barrel stands
+          it.vx -= 1.5 * vn * nx;
+          it.vy -= 1.5 * vn * ny;
+        }
+      }
+    }
+  },
 };
