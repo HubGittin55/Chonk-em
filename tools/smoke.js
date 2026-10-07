@@ -44,12 +44,12 @@ const step = (n) => { for (let i = 0; i < n; i++) tick(1 / 120); };
 console.log('CHONK-EM smoke test (v0.2 contents-full)');
 
 // 1. boot
-T('boot: level 1 loads with 61 barrels (r=10)', game.barrels.length === 61 && game.balls === 37 && game.barrels.every(b => b.r === 10));
+T('boot: level 1 loads with 61 barrels (r=10), 17 balls (75% of food)', game.barrels.length === 61 && game.balls === 17 && game.barrels.every(b => b.r === 10));
 T('boot: split power barrel present (guaranteed)', game.barrels.some(b => b.kind === 'power' && b.content === 'split'));
 
 // 2. single shot
 fireShot(300, 500);
-T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 36);
+T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 16);
 step(1200); // 10s: ball bursts the center column, then falls out
 T('fire: ball dies out cleanly', game.shots.length === 0);
 
@@ -57,7 +57,7 @@ T('fire: ball dies out cleanly', game.shots.length === 0);
 loadLevel(0);
 game.multiShots = 1;
 fireShot(300, 500);
-T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 34);
+T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 14);
 T('multi: consumed after firing', game.multiShots === 0);
 game.shots = [];
 
@@ -177,7 +177,16 @@ T('v0.4 levels: goal <= 65% of RAW snack calories (winnable with zero combo)', L
   const raw = L.barrels.reduce((t, b) => t + (b.kind === 'snack' ? CONTENT[b.content].cal : 0), 0);
   return L.goal <= raw * 0.65;
 }));
-T('v0.4 levels: balls = 60% of barrel count', LEVELS.every(L => L.balls === Math.round(L.barrels.length * 0.6)));
+const _calOf = b => (CONTENT[b.content] || { cal: 0 }).cal > 0;
+T('v0.5: balls = 75% of food barrels (handcrafted)', LEVELS.every(L => {
+  const food = L.barrels.filter(b => b.kind === 'snack' && _calOf(b)).length;
+  return L.balls === Math.max(8, Math.round(food * 0.75));
+}));
+T('v0.5: balls = 75% of food barrels (procedural)', [13, 25, 50, 100].every(n => {
+  const L = getLevel(n - 1);
+  const food = L.barrels.filter(b => b.kind === 'snack' && _calOf(b)).length;
+  return L.balls === Math.max(8, Math.round(food * 0.75));
+}));
 T('levels: calorie budget winnable (combo-aware effective cal >= 1.5x goal)', LEVELS.every(L => {
   // model real play: clean deliveries ramp the combo multiplier 1,1,1,2,2,2,3,3,3,4...
   const cals = L.barrels.filter(b => b.kind === 'snack').map(b => CONTENT[b.content].cal).sort((a, b) => a - b);
@@ -187,11 +196,36 @@ T('levels: calorie budget winnable (combo-aware effective cal >= 1.5x goal)', LE
 }));
 T('v0.4 levels: goals are the 60%-of-raw set', LEVELS.map(L => L.goal).join() === '35,37,39,42,44,47,49,51,54,56,59,61');
 
-// 10. win path
-game.calories = game.level.goal; // ensure threshold
-game.over = null;
+// 10. win path: goal no longer ends the level instantly
+loadLevel(0);
+game.calories = game.level.goal - 1;
 deliver({ cal: 1 });
-T('win: reaching goal ends level with win', game.over === 'win');
+T('v0.5: reaching goal does NOT end level mid-play', game.over === null && game.goalMet === true);
+// exhaustion: balls gone -> scores win when goal met
+loadLevel(0);
+game.calories = game.goalNow;
+game.balls = 0; game.shots = []; game.items = [];
+step(100);
+T('v0.5: balls exhausted scores a WIN when goal met', game.over === 'win');
+// exhaustion: balls gone, goal missed -> lose
+loadLevel(0);
+game.calories = 0;
+game.balls = 0; game.shots = []; game.items = [];
+step(100);
+T('v0.5: balls exhausted with goal missed scores a LOSS', game.over === 'lose');
+// exhaustion: no food barrels left but balls remain -> level still ends
+loadLevel(0);
+game.calories = game.goalNow;
+game.barrels.forEach(b => { if (b.kind === 'snack') b.cleared = true; });
+game.shots = []; game.items = [];
+step(100);
+T('v0.5: no food barrels left ends level even with balls remaining', game.over === 'win');
+// mid-level: food remains, balls remain -> keeps playing
+loadLevel(0);
+game.calories = game.goalNow;
+game.shots = []; game.items = [];
+step(100);
+T('v0.5: level continues while food and balls remain', game.over === null);
 T('saves: best stars persisted to localStorage', lsStore.has('chonk-em:best'));
 
 // 11. weight system + wobble v2 (stunkus full-chonk pass)
@@ -414,6 +448,31 @@ T('weigh: ceremony runs needle to target and fires finale', (() => {
   return Math.abs(w.shown - 20) < 0.05 && w.finale === true;
 })());
 T('weigh: trombone + fanfare synths exist', typeof AudioSys.trombone === 'function' && typeof AudioSys.fanfare === 'function');
+T('v0.5: weigh-in cat cycles 10 lb sprite -> final size', (() => {
+  loadLevel(0);
+  game.weightLb = 42; game.calories = 40; game.maxCombo = 3;
+  endGame(true);
+  const w = game.weigh;
+  if (!w || w.stageIdx !== stageIdxForLb(10)) return false;
+  for (let i = 0; i < 150; i++) updateWeigh(1 / 60); // halfway: mid-size
+  const mid = w.stageIdx;
+  for (let i = 0; i < 300; i++) updateWeigh(1 / 60);
+  return mid > stageIdxForLb(10) && w.stageIdx === stageIdxForLb(42);
+})());
+T('v0.5: weigh-in needle ticks jiggle the chonk', (() => {
+  loadLevel(0);
+  game.weightLb = 60; game.calories = 60; game.maxCombo = 3;
+  game.wob.belly.x = 0; game.wob.belly.v = 0;
+  endGame(true);
+  const w = game.weigh;
+  for (let i = 0; i < 300; i++) updateWeigh(1 / 60);
+  return Math.abs(game.wob.belly.x) + Math.abs(game.wob.belly.v) > 0.01;
+})());
+T('v0.5: weigh-in draws the real sprite, not an emoji', (() => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'js', 'main.js'), 'utf8');
+  const seg = src.split('function drawScale')[1].split('function hideOverlay')[0];
+  return seg.includes('Cats.drawMain') && !seg.includes("'🐱'");
+})());
 T('unlocks: species gated by total stars (never spent)', (() => {
   store.set('best', { 0: { stars: 3 }, 1: { stars: 3 }, 2: { stars: 2 } }); // 8 total
   const t = totalStars();
@@ -433,9 +492,9 @@ T('unlocks: loadLevel uses the picked species', (() => {
   store.set('best', {}); store.set('cat', 0);
   return v === 1;
 })());
-T('v0.4: conveyor has 60px gaps on BOTH sides (symmetric)', (() => {
+T('v0.5: conveyor has 32px gaps on BOTH sides (symmetric)', (() => {
   const nb = (x) => Conveyor.onBelt(x, false);
-  return !nb(50) && nb(100) && nb(300) && nb(500) && !nb(550) &&
+  return !nb(50) && !nb(65) && nb(100) && nb(300) && nb(500) && !nb(540) && !nb(550) &&
          Conveyor.onBelt(50, true) && Conveyor.onBelt(550, true);
 })());
 T('v0.4: conveyor slats run left with the food', (() => {
