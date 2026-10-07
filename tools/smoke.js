@@ -44,12 +44,12 @@ const step = (n) => { for (let i = 0; i < n; i++) tick(1 / 120); };
 console.log('CHONK-EM smoke test (v0.2 contents-full)');
 
 // 1. boot
-T('boot: level 1 loads with 61 barrels (r=10), 17 balls (75% of food)', game.barrels.length === 61 && game.balls === 17 && game.barrels.every(b => b.r === 10));
+T('boot: level 1 loads with 61 barrels (r=10), 11 balls (50% of food)', game.barrels.length === 61 && game.balls === 11 && game.barrels.every(b => b.r === 10));
 T('boot: split power barrel present (guaranteed)', game.barrels.some(b => b.kind === 'power' && b.content === 'split'));
 
 // 2. single shot
 fireShot(300, 500);
-T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 16);
+T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 10);
 step(1200); // 10s: ball bursts the center column, then falls out
 T('fire: ball dies out cleanly', game.shots.length === 0);
 
@@ -57,7 +57,7 @@ T('fire: ball dies out cleanly', game.shots.length === 0);
 loadLevel(0);
 game.multiShots = 1;
 fireShot(300, 500);
-T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 14);
+T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 8);
 T('multi: consumed after firing', game.multiShots === 0);
 game.shots = [];
 
@@ -178,14 +178,14 @@ T('v0.4 levels: goal <= 65% of RAW snack calories (winnable with zero combo)', L
   return L.goal <= raw * 0.65;
 }));
 const _calOf = b => (CONTENT[b.content] || { cal: 0 }).cal > 0;
-T('v0.5: balls = 75% of food barrels (handcrafted)', LEVELS.every(L => {
+T('v0.5: balls = 50% of food barrels (handcrafted)', LEVELS.every(L => {
   const food = L.barrels.filter(b => b.kind === 'snack' && _calOf(b)).length;
-  return L.balls === Math.max(8, Math.round(food * 0.75));
+  return L.balls === Math.max(8, Math.round(food * 0.5));
 }));
 T('v0.5: balls = 75% of food barrels (procedural)', [13, 25, 50, 100].every(n => {
   const L = getLevel(n - 1);
   const food = L.barrels.filter(b => b.kind === 'snack' && _calOf(b)).length;
-  return L.balls === Math.max(8, Math.round(food * 0.75));
+  return L.balls === Math.max(8, Math.round(food * 0.5));
 }));
 T('levels: calorie budget winnable (combo-aware effective cal >= 1.5x goal)', LEVELS.every(L => {
   // model real play: clean deliveries ramp the combo multiplier 1,1,1,2,2,2,3,3,3,4...
@@ -345,9 +345,10 @@ T('armor: second hit bursts', didBurst && arm.cleared);
 
 // 18. v0.4 features
 T('v0.4: menu API exists and boots open', typeof showMenu === 'function' && typeof hideMenu === 'function' && game.menuOpen === true);
-T('v0.4: ~50% of barrels are dry (empty/steel/keg/bumper, no loot flood)', LEVELS.every(L => {
+T('v0.5: dry barrels 50-70% (no loot flood; veggie cut raised it)', LEVELS.every(L => {
   const e = L.barrels.filter(b => ['empty', 'steel', 'keg', 'bumper'].includes(b.kind)).length;
-  return Math.abs(e - L.barrels.length / 2) <= 4;
+  const f = e / L.barrels.length;
+  return f >= 0.5 && f <= 0.7;
 }));
 T('v0.4: empty barrel burst spawns no item', (() => {
   loadLevel(0);
@@ -355,6 +356,13 @@ T('v0.4: empty barrel burst spawns no item', (() => {
   const eb = game.barrels.find(b => b.kind === 'empty');
   onBarrelBurst(eb, null);
   return game.items.length === before;
+})());
+T('v0.5: hard mode = 20% fewer balls than normal, goals kept', (() => {
+  store.set('difficulty', 'hard'); loadLevel(0);
+  const hardBalls = game.balls, hardGoal = game.goalNow;
+  store.set('difficulty', 'normal'); loadLevel(0);
+  const ok = hardBalls === Math.round(game.balls * 0.8) && hardGoal === Math.round(LEVELS[0].goal * 1.2);
+  return ok;
 })());
 T('v0.4: difficulty setting scales balls and goal', (() => {
   store.set('difficulty', 'hard'); loadLevel(0);
@@ -468,6 +476,49 @@ T('v0.5: weigh-in needle ticks jiggle the chonk', (() => {
   for (let i = 0; i < 300; i++) updateWeigh(1 / 60);
   return Math.abs(game.wob.belly.x) + Math.abs(game.wob.belly.v) > 0.01;
 })());
+T('v0.5: no item wedges forever (freeze regression)', (() => {
+  loadLevel(10); // L11, dense field
+  let seed = 7;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  for (let shot = 0; shot < 8 && game.balls > 0; shot++) {
+    fireShot(100 + rnd() * 400, 200 + rnd() * 300);
+    for (let i = 0; i < 2400 && game.shots.length; i++) tick(1 / 120);
+    for (let i = 0; i < 3600; i++) tick(1 / 120);
+  }
+  return game.items.length === 0;
+})());
+T('v0.5: big bites no longer 2x the cat (capped eating kick)', (() => {
+  loadLevel(0);
+  game.wob.belly.x = 0; game.wob.belly.v = 0;
+  deliver({ cal: 100 }); // imperial feast: old kick 1.6+35 -> ~2x height blowup
+  let peak = 0;
+  for (let i = 0; i < 600; i++) { tick(1 / 120); peak = Math.max(peak, Math.abs(game.wob.belly.x)); }
+  return peak < 3.5; // capped: old formula peaked ~16 (2x+ visual blowup)
+})());
+T('v0.5: barrel hits spawn no floating text (decluttered)', (() => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'js', 'main.js'), 'utf8');
+  const burst = src.split('function onBarrelBurst')[1].split('function explode')[0];
+  const special = src.split('function onBarrelSpecial')[1].split('function deliver')[0];
+  return !/addPopup/.test(burst) && !/addPopup/.test(special) && !/CRACKED|CLANG|BOING|BOOM!|SPLIT!/.test(burst + special);
+})());
+T('v0.5: weigh-in stars light cumulatively (1st star not skipped)', (() => {
+  const run = frac => {
+    loadLevel(0);
+    const max = START_LB + LB_PER_CAL * rawCal(game.level);
+    game.weightLb = START_LB + frac * (max - START_LB);
+    game.calories = game.goalNow; game.maxCombo = 3;
+    endGame(true);
+    for (let i = 0; i < 400; i++) updateWeigh(1 / 60);
+    return game.weigh.lit;
+  };
+  return run(0.5) === 1 && run(0.8) === 2 && run(0.95) === 3;
+})());
+T('v0.5: frame loop is unkillable (reschedule-first + try/catch + step cap)', (() => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'js', 'main.js'), 'utf8');
+  const seg = src.split('function frame(now)')[1].split('\nrequestAnimationFrame(frame);\n')[0];
+  const reschedFirst = seg.indexOf('requestAnimationFrame(frame);') < seg.indexOf('try {');
+  return reschedFirst && /try \{[\s\S]*tick\(STEP\)[\s\S]*catch \(e\)/.test(seg) && /n\+\+ < 24/.test(seg);
+})());
 T('v0.5: weigh-in draws the real sprite, not an emoji', (() => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'js', 'main.js'), 'utf8');
   const seg = src.split('function drawScale')[1].split('function hideOverlay')[0];
@@ -492,6 +543,18 @@ T('unlocks: loadLevel uses the picked species', (() => {
   store.set('best', {}); store.set('cat', 0);
   return v === 1;
 })());
+T('v0.5: veggies quartered, food untouched (handcrafted)', (() => {
+  const orig = { 1: 6, 2: 9, 3: 3, 4: 14, 5: 9, 6: 12, 7: 8, 8: 22, 9: 13, 10: 9, 11: 9, 12: 16 };
+  return LEVELS.every((L, i) => {
+    const veg = L.barrels.filter(b => b.kind === 'veggie').length;
+    return veg === Math.max(1, Math.round(orig[i + 1] / 4));
+  });
+})());
+T('v0.5: veggies quartered (procedural ~3%)', (() => [13, 50, 100].every(n => {
+  const L = getLevel(n - 1);
+  const veg = L.barrels.filter(b => b.kind === 'veggie').length;
+  return veg <= Math.ceil(L.barrels.length * 0.05);
+}))());
 T('v0.5: conveyor has 32px gaps on BOTH sides (symmetric)', (() => {
   const nb = (x) => Conveyor.onBelt(x, false);
   return !nb(50) && !nb(65) && nb(100) && nb(300) && nb(500) && !nb(540) && !nb(550) &&
