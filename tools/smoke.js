@@ -109,9 +109,9 @@ for (let i = 0; i < 120 * 2; i++) {
   if (game.items.some(it => it.state === 'belt' || it.state === 'drop')) { caught = true; break; }
 }
 T('chain: loot lands on belt → rides to bowl', caught);
-// loot over the gap → lost
+// loot over the end gap → lost
 const comboBefore = game.combo;
-game.items.push({ x: 490, y: 650, vx: 0, vy: 100, r: 9, state: 'fall', cal: 1, grav: 1, drift: 0, t: 0, gone: false });
+game.items.push({ x: 530, y: 650, vx: 0, vy: 100, r: 9, state: 'fall', cal: 1, grav: 1, drift: 0, t: 0, gone: false });
 let lost = false;
 for (let i = 0; i < 120 * 4; i++) {
   tick(1 / 120);
@@ -120,7 +120,7 @@ for (let i = 0; i < 120 * 4; i++) {
 T('gap: loot through the gap is lost', lost);
 // bridge power-up saves gap loot
 game.bridgeT = 15;
-game.items.push({ x: 490, y: 650, vx: 0, vy: 100, r: 9, state: 'fall', cal: 1, grav: 1, drift: 0, t: 0, gone: false });
+game.items.push({ x: 530, y: 650, vx: 0, vy: 100, r: 9, state: 'fall', cal: 1, grav: 1, drift: 0, t: 0, gone: false });
 let bridged = false;
 for (let i = 0; i < 120 * 2; i++) {
   tick(1 / 120);
@@ -139,9 +139,12 @@ const ballsBefore = game.balls;
 deliver({ cal: 1 }); // clean stage-up → FEAST FRENZY
 T('frenzy: clean stage-up triggers FEAST FRENZY (+2 yarn, 0.35× time)',
   game.frenzy === 6 && game.balls === ballsBefore + 2 && game.timeScale === 0.35);
+// chonk easing: bulk past 10 lb (0.3 lb/cal needs real food), then watch it ease
+loadLevel(0);
+deliver({ cal: 5 }); deliver({ cal: 5 }); deliver({ cal: 5 }); deliver({ cal: 5 });
 step(60);
 T('chonk-stages: body width eases toward weight-based target (not instant)',
-  game.displayRx > catRx(0) && game.displayRx < catRx(chonkT(game.weightLb)));
+  game.weightLb > 10 && game.displayRx > catRx(0) && game.displayRx < catRx(chonkT(game.weightLb)));
 loadLevel(0);
 fireShot(150, 400);
 T('stars/par: shotsFired counts balls launched', game.shotsFired === 1);
@@ -182,7 +185,7 @@ T('levels: calorie budget winnable (combo-aware effective cal >= 1.5x goal)', LE
   cals.forEach((c, i) => { eff += c * Math.min(4, 1 + Math.floor(i / 3)); });
   return eff >= L.goal * 1.5;
 }));
-T('v0.4 levels: goals are the 60%-of-raw set', LEVELS.map(L => L.goal).join() === '37,52,61,43,67,57,62,61,79,87,98,103');
+T('v0.4 levels: goals are the 60%-of-raw set', LEVELS.map(L => L.goal).join() === '35,37,39,42,44,47,49,51,54,56,59,61');
 
 // 10. win path
 game.calories = game.level.goal; // ensure threshold
@@ -196,11 +199,11 @@ loadLevel(0);
 const w0 = game.weightLb;
 deliver({ cal: 5 });
 T('weight: snack deliveries add pounds from RAW cal (per-level growth)', game.weightLb === w0 + 5 * game.lbPerCal);
-T('weight: cap is 100lb with per-level reserve tiers', MAX_LB === 100 && LEVEL_MAX_LB.join() === '50,55,60,65,70,75,80,85,90,95,100,100');
-T('weight: per-level cap binds (L1 cannot exceed 50)', (() => {
-  loadLevel(0); game.weightLb = 49;
-  deliver({ cal: 5 });
-  return game.weightLb <= 50;
+T('weight: flat 0.3 lb/cal, 150lb absolute cap, no per-level caps', MAX_LB === 150 && LB_PER_CAL === 0.3 && typeof LEVEL_MAX_LB === 'undefined');
+T('weight: 100 raw cal gains exactly 30 lb', (() => {
+  loadLevel(11); game.weightLb = 5;
+  deliver({ cal: 100 });
+  return Math.abs(game.weightLb - 35) < 1e-9;
 })());
 T('weight: weight persists to localStorage', lsStore.get('chonk-em:weight') === String(game.weightLb));
 const w1 = game.weightLb;
@@ -235,6 +238,17 @@ step(60);
 T('vacuum: hoovers nearby fall + belt loot', game.vacuum.eaten >= eaten0 + 2);
 T('vacuum: ignores distant loot', !farItem.gone);
 T('vacuum: only 3 of 12 levels flagged', LEVELS.filter(L => L.vacuum).length === 3);
+T('vacuum: tuned down (suck 55 / eat 20 / 2 per shot)', Vacuum.SUCK_R === 55 && Vacuum.EAT_R === 20 && Vacuum.MEAL === 2);
+T('vacuum: two-item limit per shot', (() => {
+  loadLevel(5);
+  game.vacuum.x = 300; game.vacuum.eatenThisShot = 0;
+  for (const dx of [-10, 0, 10]) game.items.push({ x: 300 + dx, y: 735, vx: 0, vy: 0, r: 9, state: 'fall', cal: 3, t: 0, gone: false });
+  const e0 = game.vacuum.eaten;
+  step(90);
+  const eatenNow = game.vacuum.eaten - e0;
+  const leftover = game.items.filter(i => !i.gone).length;
+  return eatenNow === 2 && leftover === 1;
+})());
 
 // 14. food physics: bounce, never burst
 loadLevel(0);
@@ -250,7 +264,7 @@ game.items.push(fi);
 step(240);
 T('food: belt bounce settles into belt ride', fi.bounces > 0 && (fi.state === 'belt' || fi.gone));
 loadLevel(0);
-game.items.push({ x: 490, y: 700, vx: 0, vy: 300, r: 9, state: 'fall', cal: 3, t: 0, gone: false }); // over the gap
+game.items.push({ x: 530, y: 700, vx: 0, vy: 300, r: 9, state: 'fall', cal: 3, t: 0, gone: false }); // over the end gap
 const misses0 = game.misses;
 step(600);
 T('food: missed food bounces on floor, then lost', game.items.length === 0 && game.misses > misses0);
@@ -297,9 +311,9 @@ T('armor: second hit bursts', didBurst && arm.cleared);
 
 // 18. v0.4 features
 T('v0.4: menu API exists and boots open', typeof showMenu === 'function' && typeof hideMenu === 'function' && game.menuOpen === true);
-T('v0.4: 50% of barrels are empty (hollow, no loot flood)', LEVELS.every(L => {
-  const e = L.barrels.filter(b => b.kind === 'empty').length;
-  return Math.abs(e - L.barrels.length / 2) <= 2;
+T('v0.4: ~50% of barrels are dry (empty/steel/keg/bumper, no loot flood)', LEVELS.every(L => {
+  const e = L.barrels.filter(b => ['empty', 'steel', 'keg', 'bumper'].includes(b.kind)).length;
+  return Math.abs(e - L.barrels.length / 2) <= 4;
 }));
 T('v0.4: empty barrel burst spawns no item', (() => {
   loadLevel(0);
@@ -324,6 +338,105 @@ T('v0.4: vacuum cannot steal from the bowl chute', (() => {
   v.x = 100;
   Vacuum.tick(v, 1 / 60, [it], () => {});
   return !it.gone && !it.sucked;
+})());
+T('tiers: 100 levels, exotic every 5 (L1:5cal … L100:100cal)',
+  NUM_LEVELS === 100 && tierMaxCal(1) === 5 && tierMaxCal(5) === 10 && tierMaxCal(10) === 15 && tierMaxCal(100) === 100 &&
+  tierExotic(10) === 'caviar' && tierExoticName(50) === 'King Crab');
+T('tiers: handcrafted 1-12 respect tier max cal', (() => {
+  for (let i = 0; i < 12; i++) {
+    const mc = tierMaxCal(i + 1);
+    for (const b of getLevel(i).barrels)
+      if (b.kind === 'snack' && (CONTENT[b.content] || {}).cal > mc) return false;
+  }
+  return true;
+})());
+T('curve: 80lb impossible on L10, reachable ~L50, 130+ on L100', (() => {
+  const maxLb = n => 5 + 0.3 * getLevel(n - 1).barrels
+    .filter(b => b.kind === 'snack').reduce((a, b) => a + CONTENT[b.content].cal, 0);
+  return maxLb(10) < 40 && maxLb(50) >= 75 && maxLb(50) <= 90 && maxLb(100) >= 130;
+})());
+T('curve: tier exotic present on 10/25/50/100', [10, 25, 50, 100].every(n =>
+  getLevel(n - 1).barrels.some(b => b.kind === 'snack' && b.content === tierExotic(n))));
+T('steel: unbreakable — ball bounces, barrel stands', (() => {
+  loadLevel(11);
+  const st = game.barrels.find(b => b.kind === 'steel');
+  if (!st) return false;
+  const ball = { x: st.x, y: st.y - 16, vx: 0, vy: 300, r: 8, life: 0, slowT: 0, bounces: 0 };
+  let special = null;
+  Physics.stepBall(ball, 1 / 60, game.barrels, () => {}, () => {}, k => { special = k; });
+  return !st.cleared && special === 'steel' && ball.bounces > 0;
+})());
+T('bumper: power bounce + combo, never breaks', (() => {
+  loadLevel(11);
+  const bu = game.barrels.find(b => b.kind === 'bumper');
+  if (!bu) return false;
+  const c0 = game.combo;
+  const ball = { x: bu.x, y: bu.y - 16, vx: 0, vy: 200, r: 8, life: 0, slowT: 0, bounces: 0 };
+  Physics.stepBall(ball, 1 / 60, game.barrels, () => {}, () => {}, onBarrelSpecial);
+  return !bu.cleared && game.combo === c0 + 1 && Math.hypot(ball.vx, ball.vy) > 200;
+})());
+T('keg: explodes neighbors, steel immune, chains', (() => {
+  loadLevel(0);
+  game.barrels.forEach(b => { b.cleared = true; });
+  const mk = (x, kind, content) => ({ x, y: 400, r: 10, kind, content: content || null, cleared: false });
+  const keg = mk(300, 'keg'), snack = mk(340, 'snack', 'kibble'), steel = mk(360, 'steel'), far = mk(500, 'snack', 'kibble');
+  game.barrels.push(keg, snack, steel, far);
+  const items0 = game.items.length;
+  keg.cleared = true; onBarrelBurst(keg, null);
+  const ok = snack.cleared && !steel.cleared && !far.cleared && game.items.length > items0;
+  game.barrels = game.barrels.filter(b => ![keg, snack, steel, far].includes(b));
+  return ok;
+})());
+T('gen: deterministic + symmetric + sane size', (() => {
+  const a = JSON.stringify(genLevel(50)), b = JSON.stringify(genLevel(50));
+  if (a !== b) return false;
+  const bs = getLevel(49).barrels, set = new Set(bs.map(x => x.x + ',' + x.y));
+  return bs.every(x => set.has((600 - x.x) + ',' + x.y)) && bs.length >= 60 && bs.length <= 115;
+})());
+T('gen: procedural levels include steel/keg/bumper', (() => {
+  const kinds = new Set(getLevel(49).barrels.map(b => b.kind));
+  return kinds.has('steel') && kinds.has('keg') && kinds.has('bumper');
+})());
+T('weigh: stars are weight-based (1 win / 2 @75% / 3 @90% of level food)', (() => {
+  loadLevel(0);
+  const L = game.level, max = START_LB + LB_PER_CAL * rawCal(L);
+  return starsFor(START_LB + 0.95 * (max - START_LB), L) === 3 &&
+         starsFor(START_LB + 0.8 * (max - START_LB), L) === 2 &&
+         starsFor(START_LB + 0.1 * (max - START_LB), L) === 1;
+})());
+T('weigh: ceremony runs needle to target and fires finale', (() => {
+  loadLevel(0);
+  game.weightLb = 20; game.calories = 40; game.maxCombo = 3;
+  endGame(true);
+  const w = game.weigh;
+  if (!w || w.target !== 20) return false;
+  for (let i = 0; i < 300; i++) updateWeigh(1 / 60);
+  return Math.abs(w.shown - 20) < 0.05 && w.finale === true;
+})());
+T('weigh: trombone + fanfare synths exist', typeof AudioSys.trombone === 'function' && typeof AudioSys.fanfare === 'function');
+T('unlocks: species gated by total stars (never spent)', (() => {
+  store.set('best', { 0: { stars: 3 }, 1: { stars: 3 }, 2: { stars: 2 } }); // 8 total
+  const t = totalStars();
+  store.set('cat', 3);
+  const sel = selectedCat(); // calico locked at 8 stars -> falls back to tabby
+  store.set('cat', 1);
+  const sel2 = selectedCat(); // orange unlocked at 8
+  const ok = t === 8 && catUnlocked(0) && catUnlocked(1) && !catUnlocked(2) && !catUnlocked(3) && sel === 0 && sel2 === 1;
+  store.set('best', {}); store.set('cat', 0);
+  return ok;
+})());
+T('unlocks: loadLevel uses the picked species', (() => {
+  store.set('best', { 0: { stars: 3 }, 1: { stars: 3 }, 2: { stars: 2 } });
+  store.set('cat', 1);
+  loadLevel(0);
+  const v = game.catVar;
+  store.set('best', {}); store.set('cat', 0);
+  return v === 1;
+})());
+T('v0.4: conveyor has 60px gaps on BOTH sides (symmetric)', (() => {
+  const nb = (x) => Conveyor.onBelt(x, false);
+  return !nb(50) && nb(100) && nb(300) && nb(500) && !nb(550) &&
+         Conveyor.onBelt(50, true) && Conveyor.onBelt(550, true);
 })());
 T('v0.4: conveyor slats run left with the food', (() => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'js', 'conveyor.js'), 'utf8');
