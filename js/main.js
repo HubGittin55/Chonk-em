@@ -54,14 +54,29 @@ const STAGES = [
 // (body half-width is now weight-driven: catRx(chonkT(weightLb)))
 
 // ---- Lifetime weight system: the cat keeps its chonk between levels ----
-const LB_PER_CAL = 0.4, START_LB = 5.0, MAX_VIS_LB = 80, MAX_LB = 100;
-const LEVEL_MAX_LB = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 100]; // 80+ lb reserved for the late game
+const LB_PER_CAL = 0.3, START_LB = 5.0, MAX_VIS_LB = 80, MAX_LB = 150; // even bigger chonk
+// Species unlocks: total stars are never spent, they just gate the roster.
+const CAT_UNLOCKS = [
+  { name: 'Tabby',  icon: '\U0001F431', stars: 0 },
+  { name: 'Orange', icon: '\U0001F408', stars: 8 },
+  { name: 'Tuxedo', icon: '\U0001F408\u200D\u2B1B', stars: 25 },
+  { name: 'Calico', icon: '\U0001F43E', stars: 60 },
+];
+function totalStars() {
+  const b = store.get('best', {});
+  return Object.values(b).reduce((a, r) => a + ((r && r.stars) || 0), 0);
+}
+function catUnlocked(i) { return totalStars() >= CAT_UNLOCKS[i].stars; }
+function selectedCat() {
+  const i = Math.max(0, Math.min(3, store.get('cat', 0) | 0));
+  return catUnlocked(i) ? i : 0;
+} // 0.3 lb/cal: 100 cal = 30 lb; food in the barrels is the only limit
 const DIFFS = {
   easy:   { balls: 1.3, goal: 0.8,  vacuum: 0.8,  label: '😌 Easy' },
   normal: { balls: 1.0, goal: 1.0,  vacuum: 1.0,  label: '😼 Normal' },
   hard:   { balls: 0.8, goal: 1.2,  vacuum: 1.25, label: '🙀 Hard' },
 };
-const LB_MILESTONES = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+const LB_MILESTONES = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150];
 const chonkT = (lb) => Math.max(0, Math.min(1, (lb - 10) / (MAX_VIS_LB - 10)));
 const catRx = (t) => 62 + t * 88; // body half-width from chonk factor
 
@@ -99,10 +114,10 @@ function stageFor(cal) {
 }
 
 function loadLevel(i) {
-  const L = LEVELS[i];
+  const L = getLevel(i);
   game.levelIndex = i;
   game.level = L;
-  game.catVar = Math.floor(Math.random() * 4); // which cat shows up at the bowl this level
+  game.catVar = selectedCat(); // player's unlocked species
   game.particles = [];
   nextBtn.classList.add('hidden');
   game.diffKey = store.get('difficulty', 'normal');
@@ -111,10 +126,9 @@ function loadLevel(i) {
   game.par = Math.round(L.par * D.balls);
   game.goalNow = Math.round(L.goal * D.goal);
   game.shots = [];
-  game.multiShots = 0; game.splitNext = false; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0; game.shotsFired = 0;
+  game.multiShots = 0; game.maxCombo = 0; game.splitNext = false; game.weigh = null; game.shakeT = 0; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0; game.shotsFired = 0;
   game.weightLb = START_LB; // size resets every level (owner)
-  game.levelMaxLb = LEVEL_MAX_LB[i] || MAX_LB;
-  game.lbPerCal = (game.levelMaxLb - START_LB) / Math.max(1, L.goal); // growth arc spans the quota
+  game.lbPerCal = LB_PER_CAL; // flat 0.3 lb/cal — the food in the barrels is the only limit
   game.items = [];
   game.popups = [];
   game.vacuum = L.vacuum ? Vacuum.create((DIFFS[game.diffKey] || DIFFS.normal).vacuum) : null;
@@ -147,11 +161,12 @@ function wobbleImpulse(part, amt) {
   if (part === 'belly') { game.jiggle = w.x; game.jiggleV = w.v; } // legacy mirror
 }
 
-const LB_MSGS = { 10: 'DOUBLE DIGITS!', 20: '20 LB CLUB!', 30: 'CERTIFIED CHONK!', 40: 'FAT CITY!', 50: 'HEAVYWEIGHT CHAMPION!', 60: 'WHEELED AWAY!', 70: 'COLOSSAL!', 80: 'ABSOLUTE UNIT!' };
+const LB_MSGS = { 10: 'DOUBLE DIGITS!', 20: '20 LB CLUB!', 30: 'CERTIFIED CHONK!', 40: 'FAT CITY!', 50: 'HEAVYWEIGHT CHAMPION!', 60: 'WHEELED AWAY!', 70: 'COLOSSAL!', 80: 'ABSOLUTE UNIT!', 90: 'NINETY!', 100: 'CENTURY CHONK!', 110: 'MASSIVE!', 120: 'GARGANTUAN!', 130: 'PLANETARY!', 140: 'TITANIC!', 150: 'MAXIMUM CHONK!' };
 function checkLbMilestones(before, after) {
   for (const m of LB_MILESTONES) {
     if (before < m && after >= m) {
       addPopup(300, 340, '⚖ ' + m + ' lb — ' + LB_MSGS[m], '#6a1b9a');
+      AudioSys.meow(Math.min(1, m / 100));
       AudioSys.jingle();
       game.face = 'bliss'; game.faceT = 2.5;
       wobbleImpulse('belly', 4); wobbleImpulse('cheek', 2);
@@ -168,6 +183,8 @@ function aimAngleFor(px, py) {
 }
 
 function fireShot(px, py) {
+  AudioSys.shoot();
+  if (game.vacuum) game.vacuum.eatenThisShot = 0; // vacuum gets 2 items per shot
   if (game.over || game.shots.length || game.balls <= 0) return;
   const ang = aimAngleFor(px, py);
   if (ang == null) return;
@@ -258,6 +275,7 @@ function onBarrelBurst(barrel, ball) {
     AudioSys.pop();
   }
   spawnChips(barrel.x, barrel.y);
+  if (barrel.kind === 'keg') { explode(barrel.x, barrel.y); return; } // powder keg: chain explosion
   if (barrel.kind === 'empty') { AudioSys.burst(); return; } // hollow barrel: no loot inside
   const c = CONTENT[barrel.content];
   const label = c.power ? '★' : (c.cal > 0 ? '+' + c.cal : '' + c.cal);
@@ -271,6 +289,42 @@ function onBarrelBurst(barrel, ball) {
     grav: c.grav, drift: c.drift, power: c.power || null,
     t: 0, gone: false,
   });
+}
+
+function explode(x, y) {
+  AudioSys.boom();
+  game.shakeT = 0.35;
+  addPopup(x, y - 30, 'BOOM!', '#d32f2f');
+  if (!REDUCED) for (let i = 0; i < 26; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 80 + Math.random() * 320;
+    game.particles.push({
+      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 120,
+      rot: Math.random() * 6, vr: (Math.random() - 0.5) * 14,
+      size: 3 + Math.random() * 6, life: 0.5 + Math.random() * 0.6,
+      color: ['#ff6f00', '#ffca28', '#d32f2f', '#616161'][i % 4],
+    });
+  }
+  for (const b of game.barrels) {
+    if (b.cleared || b.kind === 'steel') continue; // steel is blast-proof
+    if (Math.hypot(b.x - x, b.y - y) < 80) {
+      b.cleared = true; b.popT = 0;
+      onBarrelBurst(b, null); // chain: kegs recurse, loot spawns normally
+    }
+  }
+}
+
+function onBarrelSpecial(kind, b, ball) {
+  if (kind === 'steel') {
+    AudioSys.clang();
+    addPopup(b.x, b.y - 26, 'CLANG!', '#78909c');
+    spawnChips(b.x, b.y);
+  } else if (kind === 'bumper') {
+    AudioSys.boing();
+    game.combo++;
+    game.maxCombo = Math.max(game.maxCombo || 0, game.combo);
+    addPopup(b.x, b.y - 26, 'BOING! +1', '#ef6c00');
+    spawnChips(b.x, b.y);
+  }
 }
 
 function deliver(item) {
@@ -297,11 +351,10 @@ function deliver(item) {
   game.stage = stageFor(game.calories);
   game.nomT = 0.6;
 
-  // Weight from RAW calories only (no combo inflation — no more 20-lb single deliveries).
-  // Veggies never slim the cat. Per-level cap reserves 80+ lb for the late game.
+  // Weight from RAW calories only (no combo inflation). Veggies never slim the cat.
   if (item.cal > 0) {
     const beforeLb = game.weightLb;
-    game.weightLb = Math.min(game.levelMaxLb || MAX_LB, MAX_LB, game.weightLb + item.cal * (game.lbPerCal || LB_PER_CAL));
+    game.weightLb = Math.min(MAX_LB, game.weightLb + item.cal * (game.lbPerCal || LB_PER_CAL));
     store.set('weight', game.weightLb);
     checkLbMilestones(beforeLb, game.weightLb);
   }
@@ -317,6 +370,7 @@ function deliver(item) {
     addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, gained + ' ugh', '#c62828');
   } else {
     game.combo++;
+    game.maxCombo = Math.max(game.maxCombo || 0, game.combo);
     AudioSys.nom();
     addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '+' + gained, '#2e7d32');
     spawnCrumbs(Conveyor.BOWL_X, Conveyor.BOWL_Y - 18);
@@ -358,39 +412,173 @@ function loseItem(item) {
   addPopup(Math.max(40, Math.min(W - 40, item.x)), H - 70, 'lost…', '#8a7a66');
 }
 
+function rawCal(L) {
+  return L.barrels.filter(b => b.kind === 'snack')
+    .reduce((a, b) => a + ((CONTENT[b.content] || {}).cal || 0), 0);
+}
+// Stars are WEIGHT stars now: 1 = goal met, 2 = 75% of the level's food delivered, 3 = 90%.
+function starsFor(lb, L) {
+  const max = START_LB + LB_PER_CAL * rawCal(L);
+  const frac = (lb - START_LB) / Math.max(1, max - START_LB);
+  return frac >= 0.9 ? 3 : frac >= 0.75 ? 2 : 1;
+}
+
 function endGame(win) {
   if (game.over) return;
   game.over = win ? 'win' : 'lose';
-  let stars = '';
   if (win) {
-    // 1 = goal met, +1 under par, +1 zero misses and zero veggies
-    let n = 1;
-    if (game.shotsFired <= game.level.par) n++;
-    if (game.misses === 0 && game.veggies === 0) n++;
-    stars = '★'.repeat(n) + '☆'.repeat(3 - n);
+    const before = CAT_UNLOCKS.filter((c, i) => i > 0 && catUnlocked(i)).length;
+    const n = starsFor(game.weightLb, game.level);
     saveBest(game.levelIndex, n, game.calories);
-    AudioSys.win();
+    const after = CAT_UNLOCKS.filter((c, i) => i > 0 && catUnlocked(i)).length;
+    game.justUnlocked = after > before ? CAT_UNLOCKS[after].name : null;
+    showResults(n);
   } else {
     AudioSys.lose();
-  }
-  overlayTitle.textContent = win ? 'CHONK ACHIEVED!' : 'Still scrawny…';
-  overlaySub.textContent = win
-    ? `${stars}   ${game.calories} calories — the cat is ${STAGES[game.stage].name}, now ${game.weightLb.toFixed(1)} lb!`
-    : `${game.calories}/${game.goalNow} calories. The cat demands another try.`;
-  if (win && game.levelIndex + 1 < LEVELS.length) {
-    nextBtn.textContent = 'Next: ' + LEVELS[game.levelIndex + 1].name + ' →';
-    nextBtn.classList.remove('hidden');
-  } else {
+    overlayTitle.textContent = 'Still scrawny…';
+    overlaySub.textContent = `${game.calories}/${game.goalNow} calories. The cat demands another try.`;
     nextBtn.classList.add('hidden');
-    if (win) overlaySub.textContent += ' All levels chonked! 👑';
+    overlay.classList.remove('hidden');
   }
-  overlay.classList.remove('hidden');
+}
+
+/* ---------------- weigh-in results ceremony ---------------- */
+const resultsEl = () => document.getElementById('results');
+const scaleCv = () => document.getElementById('scaleCanvas');
+
+function showResults(nStars) {
+  const w = game.weigh = {
+    t: 0, dur: 2.6, shown: START_LB, target: game.weightLb, stars: nStars,
+    lit: 0, ticked: START_LB, finale: false, confetti: [],
+  };
+  for (let k = 0; k < 3; k++) {
+    const sp = document.getElementById('rs' + k);
+    sp.textContent = '☆'; sp.className = '';
+  }
+  document.getElementById('res-title').textContent = '⚖ WEIGH-IN! ⚖';
+  document.getElementById('res-sub').textContent = '';
+  for (const id of ['res-retry', 'res-menu', 'res-next']) document.getElementById(id).style.visibility = 'hidden';
+  document.getElementById('res-next').style.display = game.levelIndex + 1 < NUM_LEVELS ? '' : 'none';
+  AudioSys.sfx('splash', function() { this.tone(400, 0.25, 'sine', 0.06, 800); });
+  resultsEl().classList.remove('hidden');
+  drawScale(w);
+}
+
+function hideResults() { resultsEl().classList.add('hidden'); game.weigh = null; }
+
+function updateWeigh(dt) { // real-time, called from tick()
+  const w = game.weigh;
+  if (!w) return;
+  w.t += dt;
+  const k = Math.min(1, w.t / w.dur);
+  const ease = 1 - Math.pow(1 - k, 3);
+  w.shown = START_LB + (w.target - START_LB) * ease;
+  // tick sounds as the needle climbs
+  while (w.ticked + 2 <= w.shown) { w.ticked += 2; AudioSys.tick(600 + w.ticked * 9); }
+  // star pops as the needle crosses each star's weight
+  const max = START_LB + LB_PER_CAL * rawCal(game.level);
+  const need = [0, 0, START_LB + 0.75 * (max - START_LB), START_LB + 0.9 * (max - START_LB)];
+  const span = i => document.getElementById('rs' + i);
+  for (let st = 2; st <= w.stars; st++) {
+    if (w.shown >= need[st] && w.lit < st) {
+      w.lit = st;
+      span(st - 1).textContent = '★'; span(st - 1).className = 'lit pop';
+      AudioSys.starPop();
+    }
+  }
+  if (w.lit < 1 && k >= 1) { // first star always lights at the end
+    w.lit = 1; span(0).textContent = '★'; span(0).className = 'lit pop'; AudioSys.starPop();
+  }
+  drawScale(w);
+  if (k >= 1 && !w.finale) {
+    w.finale = true;
+    const sub = document.getElementById('res-sub');
+    if (w.stars === 1) {
+      AudioSys.trombone();
+      sub.textContent = `${game.calories} cal · best combo ×${game.maxCombo || 1} · ${w.target.toFixed(1)} lb — the cat wanted more snacks. Womp womp.`;
+    } else if (w.stars === 2) {
+      AudioSys.jingle();
+      sub.textContent = `${game.calories} cal · best combo ×${game.maxCombo || 1} · ${w.target.toFixed(1)} lb — a respectable chonk!`;
+    } else {
+      AudioSys.fanfare();
+      for (let i = 0; i < 90; i++) w.confetti.push({
+        x: 160 + (Math.random() - 0.5) * 120, y: -10 - Math.random() * 60,
+        vx: (Math.random() - 0.5) * 60, vy: 60 + Math.random() * 120,
+        c: ['#e91e63', '#ff9800', '#ffeb3b', '#4caf50', '#2196f3', '#9c27b0'][i % 6],
+        r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 10,
+      });
+      sub.textContent = `${game.calories} cal · best combo ×${game.maxCombo || 1} · ${w.target.toFixed(1)} lb — CERTIFIED MAXIMUM CHONK!`;
+    }
+    if (game.justUnlocked) {
+      sub.textContent += ` \U0001F408 NEW CAT UNLOCKED: ${game.justUnlocked}!`;
+      AudioSys.sfx('unlock', function() { [660, 880, 1108, 1318].forEach((f, i) => setTimeout(() => this.tone(f, 0.14, 'triangle', 0.10), i * 100)); });
+    }
+    if (game.levelIndex + 1 >= NUM_LEVELS) sub.textContent += ' All levels chonked! 👑';
+    for (const id of ['res-retry', 'res-menu', 'res-next']) document.getElementById(id).style.visibility = 'visible';
+  }
+  // confetti physics
+  for (const c of w.confetti) { c.x += c.vx * dt; c.y += c.vy * dt; c.r += c.vr * dt; }
+  w.confetti = w.confetti.filter(c => c.y < 260);
+  if (w.confetti.length) drawScale(w);
+}
+
+function drawScale(w) {
+  const cv = scaleCv(); if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const lb = w.shown;
+  ctx.clearRect(0, 0, 320, 250);
+  const cx = 160, cy = 132, R = 92;
+  const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25;
+  const ang = l => a0 + (Math.min(l, MAX_LB) / MAX_LB) * (a1 - a0);
+  // dial face
+  ctx.beginPath(); ctx.arc(cx, cy, R + 10, 0, 7); ctx.fillStyle = '#fffdf5'; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, R, a0, a1); ctx.lineWidth = 12; ctx.strokeStyle = '#ffe9c4'; ctx.stroke();
+  for (let v = 0; v <= MAX_LB; v += 10) {
+    const a = ang(v), big = v % 30 === 0, r1 = R - (big ? 15 : 9), r2 = R - 3;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+    ctx.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2);
+    ctx.lineWidth = big ? 3 : 1.5; ctx.strokeStyle = '#5d4037'; ctx.stroke();
+    if (big) {
+      ctx.fillStyle = '#5d4037'; ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(v, cx + Math.cos(a) * (R - 26), cy + Math.sin(a) * (R - 26));
+    }
+  }
+  // needle
+  const a = ang(lb);
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
+  ctx.fillStyle = '#d32f2f';
+  ctx.beginPath(); ctx.moveTo(-8, -3.5); ctx.lineTo(R - 10, 0); ctx.lineTo(-8, 3.5); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(cx, cy, 9, 0, 7); ctx.fillStyle = '#5d4037'; ctx.fill();
+  // scale platform + the chonk under test (squashes as the needle climbs)
+  ctx.fillStyle = '#8d6e63';
+  ctx.beginPath(); ctx.roundRect(70, 208, 180, 14, 6); ctx.fill();
+  ctx.fillStyle = '#5d4037';
+  ctx.beginPath(); ctx.roundRect(140, 222, 40, 8, 3); ctx.fill();
+  const cs = 30 + lb * 0.32, squash = 1 - Math.min(0.3, lb / 500);
+  ctx.save(); ctx.translate(160, 208); ctx.scale(1 + (1 - squash) * 0.7, squash);
+  ctx.font = cs + 'px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText('🐱', 0, 0); ctx.restore();
+  // digital readout
+  ctx.fillStyle = '#212121'; ctx.font = 'bold 24px monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText(lb.toFixed(1) + ' lb', 160, 226);
+  // confetti
+  for (const c of w.confetti) {
+    ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.r);
+    ctx.fillStyle = c.c; ctx.fillRect(-4, -2.5, 8, 5); ctx.restore();
+  }
 }
 
 function hideOverlay() { overlay.classList.add('hidden'); }
 
 function tick(dt) {
   game.time += dt;
+
+  updateWeigh(dt);
+  if (game.shakeT > 0) game.shakeT -= dt;
 
   // Real-time UI timers (unaffected by slow-mo)
   for (const p of game.popups) p.t += dt;
@@ -429,7 +617,7 @@ function tick(dt) {
   if (game.bridgeT > 0) game.bridgeT -= dt;
 
   for (let i = game.shots.length - 1; i >= 0; i--) {
-    if (Physics.stepBall(game.shots[i], wdt, game.barrels, onBarrelBurst, onBarrelCrack)) game.shots.splice(i, 1);
+    if (Physics.stepBall(game.shots[i], wdt, game.barrels, onBarrelBurst, onBarrelCrack, onBarrelSpecial)) game.shots.splice(i, 1);
   }
 
   for (const it of game.items) {
@@ -475,8 +663,10 @@ function tick(dt) {
   game.items = game.items.filter(i => !i.gone);
 
   if (game.vacuum) Vacuum.tick(game.vacuum, wdt, game.items, (x, y, it) => {
+    AudioSys.slurp();
     addPopup(x, y - 22, 'VACUUM\'D!', '#7b1fa2');
     spawnCrumbs(x, y);
+    if ((game.vacuum.eatenThisShot || 0) >= 2) addPopup(x, y - 44, 'VACUUM FULL', '#7b1fa2');
   });
 
   if (!game.over && game.balls <= 0 && !game.shots.length && game.items.length === 0) endGame(false);
@@ -696,12 +886,15 @@ function drawFrenzy() {
 
 function render() {
   drawBackground();
+  ctx.save();
+  if (game.shakeT > 0) ctx.translate((Math.random() - 0.5) * game.shakeT * 36, (Math.random() - 0.5) * game.shakeT * 36);
   drawBarrels(ctx, game.barrels, game.time);
   Conveyor.draw(ctx, game.bridgeT > 0);
   drawItems();
   drawPreview();
   drawBall();
   drawParticles(ctx);
+  ctx.restore();
   Cats.drawShooter(ctx, SHOOT.x, SHOOT.y, game.aimAng, !game.shots.length && game.balls > 0 && !game.over);
   Cats.drawMain(ctx, 252, 806, {
     t: chonkT(game.weightLb), lb: game.weightLb, wob: game.wob, var: game.catVar,
@@ -766,21 +959,40 @@ function showMenu() {
     btn.addEventListener('click', (e) => { e.stopPropagation(); store.set('difficulty', k); showMenu(); });
     diffRow.appendChild(btn);
   });
+  // species picker — total stars gate, never spent
+  const catRow = document.getElementById('catRow');
+  catRow.innerHTML = '<span>Cat:</span>';
+  const tot = totalStars(), sel = selectedCat();
+  CAT_UNLOCKS.forEach((c, i) => {
+    const btn = document.createElement('button');
+    const un = tot >= c.stars;
+    btn.textContent = un ? `${c.icon} ${c.name}` : `🔒 ${c.stars}★`;
+    btn.title = un ? c.name : `Earn ${c.stars} total stars to unlock ${c.name}`;
+    if (i === sel) btn.className = 'sel';
+    if (!un) btn.disabled = true;
+    btn.addEventListener('click', (e) => { e.stopPropagation(); store.set('cat', i); showMenu(); });
+    catRow.appendChild(btn);
+  });
   levelGrid.innerHTML = '';
-  LEVELS.forEach((L, i) => {
+  for (let i = 0; i < NUM_LEVELS; i++) {
+    const L = getLevel(i);
     const btn = document.createElement('button');
     const rec = b[i] || { stars: 0 };
     btn.className = i === game.levelIndex ? 'cur' : '';
-    btn.innerHTML = (i + 1) + '. ' + L.name +
+    const tierNote = tierExotic(i + 1) && !tierExotic(i) ? ' <small>🆕 ' + tierExoticName(i + 1) + '</small>' : '';
+    btn.innerHTML = (i + 1) + '. ' + L.name + tierNote +
       '<small>goal ' + Math.round(L.goal * D.goal) + ' cal</small>' +
       '<span class="stars">' + ('★'.repeat(rec.stars) || '☆☆☆') + '</span>';
     btn.addEventListener('click', () => { hideMenu(); loadLevel(i); showSplash(i); });
     levelGrid.appendChild(btn);
-  });
+  }
   menuOverlay.classList.remove('hidden');
 }
 function hideMenu() { game.menuOpen = false; menuOverlay.classList.add('hidden'); }
 document.getElementById('menuBtn').addEventListener('click', (e) => { e.stopPropagation(); showMenu(); });
+document.getElementById('res-retry').addEventListener('click', () => { hideResults(); loadLevel(game.levelIndex); });
+document.getElementById('res-menu').addEventListener('click', () => { hideResults(); showMenu(); });
+document.getElementById('res-next').addEventListener('click', () => { hideResults(); loadLevel(game.levelIndex + 1); showSplash(game.levelIndex); });
 document.getElementById('resetGame').addEventListener('click', (e) => {
   e.stopPropagation();
   if (confirm('Reset CHONK\'EM? This wipes best stars and the cat\'s saved weight.')) {
@@ -794,11 +1006,12 @@ window.addEventListener('keydown', (e) => {
 
 // Level intro splash card
 function showSplash(i) {
-  const L = LEVELS[i];
+  const L = getLevel(i);
   const D = DIFFS[store.get('difficulty', 'normal')] || DIFFS.normal;
   document.getElementById('splashTitle').textContent = (i + 1) + '. ' + L.name;
-  document.getElementById('splashSub').textContent =
-    'Goal ' + Math.round(L.goal * D.goal) + ' cal · ' + Math.round(L.balls * D.balls) + ' yarn · ' + D.label;
+  let sub = 'Goal ' + Math.round(L.goal * D.goal) + ' cal · ' + Math.round(L.balls * D.balls) + ' yarn · ' + D.label;
+  if (tierExotic(i + 1) && !tierExotic(i)) sub += ' · 🆕 NEW: ' + tierExoticName(i + 1) + ' (' + tierMaxCal(i + 1) + ' cal)!';
+  document.getElementById('splashSub').textContent = sub;
   const sp = document.getElementById('levelSplash');
   sp.classList.remove('hidden');
   clearTimeout(showSplash._t);

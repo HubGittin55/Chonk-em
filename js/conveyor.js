@@ -8,19 +8,19 @@ const Conveyor = {
   SPEED: 130,    // px/s, leftward
   BOWL_X: 100,
   BOWL_Y: 744,
-  LEFT: 40, RIGHT: 560,      // belt extent
-  GAP_L: 440, GAP_R: 540,    // static gap — learnable miss zone
+  LEFT: 100, RIGHT: 500,     // belt extent — 60px empty gaps on BOTH sides (symmetric)
+  EDGE: 60,                  // end-gap width, each side
   t: 0,
 
   onBelt(x, bridged) {
-    if (bridged) return x >= this.LEFT && x <= this.RIGHT;
-    return (x >= this.LEFT && x < this.GAP_L) || (x >= this.GAP_R && x <= this.RIGHT);
+    if (bridged) return x >= this.LEFT - this.EDGE && x <= this.RIGHT + this.EDGE;
+    return x >= this.LEFT && x <= this.RIGHT;
   },
 
   draw(ctx, bridged) {
     const by = this.BELT_Y;
-    const segs = bridged ? [[this.LEFT, this.RIGHT]]
-                         : [[this.LEFT, this.GAP_L], [this.GAP_R, this.RIGHT]];
+    const segs = bridged ? [[this.LEFT - this.EDGE, this.RIGHT + this.EDGE]]
+                         : [[this.LEFT, this.RIGHT]];
 
     // Legs
     ctx.fillStyle = '#4a4a52';
@@ -51,13 +51,7 @@ const Conveyor = {
       }
     }
 
-    // Bridge plate over the gap (power-up active)
-    if (bridged) {
-      ctx.fillStyle = '#8d6e63';
-      ctx.beginPath(); ctx.roundRect(this.GAP_L - 6, by - 17, this.GAP_R - this.GAP_L + 12, 11, 4); ctx.fill();
-      ctx.strokeStyle = '#5d4037'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.roundRect(this.GAP_L - 6, by - 17, this.GAP_R - this.GAP_L + 12, 11, 4); ctx.stroke();
-    }
+    // Bridge power-up: belt extends over both end gaps (segs above already cover it)
 
     // Bowl
     const bx = this.BOWL_X, wy = this.BOWL_Y;

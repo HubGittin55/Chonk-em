@@ -13,6 +13,29 @@ const CONTENT = {
   slow:     { cal:  0, icon: '⭐', name: 'Slow-Mo',     grav: 0.80, drift: 30, power: 'slow'   },
   magnet:   { cal:  0, icon: '⭐', name: 'Magnet',      grav: 0.80, drift: 30, power: 'magnet' },
   split:    { cal:  0, icon: '⭐', name: 'Split Yarn',  grav: 0.80, drift: 30, power: 'split'  },
+  // --- tier 1 unlocks (level 5+, 10-cal max) ---
+  turkey:   { cal:  6, icon: '🦃', name: 'Turkey',   grav: 1.00, drift:  0  },
+  shrimp:   { cal:  8, icon: '🍤', name: 'Shrimp',   grav: 0.90, drift: 40  },
+  steak:    { cal: 10, icon: '🥩', name: 'Steak',    grav: 1.10, drift:  0  },
+  // --- exotic tier: new food every 5 levels, +5 cal (level 10+). Sprites TBD (emoji fallback) ---
+  caviar:    { cal: 15, icon: '⚫', name: 'Caviar',          grav: 1.20, drift: 20 },
+  lobster:   { cal: 20, icon: '🦞', name: 'Lobster',         grav: 1.10, drift: 30 },
+  wagyu:     { cal: 25, icon: '🥩', name: 'Wagyu',           grav: 1.30, drift:  0 },
+  btruffle:  { cal: 30, icon: '🍄', name: 'Black Truffle',   grav: 1.00, drift: 50 },
+  saffron:   { cal: 35, icon: '🌾', name: 'Saffron',         grav: 0.80, drift: 60 },
+  bluefin:   { cal: 40, icon: '🍣', name: 'Bluefin',         grav: 1.20, drift: 20 },
+  foiegras:  { cal: 45, icon: '🪿', name: 'Foie Gras',       grav: 1.10, drift: 30 },
+  goldkib:   { cal: 50, icon: '🪙', name: 'Gold Kibble',      grav: 1.40, drift:  0 },
+  kingcrab:  { cal: 55, icon: '🦀', name: 'King Crab',        grav: 1.20, drift: 30 },
+  uni:       { cal: 60, icon: '🟠', name: 'Uni',              grav: 1.00, drift: 40 },
+  kobe:      { cal: 65, icon: '🥓', name: 'Kobe',             grav: 1.30, drift:  0 },
+  matsutake: { cal: 70, icon: '🍄‍🟫', name: 'Matsutake',      grav: 1.10, drift: 30 },
+  beluga:    { cal: 75, icon: '🐟', name: 'Beluga',           grav: 1.20, drift: 20 },
+  iberico:   { cal: 80, icon: '🍖', name: 'Ibérico',          grav: 1.30, drift:  0 },
+  amberjack: { cal: 85, icon: '🐠', name: 'Amberjack',        grav: 1.10, drift: 40 },
+  wtruffle:  { cal: 90, icon: '🤍', name: 'White Truffle',    grav: 1.00, drift: 50 },
+  saffris:   { cal: 95, icon: '🥘', name: 'Saffron Risotto',  grav: 1.20, drift: 20 },
+  imperial:  { cal: 100, icon: '👑', name: 'Imperial Feast',  grav: 1.40, drift: 10 },
 };
 
 // Armor band + cracks drawn over generated skins (vector path inlines its own)
@@ -124,6 +147,48 @@ function drawBarrels(ctx, barrels, time) {
       ctx.setLineDash([4, 3]);
       ctx.beginPath(); ctx.arc(b.x, b.y, br, 0, 7); ctx.stroke();
       ctx.setLineDash([]);
+      continue;
+    }
+    if (b.kind === 'steel') {
+      // unbreakable obstacle: brushed steel with rivets
+      const g2 = ctx.createRadialGradient(b.x - r * 0.4, b.y - r * 0.45, r * 0.2, b.x, b.y, r);
+      g2.addColorStop(0, '#eceff1'); g2.addColorStop(0.55, '#90a4ae'); g2.addColorStop(1, '#546e7a');
+      ctx.fillStyle = g2;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#37474f'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r - 1.5, 0, 7); ctx.stroke();
+      ctx.fillStyle = '#37474f';
+      for (const [rx, ry] of [[-0.55, -0.55], [0.55, -0.55], [-0.55, 0.55], [0.55, 0.55], [0, 0]]) {
+        ctx.beginPath(); ctx.arc(b.x + rx * r, b.y + ry * r, Math.max(1.5, r * 0.09), 0, 7); ctx.fill();
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.beginPath(); ctx.ellipse(b.x - r * 0.35, b.y - r * 0.42, r * 0.3, r * 0.16, -0.6, 0, 7); ctx.fill();
+      continue;
+    }
+    if (b.kind === 'keg') {
+      // powder keg: dark red, fuse spark, gentle pulse
+      const pulse = 1 + 0.06 * Math.sin(time * 5 + b.x);
+      const g2 = ctx.createRadialGradient(b.x - r * 0.3, b.y - r * 0.35, r * 0.2, b.x, b.y, r * pulse);
+      g2.addColorStop(0, '#8d3b2f'); g2.addColorStop(0.6, '#5d231b'); g2.addColorStop(1, '#3a130d');
+      ctx.fillStyle = g2;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r * pulse, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#2a0d08'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r * pulse - 1.5, 0, 7); ctx.stroke();
+      ctx.font = Math.round(r * 1.1) + 'px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('\U0001F9E8', b.x, b.y + 1);
+      continue;
+    }
+    if (b.kind === 'bumper') {
+      // chrome bumper dome: never breaks, kicks the ball
+      const g2 = ctx.createRadialGradient(b.x - r * 0.35, b.y - r * 0.4, r * 0.15, b.x, b.y, r);
+      g2.addColorStop(0, '#ffffff'); g2.addColorStop(0.5, '#b0bec5'); g2.addColorStop(1, '#607d8b');
+      ctx.fillStyle = g2;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#ff8f00'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r - 3, 0, 7); ctx.stroke();
+      ctx.font = Math.round(r * 0.95) + 'px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#e65100';
+      ctx.fillText('\u2605', b.x, b.y + 1);
       continue;
     }
     ctx.fillStyle = 'rgba(0,0,0,0.18)';

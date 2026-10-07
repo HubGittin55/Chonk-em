@@ -176,3 +176,45 @@ Owner's post-PR4 list, built on top of qwen's sprite/ghost-food work (main @ 938
 - Vacuum actually visible now: was drawn BEFORE the main cat and hidden behind the chonk;
   now drawn after. Bowl-chute protection implemented (was comment-only).
 - Polish: favicon, v0.4 title, level intro splash cards.
+
+## v0.4 follow-up tweaks (PR #5, 2026-10-06)
+- Weight: flat 0.3 lb/cal (100 cal = 30 lb). Per-level caps removed — food in the
+  barrels is the only limit (100 lb absolute cap stays).
+- Menu button moved top-right (was covering the HUD stats).
+- Conveyor: symmetric 60px end gaps on both sides (was: single 100px gap right).
+  Bridge power-up now extends the belt over both end gaps.
+- Vacuum tuned down: suck 95→55, eat 30→20, 2 items per shot then it's full
+  (resets every shot, "VACUUM FULL" popup). Proper vacuum asset still wanted later.
+
+## Food tiers & the 100-level chonk curve (PR #5, 2026-10-06)
+Owner's long-term replay design: per-level reset STAYS, but food is the progression.
+- New exotic food every 5 levels, +5 cal: L1 max 5 (tuna), L5 max 10 (steak),
+  L10 caviar 15, L15 lobster 20 … L100 Imperial Feast 100. Past exotics stay on the menu.
+- Each level's TOTAL raw cal follows 55 + 4*(n-1): L1 55 (21.5 lb max), L10 91
+  (32 lb — 80 impossible), L50 251 (80 lb with near-perfect play — rare),
+  L100 451 (140 lb). Cap raised to 150 for the even-bigger chonk.
+- Levels 1-12 handcrafted and retuned to the curve; 13-100 generated deterministically
+  (seeded, symmetric archetypes: full/diamond/ring/columns/checker/twin/wave).
+- Splash + menu flag newly unlocked exotics (🆕).
+- Asset debt: 18 exotic food sprites + cat stages 90-150 (Qwen).
+
+## Weigh-in results ceremony (PR #5, 2026-10-07)
+Owner's idea: after a win, the cat steps onto a scale. Analog dial (0-150 lb),
+needle eases up over ~2.6s with rising tick sounds; the cat emoji on the platform
+grows and squashes as the needle climbs. Stars are WEIGHT stars now:
+1 = goal met, 2 = 75% of the level's food delivered, 3 = 90%.
+Stars pop in as the needle crosses each threshold. Finale: 1 star = sad trombone
+(synth), 2 stars = jingle, 3 stars = fanfare + canvas confetti.
+Stats line (cal, best combo) + Retry/Menu/Next buttons appear after the needle lands.
+
+## New barrel types (PR #5, 2026-10-07)
+Owner asked for unbreakable steel + two of Stunkus's choosing:
+- **Steel** — unbreakable obstacle. Ball bounces off dead (CLANG!), never bursts,
+  immune to explosions. Brushed-steel vector art with rivets.
+- **Powder keg** — bursts into a chain explosion: clears every barrel within 80px
+  (except steel), their loot spawns normally, kegs chain-recurse. Screen shake +
+  BOOM. The jackpot play.
+- **Bumper** — chrome dome, never breaks: kicks the ball away at 1.25x (capped),
+  +1 combo, BOING! Rewards skillful bank shots.
+Procedural levels (13+) deal ~6% steel / ~4% keg / ~4% bumper from the empty share;
+handcrafted 6/9/12 got a sprinkle so they show up early.
