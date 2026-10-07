@@ -126,7 +126,7 @@ function loadLevel(i) {
   game.par = Math.round(L.par * D.balls);
   game.goalNow = Math.round(L.goal * D.goal);
   game.shots = [];
-  game.multiShots = 0; game.maxCombo = 0; game.splitNext = false; game.weigh = null; game.shakeT = 0; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0; game.shotsFired = 0;
+  game.multiShots = 0; game.maxCombo = 0; game.splitNext = false; game.weigh = null; game.shakeT = 0; game.goalMet = false; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0; game.shotsFired = 0;
   game.weightLb = START_LB; // size resets every level (owner)
   game.lbPerCal = LB_PER_CAL; // flat 0.3 lb/cal — the food in the barrels is the only limit
   game.items = [];
@@ -390,7 +390,11 @@ function deliver(item) {
     if (cleanStage) triggerFrenzy();
   }
 
-  if (game.calories >= game.goalNow) endGame(true);
+  if (!game.goalMet && game.calories >= game.goalNow) {
+    game.goalMet = true;
+    addPopup(300, 420, 'GOAL MET!', '#2e7d32');
+    AudioSys.jingle();
+  }
 }
 
 function triggerFrenzy() {
@@ -450,6 +454,7 @@ function showResults(nStars) {
   const w = game.weigh = {
     t: 0, dur: 2.6, shown: START_LB, target: game.weightLb, stars: nStars,
     lit: 0, ticked: START_LB, finale: false, confetti: [],
+    stageIdx: (typeof stageIdxForLb === 'function') ? stageIdxForLb(START_LB) : 0,
   };
   for (let k = 0; k < 3; k++) {
     const sp = document.getElementById('rs' + k);
@@ -473,8 +478,19 @@ function updateWeigh(dt) { // real-time, called from tick()
   const k = Math.min(1, w.t / w.dur);
   const ease = 1 - Math.pow(1 - k, 3);
   w.shown = START_LB + (w.target - START_LB) * ease;
-  // tick sounds as the needle climbs
-  while (w.ticked + 2 <= w.shown) { w.ticked += 2; AudioSys.tick(600 + w.ticked * 9); }
+  // tick sounds as the needle climbs — each tick jiggles the chonk
+  while (w.ticked + 2 <= w.shown) {
+    w.ticked += 2; AudioSys.tick(600 + w.ticked * 9);
+    game.wob.belly.v += 1.2; game.wob.sub.v += 0.6;
+  }
+  // stage-up: the cat visibly size-pops with a big bounce
+  if (typeof stageIdxForLb === 'function') {
+    const idx = stageIdxForLb(w.shown);
+    if (idx > w.stageIdx) {
+      w.stageIdx = idx;
+      game.wob.belly.v += 3.2; game.wob.cheek.v += 1.6; game.wob.tail.v += 2.0;
+    }
+  }
   // star pops as the needle crosses each star's weight
   const max = START_LB + LB_PER_CAL * rawCal(game.level);
   const need = [0, 0, START_LB + 0.75 * (max - START_LB), START_LB + 0.9 * (max - START_LB)];
@@ -557,10 +573,15 @@ function drawScale(w) {
   ctx.beginPath(); ctx.roundRect(70, 208, 180, 14, 6); ctx.fill();
   ctx.fillStyle = '#5d4037';
   ctx.beginPath(); ctx.roundRect(140, 222, 40, 8, 3); ctx.fill();
-  const cs = 30 + lb * 0.32, squash = 1 - Math.min(0.3, lb / 500);
-  ctx.save(); ctx.translate(160, 208); ctx.scale(1 + (1 - squash) * 0.7, squash);
-  ctx.font = cs + 'px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-  ctx.fillText('🐱', 0, 0); ctx.restore();
+  // the actual chonk under test: real sprite asset, cycling 10 lb -> final size
+  // as the needle climbs, jiggling on the live wobble springs
+  ctx.save();
+  ctx.translate(160, 208); ctx.scale(0.62, 0.62);
+  Cats.drawMain(ctx, 0, -74, {
+    t: chonkT(lb), lb: lb, wob: game.wob, var: game.catVar,
+    nomT: 0, face: 'happy', time: game.time,
+  });
+  ctx.restore();
   // digital readout
   ctx.fillStyle = '#212121'; ctx.font = 'bold 24px monospace';
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
@@ -669,7 +690,10 @@ function tick(dt) {
     if ((game.vacuum.eatenThisShot || 0) >= 2) addPopup(x, y - 44, 'VACUUM FULL', '#7b1fa2');
   });
 
-  if (!game.over && game.balls <= 0 && !game.shots.length && game.items.length === 0) endGame(false);
+  if (!game.over && !game.shots.length && game.items.length === 0) {
+    const foodLeft = game.barrels.some(b => !b.cleared && b.kind === 'snack' && (((CONTENT[b.content] || {}).cal) || 0) > 0);
+    if (game.balls <= 0 || !foodLeft) endGame(game.calories >= game.goalNow);
+  }
 }
 
 /* ---------------- rendering ---------------- */
