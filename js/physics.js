@@ -72,6 +72,9 @@ const Physics = {
 
   // Food/item bounce off barrels. Food NEVER bursts barrels — burst is yarn-only.
   // Push-out + velocity reflect with restitution; the barrel is untouched.
+  // Gentle rests slide off tangentially instead of micro-bouncing in place
+  // forever (that wedged items mid-field and soft-locked the level — the
+  // exhaustion check waits for game.items to empty).
   bounceItem(it, barrels) {
     for (const b of barrels) {
       if (b.cleared) continue;
@@ -83,9 +86,15 @@ const Physics = {
         it.x = b.x + nx * min;
         it.y = b.y + ny * min;
         const vn = it.vx * nx + it.vy * ny;
-        if (vn < 0) { // restitution 0.5 — food bounces off, barrel stands
-          it.vx -= 1.5 * vn * nx;
-          it.vy -= 1.5 * vn * ny;
+        if (vn < 0) {
+          if (vn < -60) { // solid hit: restitution 0.5 — food bounces off, barrel stands
+            it.vx -= 1.5 * vn * nx;
+            it.vy -= 1.5 * vn * ny;
+          } else { // gentle rest: slide off around the barrel instead of hovering
+            const tx = -ny, ty = nx, vt = it.vx * tx + it.vy * ty;
+            it.vx = tx * vt + nx * 14;
+            it.vy = ty * vt + ny * 14;
+          }
         }
       }
     }

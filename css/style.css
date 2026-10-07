@@ -124,3 +124,5 @@ body {
 #catRow button { font-size: 15px; padding: 6px 12px; border-radius: 999px; border: 2px solid transparent; background: #4e342e; color: #fff; cursor: pointer; }
 #catRow button.sel { border-color: #ffb300; }
 #catRow button:disabled { opacity: .45; cursor: default; }
+#errtoast { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: #b71c1c; color: #fff; font: 13px/1.4 sans-serif; padding: 6px 12px; border-radius: 8px; z-index: 99; max-width: 90%; }
+#errtoast.hidden { display: none; }
