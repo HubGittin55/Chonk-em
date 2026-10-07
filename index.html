@@ -17,10 +17,22 @@
     <button id="retry">Retry</button>
     <button id="next" class="hidden">Next Level →</button>
   </div>
+  <div id="results" class="hidden">
+    <h2 id="res-title">&#9878; WEIGH-IN! &#9878;</h2>
+    <canvas id="scaleCanvas" width="320" height="250"></canvas>
+    <div id="res-stars"><span id="rs0">&#9734;</span><span id="rs1">&#9734;</span><span id="rs2">&#9734;</span></div>
+    <p id="res-sub"></p>
+    <div class="row">
+      <button id="res-retry">Retry</button>
+      <button id="res-menu">Menu</button>
+      <button id="res-next">Next &rarr;</button>
+    </div>
+  </div>
   <div id="menuOverlay">
     <h1>CHONK &rsquo;EM</h1>
     <p class="sub">pick a level &middot; fatten the cat</p>
     <div id="diffRow"></div>
+    <div id="catRow"></div>
     <div id="levelGrid"></div>
     <button id="resetGame">&#128465; reset everything</button>
   </div>

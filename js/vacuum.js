@@ -7,8 +7,9 @@
 
 const Vacuum = {
   SPEED: 42,       // px/s — slow enough to play around, fast enough to matter
-  SUCK_R: 95,      // suction radius from the mouth
-  EAT_R: 30,       // capture radius — loot this close is gone
+  SUCK_R: 55,      // suction radius from the mouth (tuned down — was 95)
+  EAT_R: 20,       // capture radius — loot this close is gone (was 30)
+  MEAL: 2,         // items eaten per shot, then it's full until the next shot
   PULL: 340,       // suction velocity px/s toward the mouth
   MIN_X: 70, MAX_X: 530,
   MOUTH_Y: 740,    // mouth height: just under the belt line
@@ -16,7 +17,7 @@ const Vacuum = {
 
   create(speedMul) {
     return { x: 300, dir: Math.random() < 0.5 ? -1 : 1, t: Math.random() * 6.28, eaten: 0,
-             speedMul: speedMul || 1 };
+             eatenThisShot: 0, speedMul: speedMul || 1 };
   },
 
   // wdt: world dt (slow-mo aware). onEaten(x, y, item) fires effects in main.js.
@@ -27,6 +28,7 @@ const Vacuum = {
     else if (v.x >= Vacuum.MAX_X) { v.x = Vacuum.MAX_X; v.dir = -1; }
     const mx = v.x, my = Vacuum.MOUTH_Y;
     for (const it of items) {
+      if ((v.eatenThisShot || 0) >= Vacuum.MEAL) return; // full — no more sucking until the next shot
       if (it.gone || (it.state !== 'fall' && it.state !== 'belt')) continue;
       // bowl drop chute: once loot reaches the bowl it's the cat's, vacuum can't steal it
       if (typeof Conveyor !== 'undefined' && Math.abs(it.x - Conveyor.BOWL_X) < 44 && it.y > Conveyor.BELT_Y - 40) continue;
@@ -37,6 +39,7 @@ const Vacuum = {
       if (d < Vacuum.EAT_R) {
         it.gone = true;
         v.eaten++;
+        v.eatenThisShot = (v.eatenThisShot || 0) + 1;
         onEaten(it.x, it.y, it);
         continue;
       }

@@ -68,7 +68,7 @@ body {
   background: transparent; color: #e8a37c; cursor: pointer;
 }
 #menuBtn {
-  position: absolute; top: 10px; left: 10px; z-index: 5;
+  position: absolute; top: 10px; right: 60px; z-index: 5;
   font-size: 20px; line-height: 1;
   width: 42px; height: 42px; border-radius: 50%;
   background: rgba(255, 255, 255, 0.8); border: none; cursor: pointer;
@@ -95,3 +95,32 @@ body {
 #levelSplash.hidden { display: none; }
 #levelSplash h2 { font-size: 40px; color: #ffb14e; letter-spacing: 1px; }
 #levelSplash p { font-size: 17px; opacity: 0.9; margin-top: 8px; }
+
+#results {
+  position: absolute; inset: 0; z-index: 6;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: rgba(43, 33, 24, 0.88); color: #fff;
+  text-align: center; border-radius: 8px; padding: 20px;
+}
+#results.hidden { display: none; }
+#results h2 { font-size: 32px; margin-bottom: 6px; letter-spacing: 2px; }
+#scaleCanvas { background: #f5eeda; border-radius: 12px; box-shadow: 0 4px 18px rgba(0,0,0,.4); }
+#res-stars { font-size: 44px; margin: 6px 0 2px; letter-spacing: 8px; height: 56px; }
+#res-stars span { display: inline-block; color: #8d6e63; }
+#res-stars span.lit { color: #ffb300; text-shadow: 0 0 14px #ff8f00; }
+#res-stars span.pop { animation: starpop .45s ease-out; }
+@keyframes starpop { 0% { transform: scale(0) rotate(-40deg); } 60% { transform: scale(1.6) rotate(8deg); } 100% { transform: scale(1) rotate(0); } }
+#res-sub { font-size: 16px; opacity: .92; margin: 4px 0 2px; min-height: 22px; }
+#results .row { display: flex; gap: 12px; margin-top: 14px; }
+#results .row button {
+  font-size: 18px; font-weight: bold; padding: 10px 26px;
+  border: none; border-radius: 999px; background: #e8712b; color: #fff; cursor: pointer;
+}
+#results #res-menu { background: #6d4c41; }
+
+#catRow { display: flex; gap: 8px; align-items: center; justify-content: center; margin: 8px 0; flex-wrap: wrap; }
+#catRow span { opacity: .8; font-size: 14px; }
+#catRow button { font-size: 15px; padding: 6px 12px; border-radius: 999px; border: 2px solid transparent; background: #4e342e; color: #fff; cursor: pointer; }
+#catRow button.sel { border-color: #ffb300; }
+#catRow button:disabled { opacity: .45; cursor: default; }

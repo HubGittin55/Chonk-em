@@ -53,6 +53,12 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 - [x] kitchen_bg asset name fix
 - [ ] mystery barrels (unclaimed)
 - [ ] cucumber (unclaimed)
+- [x] species unlocks via total stars (stunkus, 2026-10-07 — Tabby 0 / Orange 8 / Tuxedo 25 / Calico 60)
+- [ ] 10 world backgrounds (qwen — spec in HANDOFFS 2026-10-07)
+- [ ] SFX generation, 24 clips (Blarmo — spec in AUDIO_SPEC.md; loader ready, synth fallback live)
+- [ ] proper vacuum asset (unclaimed — current vector Roomba is placeholder)
+- [ ] 18 exotic food sprites: caviar, lobster, wagyu, btruffle, saffron, bluefin, foiegras, goldkib, kingcrab, uni, kobe, matsutake, beluga, iberico, amberjack, wtruffle, saffris, imperial (unclaimed — emoji fallback live)
+- [ ] READABLE CHONK RAMP (approach TBD — procedural depth maps scrapped 2026-10-07; w80 sprite stretches past 80 for now)
 
 ## PR #5 — v0.4 polish (stunkus, 2026-10-06, on top of main @ 938fb47)
 - [x] conveyor slat direction fix
@@ -64,3 +70,6 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 - [x] favicon, v0.4 title, level splash
 - [ ] mystery barrels (unclaimed)
 - [ ] cucumber (unclaimed)
+- [ ] proper vacuum asset (unclaimed — current vector Roomba is placeholder)
+- [ ] 18 exotic food sprites: caviar, lobster, wagyu, btruffle, saffron, bluefin, foiegras, goldkib, kingcrab, uni, kobe, matsutake, beluga, iberico, amberjack, wtruffle, saffris, imperial (unclaimed — emoji fallback live)
+- [ ] cat chonk stages 90-150 lb (unclaimed — w80 sprite stretches past 80 for now)

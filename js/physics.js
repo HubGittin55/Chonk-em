@@ -6,7 +6,7 @@ const Physics = {
   REST: 0.72,  // wall restitution
 
   // Returns true when the ball is dead.
-  stepBall(ball, dt, barrels, onBurst, onCrack) {
+  stepBall(ball, dt, barrels, onBurst, onCrack, onSpecial) {
     const P = Physics;
     ball.vy += P.GRAV * dt;
     ball.x += ball.vx * dt;
@@ -28,6 +28,26 @@ const Physics = {
       if (d < min && d > 0.001) {
         const nx = dx / d, ny = dy / d;
         const dot = ball.vx * nx + ball.vy * ny;
+        if (b.kind === 'steel') { // unbreakable obstacle: dead bounce, never bursts
+          ball.vx = (ball.vx - 2 * dot * nx) * 0.85;
+          ball.vy = (ball.vy - 2 * dot * ny) * 0.85;
+          ball.x = b.x + nx * min;
+          ball.y = b.y + ny * min;
+          ball.bounces++;
+          if (onSpecial) onSpecial('steel', b, ball);
+          continue;
+        }
+        if (b.kind === 'bumper') { // chrome bumper: power bounce + combo, never bursts
+          let vx = (ball.vx - 2 * dot * nx) * 1.25, vy = (ball.vy - 2 * dot * ny) * 1.25;
+          const sp = Math.hypot(vx, vy), MAXSP = 950;
+          if (sp > MAXSP) { vx *= MAXSP / sp; vy *= MAXSP / sp; }
+          ball.vx = vx; ball.vy = vy;
+          ball.x = b.x + nx * min;
+          ball.y = b.y + ny * min;
+          ball.bounces++;
+          if (onSpecial) onSpecial('bumper', b, ball);
+          continue;
+        }
         ball.vx = (ball.vx - 2 * dot * nx) * 0.8;
         ball.vy = (ball.vy - 2 * dot * ny) * 0.8;
         ball.x = b.x + nx * min;

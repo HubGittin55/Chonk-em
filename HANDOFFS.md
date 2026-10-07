@@ -1,3 +1,83 @@
+## 2026-10-07 — stunkus: steel + keg + bumper barrels (same branch)
+Blarmo asked for unbreakable steel obstacles + two of my picks: **powder keg**
+(chain explosion, 80px, steel immune, screen shake) and **bumper** (chrome dome,
+1.25x power bounce capped, +1 combo, never breaks). Vector art for all three,
+clang/boing/boom synths (+SFX spec rows for Blarmo's gen work), procedural 13+
+deals them from the empty share, L6/9/12 sprinkled. Smoke 88/88.
+
+## 2026-10-07 — stunkus: WORK ORDER for qwen — 10 world backgrounds
+Blarmo approved 10 world backgrounds (10 worlds × 10 levels). Spec:
+- 600×900 PNG, same warm cartoon style/perspective as `kitchen_bg`.
+- Keep the bottom-center band (conveyor y≈700, bowl x≈100) relatively calm —
+  gameplay happens there; detail lives in the top 2/3.
+- Worlds: 1 Kitchen (exists), 2 Pantry, 3 Garden, 4 Fish Market, 5 Bakery,
+  6 Diner, 7 Farm, 8 Park Picnic, 9 Candy Shop, 10 Banquet Hall.
+- Name them `assets/bg_world1.png` … `bg_world10.png`; Stunkus wires
+  `worldForLevel(n) = floor((n-1)/10)` into drawBackground (kitchen_bg stays as
+  world 1 until the new fleet lands).
+
+## 2026-10-07 — stunkus: species unlocks built + SFX spec for Blarmo
+- Species unlocks live on this branch: total stars gate the roster (never spent) —
+  Tabby 0★, Orange 8★, Tuxedo 25★, Calico 60★. Menu cat picker, unlock fanfare +
+  notice in the weigh-in results. Smoke 84/84.
+- `AUDIO_SPEC.md` written for Blarmo's audio-gen experiments: 24 SFX, art direction,
+  `assets/sfx/<name>.mp3`. `AudioSys` now has a buffer-first loader (`loadSfx`,
+  `play`, `sfx`) — generated files play automatically, synth fallback until they land.
+
+## 2026-10-07 — stunkus: weigh-in results ceremony built (same branch)
+Blarmo's pitch, built: post-win weigh-in — analog scale dial, needle climbs ~2.6s
+with rising ticks, cat squashes on the platform, stars pop as the needle crosses
+thresholds. Stars are weight-based now (1 = win, 2 = 75% of level food, 3 = 90% —
+replaces the old par/clean criteria). Sad trombone for 1 star, jingle for 2,
+fanfare + confetti for 3. Stats + Retry/Menu/Next. Smoke 82/82.
+
+## 2026-10-07 — stunkus: depth maps SCRAPPED + v0.4 roadmap started
+Blarmo killed the procedural depth maps ("not great") — `tools/depth_refs/` deleted.
+The underlying need (readable chonk ramp) stands; approach TBD. Separately, started
+brainstorming the massive v0.4: see V04_ROADMAP.md (architecture, game design, polish
+pillars + proposed cut). Awaiting Blarmo's reaction before speccing.
+
+## 2026-10-06 — stunkus: WORK ORDER for qwen — silhouette-locked chonk ramp (ControlNet depth)
+Blarmo's diagnosis: the 30-lb sprite reads as 50-lb, and stages 50-80 are near-identical
+with slight variance — the size ramp doesn't read. Fix: build ONE ControlNet depth-map
+reference PER SIZE STAGE (12+ stages covering the 10-150 lb ramp), all sharing one
+canonical pose/camera. Depth locks the silhouette per stage; species becomes a pure
+prompt swap (tabby / orange / tuxedo / calico / future species = same 12 depth maps,
+different prompt). Requirements:
+- Monotonic silhouette growth, verified TWO ways:
+  1. Objective: silhouette pixel area (non-transparent pixel count) must increase
+     at every stage — no exceptions, script-checkable.
+  2. Subjective: the squint test — every stage must read distinctly bigger than
+     the last at thumbnail size (Blarmo grades).
+- Keep the existing asset naming + per-asset vector fallback contract in js/cats.js
+  (check the STAGES table for expected keys); Stunkus rewires thresholds once the
+  new fleet lands.
+- Reuse the AoT bold-linework style prompt from the current fleet.
+This supersedes the "stages 90-150" patch job — do the full re-ramp, not an extension.
+STATUS 2026-10-06 (stunkus): the 10 depth references are DONE — `tools/depth_refs/depth_stage01..10.png`
+(512×512 grayscale, brighter = closer) + `make_depth.py` (the generator, numpy/PIL).
+Front-facing sitting cat, bottom-anchored (paws on the same ground line every stage),
+uniform 1.10× linear growth per step (NOT logarithmic): stage 10 is 2.36× stage 1,
+pixel area strictly increasing every step (+21% per step, +456% total — script-verified,
+zero clipping). Qwen: feed each as ControlNet-depth reference, prompt-swap the species.
+If you want a different pose, tweak PARTS in make_depth.py and re-run.
+
+## 2026-10-06 — stunkus: PR #5 food tiers + 100-level curve (same branch)
+Blarmo's long-term replay design, built on `stunkus/v04-polish`: per-level reset stays,
+food becomes the progression — new exotic every 5 levels (+5 cal: L1 tuna/5 … L5 steak/10,
+L10 caviar/15 … L100 Imperial Feast/100), level raw-cal follows 55+4*(n-1) so 80 lb is
+impossible on L10, rare on L50 (needs near-perfect play), 140+ on L100; cap 150.
+Levels 1-12 retuned to the curve, 13-100 generated deterministically in JS
+(seedable, symmetric, 60-115 barrels). Splash/menu flag new exotic unlocks.
+QWEN: 18 exotic food sprites + cat stages 90-150 needed (emoji/w80 fallbacks live).
+Smoke 79/79.
+
+## 2026-10-06 — stunkus: PR #5 follow-up tweaks (same branch)
+Blarmo's tuning round, folded into `stunkus/v04-polish`: flat 0.3 lb/cal with per-level
+caps removed (barrel food is the only limit now), menu button moved top-right off the
+HUD stats, conveyor rebuilt with symmetric 60px end gaps (bridge extends over both),
+vacuum tuned way down (suck 55 / eat 20 / 2 items per shot, FULL popup). Smoke 74/74.
+
 ## 2026-10-06 — stunkus: PR #5 v0.4 polish ready (on top of main @ 938fb47)
 Branch `stunkus/v04-polish` answers Blarmo's post-PR4 list: conveyor slats now run left
 with the food (was: visual ran right), HUD/popup text gets dark outlines for bg contrast,
