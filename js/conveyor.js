@@ -8,8 +8,8 @@ const Conveyor = {
   SPEED: 130,    // px/s, leftward
   BOWL_X: 100,
   BOWL_Y: 744,
-  LEFT: 100, RIGHT: 500,     // belt extent — 60px empty gaps on BOTH sides (symmetric)
-  EDGE: 60,                  // end-gap width, each side
+  LEFT: 72, RIGHT: 528,      // belt extent — 32px empty gaps on BOTH sides (symmetric)
+  EDGE: 32,                  // end-gap width, each side
   t: 0,
 
   onBelt(x, bridged) {

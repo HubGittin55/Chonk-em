@@ -1,13 +1,14 @@
 'use strict';
 /* Level data. kind: 'snack' | 'veggie' | 'power' | 'empty' | 'steel' | 'keg' | 'bumper'. content keys must exist in CONTENT (barrels.js).
    Levels 1-12 handcrafted; 13-100 generated deterministically by genLevel(n).
-   Food tiers: new exotic every 5 levels (+5 cal); raw cal follows 55+4*(n-1). */
+   Food tiers: new exotic every 5 levels (+5 cal); raw cal follows 55+4*(n-1).
+   Balls: 75% of food barrels (owner directive 2026-10-07). */
 
 const LEVELS = [
   {
     name: 'First Breakfast',
-    balls: 37,
-    par: 28,
+    balls: 17,
+    par: 13,
     goal: 35,
     r: 10,
     barrels: [
@@ -76,8 +77,8 @@ const LEVELS = [
   },
   {
     name: 'Pyramid Pounce',
-    balls: 39,
-    par: 29,
+    balls: 15,
+    par: 11,
     goal: 37,
     r: 10,
     barrels: [
@@ -150,8 +151,8 @@ const LEVELS = [
   },
   {
     name: 'Starstruck',
-    balls: 43,
-    par: 32,
+    balls: 23,
+    par: 17,
     goal: 39,
     r: 10,
     barrels: [
@@ -231,8 +232,8 @@ const LEVELS = [
   },
   {
     name: 'Heartbreaker',
-    balls: 47,
-    par: 35,
+    balls: 17,
+    par: 13,
     goal: 42,
     r: 10,
     barrels: [
@@ -318,8 +319,8 @@ const LEVELS = [
   },
   {
     name: 'Smiley Face',
-    balls: 50,
-    par: 38,
+    balls: 23,
+    par: 17,
     goal: 44,
     r: 10,
     barrels: [
@@ -411,8 +412,8 @@ const LEVELS = [
   },
   {
     name: 'Diagonal Dash',
-    balls: 53,
-    par: 40,
+    balls: 23,
+    par: 17,
     goal: 47,
     r: 10,
     vacuum: true,
@@ -510,8 +511,8 @@ const LEVELS = [
   },
   {
     name: 'Twin Peaks',
-    balls: 58,
-    par: 44,
+    balls: 26,
+    par: 20,
     goal: 49,
     r: 10,
     barrels: [
@@ -615,8 +616,8 @@ const LEVELS = [
   },
   {
     name: 'The Gauntlet',
-    balls: 59,
-    par: 44,
+    balls: 20,
+    par: 15,
     goal: 51,
     r: 10,
     barrels: [
@@ -723,8 +724,8 @@ const LEVELS = [
   },
   {
     name: 'Star Invader',
-    balls: 64,
-    par: 48,
+    balls: 28,
+    par: 21,
     goal: 54,
     r: 10,
     vacuum: true,
@@ -839,8 +840,8 @@ const LEVELS = [
   },
   {
     name: 'Veggie Minefield',
-    balls: 66,
-    par: 50,
+    balls: 32,
+    par: 24,
     goal: 56,
     r: 10,
     barrels: [
@@ -958,8 +959,8 @@ const LEVELS = [
   },
   {
     name: 'Power Tower',
-    balls: 68,
-    par: 51,
+    balls: 33,
+    par: 25,
     goal: 59,
     r: 10,
     barrels: [
@@ -1081,8 +1082,8 @@ const LEVELS = [
   },
   {
     name: 'The Grand Feast',
-    balls: 72,
-    par: 54,
+    balls: 31,
+    par: 23,
     goal: 61,
     r: 10,
     vacuum: true,
@@ -1352,7 +1353,8 @@ function genLevel(n) { // 1-based, n >= 13. Deterministic — same n, same level
   }
   if (!barrels.some(b => b.armor)) { const s = snacks[0]; if (s) s.armor = true; }
 
-  const balls = Math.round(nB * 0.6);
+  const nFood = barrels.filter(b => b.kind === 'snack' && (CONTENT[b.content] || { cal: 0 }).cal > 0).length;
+  const balls = Math.max(8, Math.round(nFood * 0.75)); // 75% of food barrels (owner 2026-10-07)
   return {
     name: GEN_NAMES_A[Math.floor(rnd() * GEN_NAMES_A.length)] + ' ' +
           GEN_NAMES_B[Math.floor(rnd() * GEN_NAMES_B.length)],
