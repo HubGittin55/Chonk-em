@@ -36,7 +36,44 @@ const CONTENT = {
   wtruffle:  { cal: 90, icon: '🤍', name: 'White Truffle',    grav: 1.00, drift: 50 },
   saffris:   { cal: 95, icon: '🥘', name: 'Saffron Risotto',  grav: 1.20, drift: 20 },
   imperial:  { cal: 100, icon: '👑', name: 'Imperial Feast',  grav: 1.40, drift: 10 },
+  // --- special kinds (barrel.kind, not snack content) ---
+  cucumber:  { cal:  0, icon: '🥒', name: 'Cucumber',        grav: 1.00, drift: 40 },
 };
+
+// Twinkling 4-point sparkle — the "reads as special" hint for mystery barrels
+function drawSparkle(ctx, x, y, s, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = '#f3e5f5';
+  ctx.beginPath();
+  ctx.moveTo(x, y - s); ctx.quadraticCurveTo(x, y, x + s, y);
+  ctx.quadraticCurveTo(x, y, x, y + s); ctx.quadraticCurveTo(x, y, x - s, y);
+  ctx.quadraticCurveTo(x, y, x, y - s);
+  ctx.fill();
+  ctx.restore();
+}
+
+// Kind ring overlay for the generated-sprite path (vector path draws full bodies below)
+function drawKindRing(ctx, b, r, time) {
+  if (b.kind === 'mystery') {
+    for (let i = 0; i < 3; i++) {
+      const a = time * 2.2 + i * (Math.PI * 2 / 3);
+      drawSparkle(ctx, b.x + Math.cos(a) * (r + 9), b.y + Math.sin(a) * (r + 9),
+        5, 0.55 + 0.45 * Math.sin(time * 6 + i * 2));
+    }
+  } else if (b.kind === 'golden') {
+    ctx.strokeStyle = '#ffd54f'; ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.arc(b.x, b.y, r + 2, 0, 7); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,213,79,0.5)'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(b.x, b.y, r + 7, 0, 7); ctx.stroke();
+  } else if (b.kind === 'cuke') {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(27,94,32,0.85)'; ctx.lineWidth = 2.5;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.arc(b.x, b.y, r + 3, time * 0.8, time * 0.8 + Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+}
 
 // Armor band + cracks drawn over generated skins (vector path inlines its own)
 function drawArmor(ctx, b, r) {
@@ -76,6 +113,7 @@ function drawBarrels(ctx, barrels, time) {
         ctx.beginPath(); ctx.arc(b.x, b.y, r + 1.5, time * 1.5, time * 1.5 + Math.PI * 2); ctx.stroke();
         ctx.restore();
       }
+      drawKindRing(ctx, b, r, time);
       drawArmor(ctx, b, r);
       continue;
     }
@@ -189,6 +227,90 @@ function drawBarrels(ctx, barrels, time) {
       ctx.font = Math.round(r * 0.95) + 'px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillStyle = '#e65100';
       ctx.fillText('\u2605', b.x, b.y + 1);
+      continue;
+    }
+    if (b.kind === 'mystery') {
+      // deep purple mystery barrel: '?' badge, orbiting sparkles, gentle throb
+      const throb = 1 + 0.04 * Math.sin(time * 4 + b.x * 0.1);
+      ctx.fillStyle = 'rgba(60,35,10,0.16)';
+      ctx.beginPath(); ctx.ellipse(b.x + 3, b.y + 5, r, r * 0.92, 0, 0, 7); ctx.fill();
+      const g2 = ctx.createRadialGradient(b.x - r * 0.4, b.y - r * 0.45, r * 0.2, b.x, b.y, r * throb);
+      g2.addColorStop(0, '#9c4dcc'); g2.addColorStop(0.6, '#6a1fa0'); g2.addColorStop(1, '#3d0f63');
+      ctx.fillStyle = g2;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r * throb, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#2a0a45'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r * throb - 1.5, 0, 7); ctx.stroke();
+      const br = r * 0.62;
+      ctx.fillStyle = '#f3e5f5';
+      ctx.beginPath(); ctx.arc(b.x, b.y, br, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#7b1fa2'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(b.x, b.y, br, 0, 7); ctx.stroke();
+      ctx.fillStyle = '#4a148c';
+      ctx.font = 'bold ' + Math.max(10, Math.round(r * 0.9)) + 'px system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('?', b.x, b.y + 1);
+      for (let i = 0; i < 3; i++) {
+        const a = time * 2.2 + i * (Math.PI * 2 / 3);
+        drawSparkle(ctx, b.x + Math.cos(a) * (r + 9), b.y + Math.sin(a) * (r + 9),
+          5, 0.55 + 0.45 * Math.sin(time * 6 + i * 2));
+      }
+      continue;
+    }
+    if (b.kind === 'golden') {
+      // radiant gold jackpot barrel
+      ctx.fillStyle = 'rgba(60,35,10,0.16)';
+      ctx.beginPath(); ctx.ellipse(b.x + 3, b.y + 5, r, r * 0.92, 0, 0, 7); ctx.fill();
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,213,79,0.75)'; ctx.lineWidth = 2.5;
+      for (let i = 0; i < 8; i++) {
+        const a = time * 0.9 + i * (Math.PI / 4);
+        ctx.beginPath();
+        ctx.moveTo(b.x + Math.cos(a) * (r + 3), b.y + Math.sin(a) * (r + 3));
+        ctx.lineTo(b.x + Math.cos(a) * (r + 9), b.y + Math.sin(a) * (r + 9));
+        ctx.stroke();
+      }
+      ctx.restore();
+      const g2 = ctx.createRadialGradient(b.x - r * 0.4, b.y - r * 0.45, r * 0.2, b.x, b.y, r);
+      g2.addColorStop(0, '#fff8e1'); g2.addColorStop(0.5, '#ffd54f'); g2.addColorStop(1, '#b47e00');
+      ctx.fillStyle = g2;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#7a5200'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r - 1.5, 0, 7); ctx.stroke();
+      const gc = CONTENT[b.content] || {};
+      const br = r * 0.62;
+      ctx.fillStyle = '#fffdf5';
+      ctx.beginPath(); ctx.arc(b.x, b.y, br, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#ffb300'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(b.x, b.y, br, 0, 7); ctx.stroke();
+      ctx.font = Math.max(9, Math.round(r * 0.72)) + 'px serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(gc.icon || '★', b.x, b.y - 2);
+      ctx.fillStyle = '#7a5200';
+      ctx.font = 'bold ' + Math.max(8, Math.round(r * 0.42)) + 'px system-ui, sans-serif';
+      ctx.fillText('×3', b.x, b.y + r * 0.34);
+      continue;
+    }
+    if (b.kind === 'cuke') {
+      // cucumber-green barrel of mild menace
+      ctx.fillStyle = 'rgba(60,35,10,0.16)';
+      ctx.beginPath(); ctx.ellipse(b.x + 3, b.y + 5, r, r * 0.92, 0, 0, 7); ctx.fill();
+      const g2 = ctx.createRadialGradient(b.x - r * 0.4, b.y - r * 0.45, r * 0.2, b.x, b.y, r);
+      g2.addColorStop(0, '#a5d6a7'); g2.addColorStop(0.6, '#66bb6a'); g2.addColorStop(1, '#2e7d32');
+      ctx.fillStyle = g2;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#1b5e20'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r - 1.5, 0, 7); ctx.stroke();
+      const br = r * 0.62;
+      ctx.fillStyle = '#f1f8e9';
+      ctx.beginPath(); ctx.arc(b.x, b.y, br, 0, 7); ctx.fill();
+      ctx.save();
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = '#1b5e20'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(b.x, b.y, br, 0, 7); ctx.stroke();
+      ctx.restore();
+      ctx.font = Math.max(9, Math.round(r * 0.72)) + 'px serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🥒', b.x, b.y + 1);
       continue;
     }
     ctx.fillStyle = 'rgba(0,0,0,0.18)';

@@ -6,7 +6,7 @@
 const SFX_FILES = ['ui_click', 'shoot', 'burst', 'bounce', 'belt_catch', 'nom',
   'combo2', 'combo3', 'combo4', 'star_pop', 'needle_tick', 'trombone', 'fanfare',
   'jingle_win', 'jingle_lose', 'slurp', 'vacuum_full', 'meow1', 'meow2', 'meow3',
-  'powerup', 'frenzy', 'splash', 'unlock', 'clang', 'boing', 'boom'];
+  'powerup', 'frenzy', 'splash', 'unlock', 'clang', 'boing', 'boom', 'startle'];
 
 const AudioSys = {
   ctx: null,
@@ -99,6 +99,12 @@ const AudioSys = {
   clang()   { this.sfx('clang', function() { this.tone(1900, 0.09, 'square', 0.06, 800); this.tone(2600, 0.06, 'square', 0.04, 1200); }); },
   boing()   { this.sfx('boing', function() { this.tone(180, 0.28, 'sine', 0.10, 640); }); },
   boom()    { this.sfx('boom', function() { this.tone(90, 0.45, 'sawtooth', 0.14, 38); this.tone(55, 0.5, 'sine', 0.12, 30); }); },
+  startle() { // cucumber jump-scare: sharp hiss-blip up, low slide down
+    this.sfx('startle', function() {
+      this.tone(880, 0.09, 'square', 0.09, 1760);
+      setTimeout(() => this.tone(240, 0.25, 'sawtooth', 0.08, 90), 90);
+    });
+  },
   meow(big) { // big 0..1 — pitch drops as the chonk grows
     this.sfx(big > 0.66 ? 'meow3' : big > 0.33 ? 'meow2' : 'meow1', function() {
       const f = 700 - big * 350;
