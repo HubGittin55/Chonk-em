@@ -126,7 +126,8 @@ function loadLevel(i) {
   game.par = Math.round(L.par * D.balls);
   game.goalNow = Math.round(L.goal * D.goal);
   game.shots = [];
-  game.multiShots = 0; game.maxCombo = 0; game.splitNext = false; game.weigh = null; game.shakeT = 0; game.goalMet = false; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0; game.shotsFired = 0;
+  game.multiShots = 0; game.maxCombo = 0; game.splitNext = false; game.weigh = null; game.shakeT = 0; game.shakeAmt = 36; game.goalMet = false; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0; game.shotsFired = 0;
+  game.cukeT = 0; game.scareJump = 0; game.hitstopT = 0; game.fxSlowT = 0; game.fxSlowScale = 0.45; // FX bus state
   game.weightLb = START_LB; // size resets every level (owner)
   game.lbPerCal = LB_PER_CAL; // flat 0.3 lb/cal — the food in the barrels is the only limit
   game.items = [];
@@ -134,6 +135,7 @@ function loadLevel(i) {
   game.vacuum = L.vacuum ? Vacuum.create((DIFFS[game.diffKey] || DIFFS.normal).vacuum) : null;
   if (game.vacuum) addPopup(W / 2, 330, '⚠ VACUUM PATROL ⚠', '#c62828');
   game.barrels = L.barrels.map(b => ({ x: b.x, y: b.y, r: L.r || 15, kind: b.kind, content: b.content, armor: !!b.armor, cracked: false, cleared: false }));
+  dealSpecialBarrels(game.barrels, i + 1); // golden + mystery + rare cuke, dealt from empty slots
   game.calories = 0;
   game.stage = 0;
   game.combo = 0; game.mult = 1;
@@ -179,6 +181,7 @@ function aimAngleFor(px, py) {
   if (dy < 30) return null;
   let ang = Math.atan2(dy, dx);
   const lo = 10 * Math.PI / 180, hi = 170 * Math.PI / 180;
+  if (game.cukeT > 0 && !REDUCED) ang += Math.sin(game.time * 9) * 0.07 * Math.min(1, game.cukeT); // spooked: aim wobbles
   return Math.max(lo, Math.min(hi, ang));
 }
 
@@ -202,6 +205,7 @@ function fireShot(px, py) {
     game.balls--;
     game.shotsFired++;
   }
+  if (game.balls === 0 && game.goalMet && !game.over) FX.slowmo(0.45, 1.4); // final-ball win: dramatic beat before the score
   AudioSys.pop();
 }
 
@@ -253,6 +257,28 @@ function drawParticles(ctx) {
   ctx.globalAlpha = 1;
 }
 
+// Mystery reveal: 65% tier snack, 20% power-up, 15% veggie dud (the spice of mystery)
+function resolveMystery() {
+  const roll = Math.random();
+  if (roll < 0.15) return Math.random() < 0.5 ? 'broccoli' : 'celery';
+  if (roll < 0.35) return ['multi', 'wide', 'slow', 'magnet'][Math.floor(Math.random() * 4)];
+  const commons = tierCommons(game.levelIndex + 1).filter(k => ((CONTENT[k] || {}).cal || 0) > 0);
+  return commons[Math.floor(Math.random() * commons.length)];
+}
+
+// The cucumber event: comedic hop, full-body wobble, aim wobbles for 4s. No calories, no combo change.
+function spookCat(item) {
+  game.nomT = 0.6;
+  game.face = 'sad'; game.faceT = 2.2;
+  game.cukeT = 4;
+  game.scareJump = 110;
+  wobbleImpulse('belly', 6); wobbleImpulse('cheek', 3.5); wobbleImpulse('tail', 4);
+  addPopup(item.x, Math.max(60, item.y - 40), '🥒 CUCUMBER!!', '#2e7d32');
+  addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, 'SPOOKED! aim wobbles!', '#2e7d32');
+  AudioSys.startle();
+  FX.shake(34, 0.3);
+}
+
 function onBarrelCrack(barrel) {
   addPopup(barrel.x, barrel.y - 28, 'CRACKED!', '#78909c');
   AudioSys.tink();
@@ -277,10 +303,48 @@ function onBarrelBurst(barrel, ball) {
   spawnChips(barrel.x, barrel.y);
   if (barrel.kind === 'keg') { explode(barrel.x, barrel.y); return; } // powder keg: chain explosion
   if (barrel.kind === 'empty') { AudioSys.burst(); return; } // hollow barrel: no loot inside
+  if (barrel.kind === 'mystery') { // the reveal: tier snack, power-up, or rare veggie dud
+    const resolved = resolveMystery();
+    barrel.kind = (CONTENT[resolved] || {}).power ? 'power' : 'snack';
+    barrel.content = resolved;
+    addPopup(barrel.x, barrel.y - 48, 'MYSTERY!', '#7b1fa2');
+    AudioSys.powerup();
+    FX.burstJuice('mystery', 0, barrel.x, barrel.y);
+    // falls through to the generic spawn with the resolved content
+  }
+  if (barrel.kind === 'golden') { // jackpot: 3x the level's top snack
+    const c = CONTENT[barrel.content] || {};
+    const jackpot = (c.cal || 5) * 3;
+    addPopup(barrel.x, barrel.y - 48, 'JACKPOT ×3!', '#ffb300');
+    AudioSys.fanfare();
+    FX.burstJuice('golden', jackpot, barrel.x, barrel.y);
+    game.items.push({
+      x: barrel.x, y: barrel.y,
+      vx: (Math.random() - 0.5) * 150, vy: -60 - Math.random() * 90,
+      r: 9, state: 'fall', cal: jackpot, icon: c.icon || '⭐', name: 'Golden ' + (c.name || 'Snack'),
+      content: barrel.content, grav: c.grav || 1, drift: c.drift || 0, power: null, golden: true,
+      t: 0, gone: false,
+    });
+    return;
+  }
+  if (barrel.kind === 'cuke') { // the green menace: spills a cucumber, terrifies the cat
+    addPopup(barrel.x, barrel.y - 46, '🥒?!', '#2e7d32');
+    AudioSys.startle();
+    FX.burstJuice('cuke', 0, barrel.x, barrel.y);
+    game.items.push({
+      x: barrel.x, y: barrel.y,
+      vx: (Math.random() - 0.5) * 150, vy: -60 - Math.random() * 90,
+      r: 9, state: 'fall', cal: 0, icon: '🥒', name: 'Cucumber',
+      content: 'cucumber', grav: 1, drift: 40, power: null, spook: true,
+      t: 0, gone: false,
+    });
+    return;
+  }
   const c = CONTENT[barrel.content];
   const label = c.power ? '★' : (c.cal > 0 ? '+' + c.cal : '' + c.cal);
   addPopup(barrel.x, barrel.y - 28, label, c.power ? '#ef6c00' : c.cal > 0 ? '#2e7d32' : '#c62828');
   AudioSys.burst();
+  FX.burstJuice(barrel.kind, c.cal, barrel.x, barrel.y);
   const pop = 1 - 0.35 * (c.grav - 1); // heavy loot pops weaker
   game.items.push({
     x: barrel.x, y: barrel.y,
@@ -293,7 +357,7 @@ function onBarrelBurst(barrel, ball) {
 
 function explode(x, y) {
   AudioSys.boom();
-  game.shakeT = 0.35;
+  FX.burstJuice('keg', 0, x, y); // shake + hit-stop, REDUCED-safe
   addPopup(x, y - 30, 'BOOM!', '#d32f2f');
   if (!REDUCED) for (let i = 0; i < 26; i++) {
     const a = Math.random() * Math.PI * 2, sp = 80 + Math.random() * 320;
@@ -329,6 +393,7 @@ function onBarrelSpecial(kind, b, ball) {
 
 function deliver(item) {
   if (game.over) return;
+  if (item.spook) { spookCat(item); return; } // the cucumber: terror, not food
   if (item.power) {
     game.nomT = 0.6;
     game.face = 'happy'; game.faceT = 1.2;
@@ -374,6 +439,7 @@ function deliver(item) {
     AudioSys.nom();
     addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '+' + gained, '#2e7d32');
     spawnCrumbs(Conveyor.BOWL_X, Conveyor.BOWL_Y - 18);
+    if (item.cal >= 15 || item.golden) FX.confetti(Conveyor.BOWL_X, Conveyor.BOWL_Y - 40, item.golden ? 40 : 22); // exotics rain paper
     if (game.combo >= 2) {
       addPopup(Conveyor.BOWL_X + 96, Conveyor.BOWL_Y - 96,
         'COMBO ×' + game.combo + (game.mult > 1 ? '  (×' + game.mult + ' cal)' : ''), '#ff8f00');
@@ -598,6 +664,8 @@ function hideOverlay() { overlay.classList.add('hidden'); }
 function tick(dt) {
   game.time += dt;
 
+  if (game.hitstopT > 0) { game.hitstopT -= dt; return; } // hit-stop: world frozen, render continues
+
   updateWeigh(dt);
   if (game.shakeT > 0) game.shakeT -= dt;
 
@@ -614,6 +682,8 @@ function tick(dt) {
   // World updates run at timeScale (slow-mo during FEAST FRENZY or slow-mo power-up)
   if (game.slowT > 0) { game.slowT -= dt; if (game.frenzy <= 0) game.timeScale = 0.45; }
   else if (game.frenzy <= 0) game.timeScale = 1;
+  FX.tick(dt); // decays the FX slow-mo timer
+  if (game.fxSlowT > 0) game.timeScale = Math.min(game.timeScale, game.fxSlowScale || 0.45); // stacks under frenzy/slow-mo power-up
   const wdt = dt * game.timeScale;
   Conveyor.t += wdt;
   tickParticles(dt);
@@ -636,6 +706,8 @@ function tick(dt) {
 
   if (game.magnetT > 0) game.magnetT -= dt;
   if (game.bridgeT > 0) game.bridgeT -= dt;
+  if (game.cukeT > 0) game.cukeT -= dt; // spooked aim wobble
+  if (game.scareJump > 0) game.scareJump = Math.max(0, game.scareJump - 420 * dt); // the hop lands
 
   for (let i = game.shots.length - 1; i >= 0; i--) {
     if (Physics.stepBall(game.shots[i], wdt, game.barrels, onBarrelBurst, onBarrelCrack, onBarrelSpecial)) game.shots.splice(i, 1);
@@ -691,7 +763,9 @@ function tick(dt) {
   });
 
   if (!game.over && !game.shots.length && game.items.length === 0) {
-    const foodLeft = game.barrels.some(b => !b.cleared && b.kind === 'snack' && (((CONTENT[b.content] || {}).cal) || 0) > 0);
+    // mystery/golden barrels always count as food left (their payload resolves at burst time)
+    const foodLeft = game.barrels.some(b => !b.cleared &&
+      ((b.kind === 'snack' || b.kind === 'golden') && (((CONTENT[b.content] || {}).cal) || 0) > 0 || b.kind === 'mystery'));
     if (game.balls <= 0 || !foodLeft) endGame(game.calories >= game.goalNow);
   }
 }
@@ -911,7 +985,10 @@ function drawFrenzy() {
 function render() {
   drawBackground();
   ctx.save();
-  if (game.shakeT > 0) ctx.translate((Math.random() - 0.5) * game.shakeT * 36, (Math.random() - 0.5) * game.shakeT * 36);
+  if (game.shakeT > 0) {
+    const mag = (game.shakeAmt || 36) * game.shakeT;
+    ctx.translate((Math.random() - 0.5) * mag, (Math.random() - 0.5) * mag);
+  }
   drawBarrels(ctx, game.barrels, game.time);
   Conveyor.draw(ctx, game.bridgeT > 0);
   drawItems();
@@ -920,7 +997,7 @@ function render() {
   drawParticles(ctx);
   ctx.restore();
   Cats.drawShooter(ctx, SHOOT.x, SHOOT.y, game.aimAng, !game.shots.length && game.balls > 0 && !game.over);
-  Cats.drawMain(ctx, 252, 806, {
+  Cats.drawMain(ctx, 252, 806 - (game.scareJump || 0), { // spooked cats hop
     t: chonkT(game.weightLb), lb: game.weightLb, wob: game.wob, var: game.catVar,
     nomT: game.nomT, face: game.face, time: game.time,
   });
