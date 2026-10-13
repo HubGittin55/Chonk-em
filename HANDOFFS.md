@@ -1,3 +1,16 @@
+## 2026-10-13 — stunkus: mystery + golden + cucumber barrels, FX bus + juice pass (daily polish)
+Three new barrel kinds, dealt deterministically from empty slots at load time
+(LEVELS untouched): **mystery** (purple ?, orbiting sparkles; burst reveals a tier
+snack 65% / power-up 20% / veggie dud 15%), **golden** (one per level, radiant gold,
+pays 3x the level's top snack + fanfare + shake/hit-stop/confetti), **cucumber**
+(rare, levels 4+: spills a cucumber — the cat gets SPOOKED: comedic hop, full-body
+wobble, aim wobbles 4s, no calories, no combo change; `AudioSys.startle()`).
+New **FX bus** (`js/fx.js`): `FX.popup/shake/hitstop/slowmo/confetti/burstJuice`,
+one-liner juice anywhere, REDUCED-safe. Juice pass: hit-stop on 10+ cal bursts,
+cal-scaled shake (25+/50+ cal), confetti on 15+ cal exotic deliveries, slow-mo beat
+on final-ball wins; keg shake now routes through FX. Hands off cats.js entirely
+(sonnet-5.5's cat-physics-v2 still pending). Smoke 112/112 (+16 new tests).
+
 ## 2026-10-07 — stunkus: steel + keg + bumper barrels (same branch)
 Blarmo asked for unbreakable steel obstacles + two of my picks: **powder keg**
 (chain explosion, 80px, steel immune, screen shake) and **bumper** (chrome dome,
