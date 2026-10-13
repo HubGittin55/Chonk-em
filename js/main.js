@@ -165,11 +165,11 @@ const LB_MSGS = { 10: 'DOUBLE DIGITS!', 20: '20 LB CLUB!', 30: 'CERTIFIED CHONK!
 function checkLbMilestones(before, after) {
   for (const m of LB_MILESTONES) {
     if (before < m && after >= m) {
-      addPopup(300, 340, '⚖ ' + m + ' lb — ' + LB_MSGS[m], '#6a1b9a');
+      addPopup(300, 340, m + ' lb — ' + LB_MSGS[m], '#6a1b9a');
       AudioSys.meow(Math.min(1, m / 100));
       AudioSys.jingle();
       game.face = 'bliss'; game.faceT = 2.5;
-      wobbleImpulse('belly', 4); wobbleImpulse('cheek', 2);
+      wobbleImpulse('belly', 2.5); wobbleImpulse('cheek', 1.5);
     }
   }
 }
@@ -254,7 +254,6 @@ function drawParticles(ctx) {
 }
 
 function onBarrelCrack(barrel) {
-  addPopup(barrel.x, barrel.y - 28, 'CRACKED!', '#78909c');
   AudioSys.tink();
 }
 
@@ -271,15 +270,12 @@ function onBarrelBurst(barrel, ball) {
         r: ball.r, life: 0, slowT: 0, bounces: 0,
       });
     }
-    addPopup(ball.x, ball.y - 24, 'SPLIT!', '#7b1fa2');
     AudioSys.pop();
   }
   spawnChips(barrel.x, barrel.y);
   if (barrel.kind === 'keg') { explode(barrel.x, barrel.y); return; } // powder keg: chain explosion
   if (barrel.kind === 'empty') { AudioSys.burst(); return; } // hollow barrel: no loot inside
   const c = CONTENT[barrel.content];
-  const label = c.power ? '★' : (c.cal > 0 ? '+' + c.cal : '' + c.cal);
-  addPopup(barrel.x, barrel.y - 28, label, c.power ? '#ef6c00' : c.cal > 0 ? '#2e7d32' : '#c62828');
   AudioSys.burst();
   const pop = 1 - 0.35 * (c.grav - 1); // heavy loot pops weaker
   game.items.push({
@@ -294,7 +290,6 @@ function onBarrelBurst(barrel, ball) {
 function explode(x, y) {
   AudioSys.boom();
   game.shakeT = 0.35;
-  addPopup(x, y - 30, 'BOOM!', '#d32f2f');
   if (!REDUCED) for (let i = 0; i < 26; i++) {
     const a = Math.random() * Math.PI * 2, sp = 80 + Math.random() * 320;
     game.particles.push({
@@ -316,13 +311,11 @@ function explode(x, y) {
 function onBarrelSpecial(kind, b, ball) {
   if (kind === 'steel') {
     AudioSys.clang();
-    addPopup(b.x, b.y - 26, 'CLANG!', '#78909c');
     spawnChips(b.x, b.y);
   } else if (kind === 'bumper') {
     AudioSys.boing();
     game.combo++;
     game.maxCombo = Math.max(game.maxCombo || 0, game.combo);
-    addPopup(b.x, b.y - 26, 'BOING! +1', '#ef6c00');
     spawnChips(b.x, b.y);
   }
 }
@@ -332,7 +325,7 @@ function deliver(item) {
   if (item.power) {
     game.nomT = 0.6;
     game.face = 'happy'; game.faceT = 1.2;
-    wobbleImpulse('cheek', 1.5); wobbleImpulse('belly', 1);
+    wobbleImpulse('cheek', 1); wobbleImpulse('belly', 0.8);
     AudioSys.powerup();
     if (item.power === 'multi')  { game.multiShots = 1;    addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ MULTI-YARN!', '#ef6c00'); }
     if (item.power === 'wide')   { game.bridgeT = 15;      addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '★ BRIDGE!', '#ef6c00'); }
@@ -358,9 +351,9 @@ function deliver(item) {
     store.set('weight', game.weightLb);
     checkLbMilestones(beforeLb, game.weightLb);
   }
-  wobbleImpulse('belly', item.cal > 0 ? 1.6 + gained * 0.35 : 1.0);
-  wobbleImpulse('cheek', item.cal > 0 ? 1.2 : 0.5);
-  wobbleImpulse('tail', 0.8);
+  wobbleImpulse('belly', item.cal > 0 ? 1.2 + Math.min(3, gained * 0.06) : 0.8); // capped: no 2x blowup
+  wobbleImpulse('cheek', item.cal > 0 ? 0.9 : 0.4);
+  wobbleImpulse('tail', 0.6);
 
   if (item.cal < 0) {
     game.combo = 0; game.mult = 1;
@@ -402,8 +395,8 @@ function triggerFrenzy() {
   game.timeScale = 0.35;
   game.balls += 2;          // the cat demands MORE
   game.face = 'bliss'; game.faceT = 6;
-  wobbleImpulse('belly', 5); wobbleImpulse('cheek', 3); wobbleImpulse('tail', 3);
-  addPopup(300, 420, 'FEAST FRENZY! +2 🧶', '#ff6f00');
+  wobbleImpulse('belly', 3); wobbleImpulse('cheek', 2); wobbleImpulse('tail', 2);
+  addPopup(300, 420, 'FEAST FRENZY! +2 YARN', '#ff6f00');
   AudioSys.frenzy();
 }
 
@@ -460,7 +453,7 @@ function showResults(nStars) {
     const sp = document.getElementById('rs' + k);
     sp.textContent = '☆'; sp.className = '';
   }
-  document.getElementById('res-title').textContent = '⚖ WEIGH-IN! ⚖';
+  document.getElementById('res-title').textContent = 'WEIGH-IN!';
   document.getElementById('res-sub').textContent = '';
   for (const id of ['res-retry', 'res-menu', 'res-next']) document.getElementById(id).style.visibility = 'hidden';
   document.getElementById('res-next').style.display = game.levelIndex + 1 < NUM_LEVELS ? '' : 'none';
@@ -481,30 +474,30 @@ function updateWeigh(dt) { // real-time, called from tick()
   // tick sounds as the needle climbs — each tick jiggles the chonk
   while (w.ticked + 2 <= w.shown) {
     w.ticked += 2; AudioSys.tick(600 + w.ticked * 9);
-    game.wob.belly.v += 1.2; game.wob.sub.v += 0.6;
+    game.wob.belly.v += 0.9; game.wob.sub.v += 0.45;
   }
   // stage-up: the cat visibly size-pops with a big bounce
   if (typeof stageIdxForLb === 'function') {
     const idx = stageIdxForLb(w.shown);
     if (idx > w.stageIdx) {
       w.stageIdx = idx;
-      game.wob.belly.v += 3.2; game.wob.cheek.v += 1.6; game.wob.tail.v += 2.0;
+      game.wob.belly.v += 2.4; game.wob.cheek.v += 1.2; game.wob.tail.v += 1.5;
     }
   }
-  // star pops as the needle crosses each star's weight
+  // star pops as the needle crosses each star's weight — cumulative: earning
+  // star N lights stars 1..N (the old code left star 1 dark on 2- and 3-star wins)
   const max = START_LB + LB_PER_CAL * rawCal(game.level);
   const need = [0, 0, START_LB + 0.75 * (max - START_LB), START_LB + 0.9 * (max - START_LB)];
   const span = i => document.getElementById('rs' + i);
-  for (let st = 2; st <= w.stars; st++) {
-    if (w.shown >= need[st] && w.lit < st) {
-      w.lit = st;
-      span(st - 1).textContent = '★'; span(st - 1).className = 'lit pop';
-      AudioSys.starPop();
+  const lightTo = (st) => {
+    for (let s = 0; s < st; s++) {
+      const el = span(s);
+      if (el.textContent !== '★') { el.textContent = '★'; el.className = 'lit pop'; }
     }
-  }
-  if (w.lit < 1 && k >= 1) { // first star always lights at the end
-    w.lit = 1; span(0).textContent = '★'; span(0).className = 'lit pop'; AudioSys.starPop();
-  }
+    if (w.lit < st) { w.lit = st; AudioSys.starPop(); }
+  };
+  for (let st = 2; st <= w.stars; st++) if (w.shown >= need[st]) lightTo(st);
+  if (k >= 1) lightTo(w.stars); // first star always lights at the end
   drawScale(w);
   if (k >= 1 && !w.finale) {
     w.finale = true;
@@ -529,7 +522,7 @@ function updateWeigh(dt) { // real-time, called from tick()
       sub.textContent += ` \U0001F408 NEW CAT UNLOCKED: ${game.justUnlocked}!`;
       AudioSys.sfx('unlock', function() { [660, 880, 1108, 1318].forEach((f, i) => setTimeout(() => this.tone(f, 0.14, 'triangle', 0.10), i * 100)); });
     }
-    if (game.levelIndex + 1 >= NUM_LEVELS) sub.textContent += ' All levels chonked! 👑';
+    if (game.levelIndex + 1 >= NUM_LEVELS) sub.textContent += ' All levels chonked!';
     for (const id of ['res-retry', 'res-menu', 'res-next']) document.getElementById(id).style.visibility = 'visible';
   }
   // confetti physics
@@ -620,7 +613,7 @@ function tick(dt) {
 
   // Multi-spring wobble: belly (slow, heavy), cheek (quick), tail (sway).
   // game.jiggle mirrors the belly spring for smoke-test compatibility.
-  const WOBK = { belly: { k: 26, c: 3.6 }, cheek: { k: 55, c: 5 }, tail: { k: 40, c: 3.4 } };
+  const WOBK = { belly: { k: 11, c: 5.3 }, cheek: { k: 22, c: 6.6 }, tail: { k: 16, c: 5.6 } }; // lazy wobble (owner 2026-10-07)
   for (const p of ['belly', 'cheek', 'tail']) {
     const w = game.wob[p], K = WOBK[p];
     w.v += (-K.k * w.x - K.c * w.v) * wdt;
@@ -629,7 +622,7 @@ function tick(dt) {
   game.jiggle = game.wob.belly.x; game.jiggleV = game.wob.belly.v;
   // sub-belly: slow secondary wobble lagging the main belly spring
   const sb = game.wob.sub, bw = game.wob.belly;
-  sb.v += (-14 * (sb.x - bw.x * 0.6) - 2.2 * sb.v) * wdt;
+  sb.v += (-6 * (sb.x - bw.x * 0.6) - 3.9 * sb.v) * wdt;
   sb.x += sb.v * wdt;
   const targetRx = catRx(chonkT(game.weightLb));
   game.displayRx += (targetRx - game.displayRx) * Math.min(1, dt * 4);
@@ -644,6 +637,8 @@ function tick(dt) {
   for (const it of game.items) {
     it.t += wdt;
     if (it.state === 'fall') {
+      it.airT = (it.airT || 0) + wdt;
+      if (it.airT > 10 && !it.gone) { it.gone = true; loseItem(it); continue; } // never hover forever
       it.vy += ITEM_GRAV * (it.grav || 1) * wdt;
       if (it.drift) it.vx += Math.sin(it.t * 7) * it.drift * wdt;
       if (game.magnetT > 0) it.vx += Math.sign(Conveyor.BOWL_X - it.x) * 300 * wdt;
@@ -1046,14 +1041,25 @@ showMenu(); // boot into the level select
 
 let last = performance.now(), acc = 0;
 const STEP = 1 / 120;
+function frameError(e) { // a bad frame must never kill the loop — report it, keep playing
+  try {
+    console.error('[chonk-em] frame error:', e);
+    const el = document.getElementById('errtoast');
+    if (el) { el.textContent = 'hiccup: ' + (e && e.message ? e.message : e); el.classList.remove('hidden'); }
+  } catch (_) {}
+}
 function frame(now) {
-  if (game.menuOpen) { render(); requestAnimationFrame(frame); return; }
-  let dt = (now - last) / 1000;
-  last = now;
-  dt = Math.min(dt, 0.1);
-  acc += dt;
-  while (acc >= STEP) { tick(STEP); acc -= STEP; }
-  render();
-  requestAnimationFrame(frame);
+  requestAnimationFrame(frame); // reschedule FIRST: an exception below can't stop the loop
+  try {
+    if (game.menuOpen) { render(); return; }
+    let dt = (now - last) / 1000;
+    last = now;
+    dt = Math.min(dt, 0.1);
+    acc += dt;
+    let n = 0;
+    while (acc >= STEP && n++ < 24) { tick(STEP); acc -= STEP; } // cap: never spiral
+    if (n >= 24) acc = 0;
+    render();
+  } catch (e) { frameError(e); }
 }
 requestAnimationFrame(frame);

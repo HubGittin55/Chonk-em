@@ -253,12 +253,13 @@ const Cats = {
       const row = Sprites.imgs[Math.max(0, Math.min(CAT_VARS.length - 1, cat.var | 0))];
       const idx = stageIdxForLb(cat.lb != null ? cat.lb : 10 + t * 70);
       if (idx !== Cats._lastIdx) { Cats._lastIdx = idx; Cats._popT0 = cat.time || 0; }
-      const popAge = (cat.time || 0) - (Cats._popT0 || 0);
-      const popE = Math.sin(Math.max(0, Math.min(1, 1 - popAge / 0.28)) * Math.PI);
+      const growAge = (cat.time || 0) - (Cats._popT0 || 0);
+      const growK = Math.max(0, Math.min(1, growAge / 0.6));
+      const grow = 1 + 0.20 * Math.sin(growK * Math.PI); // gentle 20% grow pulse, both axes (owner 2026-10-07)
       const H = 122 + (idx / (STAGE_LBS.length - 1)) * 58;   // stepped height, no ghost blend
       const jS = (wob.sub && wob.sub.x) || 0;
-      const sy = (1 + jB * 0.13 + jS * 0.06 + popE * 0.10) * (1 - bob * 0.012);
-      const sx = 1 - jB * 0.06 - jS * 0.03 - popE * 0.08;
+      const sy = (1 + jB * 0.13 + jS * 0.06) * (1 - bob * 0.012) * grow;
+      const sx = (1 - jB * 0.06 - jS * 0.03) * grow;
       const baseY = y + 74;                          // feet anchor
       ctx.save();
       ctx.translate(x, baseY - H * sy / 2 - bob);
