@@ -44,12 +44,12 @@ const step = (n) => { for (let i = 0; i < n; i++) tick(1 / 120); };
 console.log('CHONK-EM smoke test (v0.2 contents-full)');
 
 // 1. boot
-T('boot: level 1 loads with 61 barrels (r=10), 11 balls (50% of food)', game.barrels.length === 61 && game.balls === 11 && game.barrels.every(b => b.r === 10));
+T('boot: level 1 loads with 61 barrels (r=10), 8 balls (35% of food)', game.barrels.length === 61 && game.balls === 8 && game.barrels.every(b => b.r === 10));
 T('boot: split power barrel present (guaranteed)', game.barrels.some(b => b.kind === 'power' && b.content === 'split'));
 
 // 2. single shot
 fireShot(300, 500);
-T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 10);
+T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 7);
 step(1200); // 10s: ball bursts the center column, then falls out
 T('fire: ball dies out cleanly', game.shots.length === 0);
 
@@ -57,7 +57,7 @@ T('fire: ball dies out cleanly', game.shots.length === 0);
 loadLevel(0);
 game.multiShots = 1;
 fireShot(300, 500);
-T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 8);
+T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 5);
 T('multi: consumed after firing', game.multiShots === 0);
 game.shots = [];
 
@@ -178,14 +178,19 @@ T('v0.4 levels: goal <= 65% of RAW snack calories (winnable with zero combo)', L
   return L.goal <= raw * 0.65;
 }));
 const _calOf = b => (CONTENT[b.content] || { cal: 0 }).cal > 0;
-T('v0.5: balls = 50% of food barrels (handcrafted)', LEVELS.every(L => {
+T('balls = 35% of food barrels (handcrafted)', LEVELS.every(L => {
   const food = L.barrels.filter(b => b.kind === 'snack' && _calOf(b)).length;
-  return L.balls === Math.max(8, Math.round(food * 0.5));
+  return L.balls === Math.max(8, Math.round(food * 0.35));
 }));
-T('v0.5: balls = 75% of food barrels (procedural)', [13, 25, 50, 100].every(n => {
+T('balls = 35% of food barrels (procedural)', [13, 25, 50, 100].every(n => {
   const L = getLevel(n - 1);
   const food = L.barrels.filter(b => b.kind === 'snack' && _calOf(b)).length;
-  return L.balls === Math.max(8, Math.round(food * 0.5));
+  return L.balls === Math.max(8, Math.round(food * 0.35));
+}));
+T('exotics capped at 3 per level (procedural)', [20, 40, 60, 80, 100].every(n => {
+  const L = getLevel(n - 1);
+  const EXK = new Set(EXOTICS.map(e => e[0]));
+  return L.barrels.filter(b => EXK.has(b.content)).length <= 3;
 }));
 T('levels: calorie budget winnable (combo-aware effective cal >= 1.5x goal)', LEVELS.every(L => {
   // model real play: clean deliveries ramp the combo multiplier 1,1,1,2,2,2,3,3,3,4...
@@ -439,11 +444,11 @@ T('gen: procedural levels include steel/keg/bumper', (() => {
   const kinds = new Set(getLevel(49).barrels.map(b => b.kind));
   return kinds.has('steel') && kinds.has('keg') && kinds.has('bumper');
 })());
-T('weigh: stars are weight-based (1 win / 2 @75% / 3 @90% of level food)', (() => {
+T('weigh: stars are weight-based (1 win / 2 @70% / 3 @82% of level food)', (() => {
   loadLevel(0);
   const L = game.level, max = START_LB + LB_PER_CAL * rawCal(L);
-  return starsFor(START_LB + 0.95 * (max - START_LB), L) === 3 &&
-         starsFor(START_LB + 0.8 * (max - START_LB), L) === 2 &&
+  return starsFor(START_LB + 0.85 * (max - START_LB), L) === 3 &&
+         starsFor(START_LB + 0.75 * (max - START_LB), L) === 2 &&
          starsFor(START_LB + 0.1 * (max - START_LB), L) === 1;
 })());
 T('weigh: ceremony runs needle to target and fires finale', (() => {
