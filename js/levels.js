@@ -2,14 +2,16 @@
 /* Level data. kind: 'snack' | 'veggie' | 'power' | 'empty' | 'steel' | 'keg' | 'bumper' | 'mystery' | 'golden' | 'cuke'. content keys must exist in CONTENT (barrels.js).
    Levels 1-12 handcrafted; 13-100 generated deterministically by genLevel(n).
    Food tiers: new exotic every 5 levels (+5 cal); raw cal follows 55+4*(n-1).
-   Balls: 50% of food barrels (owner directive 2026-10-07). Veggies quartered (owner 2026-10-07).
+   Balls: 35% of food barrels (owner directive 2026-10-13). Veggies quartered (owner 2026-10-07).
+   Exotics capped at 3 per level (owner 2026-10-13): the raw-cal tuning loop may not
+   mint more high-tier barrels than the seeded ones.
    Special barrels (mystery/golden/cuke) are dealt from empty slots at load time
    by dealSpecialBarrels() — LEVELS stays untouched so the static tests hold. */
 
 const LEVELS = [
   {
     name: 'First Breakfast',
-    balls: 11,
+    balls: 8,
     par: 8,
     goal: 35,
     r: 10,
@@ -79,7 +81,7 @@ const LEVELS = [
   },
   {
     name: 'Pyramid Pounce',
-    balls: 10,
+    balls: 8,
     par: 8,
     goal: 37,
     r: 10,
@@ -153,7 +155,7 @@ const LEVELS = [
   },
   {
     name: 'Starstruck',
-    balls: 16,
+    balls: 11,
     par: 12,
     goal: 39,
     r: 10,
@@ -234,7 +236,7 @@ const LEVELS = [
   },
   {
     name: 'Heartbreaker',
-    balls: 11,
+    balls: 8,
     par: 8,
     goal: 42,
     r: 10,
@@ -321,7 +323,7 @@ const LEVELS = [
   },
   {
     name: 'Smiley Face',
-    balls: 16,
+    balls: 11,
     par: 12,
     goal: 44,
     r: 10,
@@ -414,7 +416,7 @@ const LEVELS = [
   },
   {
     name: 'Diagonal Dash',
-    balls: 16,
+    balls: 11,
     par: 12,
     goal: 47,
     r: 10,
@@ -513,7 +515,7 @@ const LEVELS = [
   },
   {
     name: 'Twin Peaks',
-    balls: 17,
+    balls: 12,
     par: 13,
     goal: 49,
     r: 10,
@@ -618,7 +620,7 @@ const LEVELS = [
   },
   {
     name: 'The Gauntlet',
-    balls: 13,
+    balls: 9,
     par: 10,
     goal: 51,
     r: 10,
@@ -726,7 +728,7 @@ const LEVELS = [
   },
   {
     name: 'Star Invader',
-    balls: 19,
+    balls: 13,
     par: 14,
     goal: 54,
     r: 10,
@@ -842,7 +844,7 @@ const LEVELS = [
   },
   {
     name: 'Veggie Minefield',
-    balls: 22,
+    balls: 15,
     par: 17,
     goal: 56,
     r: 10,
@@ -961,7 +963,7 @@ const LEVELS = [
   },
   {
     name: 'Power Tower',
-    balls: 22,
+    balls: 15,
     par: 17,
     goal: 59,
     r: 10,
@@ -1084,7 +1086,7 @@ const LEVELS = [
   },
   {
     name: 'The Grand Feast',
-    balls: 21,
+    balls: 14,
     par: 16,
     goal: 61,
     r: 10,
@@ -1319,10 +1321,17 @@ function genLevel(n) { // 1-based, n >= 13. Deterministic — same n, same level
   }
   // tune total raw cal to the curve
   const calOf = b => (CONTENT[b.content] || { cal: 0 }).cal;
+  const EXOTIC_KEYS = new Set(EXOTICS.map(e => e[0]));
+  const MAX_EXOTICS = 3; // owner 2026-10-13: no more than 3 upgraded-food barrels per level
   let raw = snacks.reduce((a, b) => a + calOf(b), 0);
   guard = 0;
   while (raw < target - 3 && guard++ < 600) {
-    const cands = snacks.filter(b => b.content !== exotic && commons.indexOf(b.content) < commons.length - 1);
+    const nEx = snacks.filter(b => EXOTIC_KEYS.has(b.content)).length;
+    const cands = snacks.filter(b => {
+      if (b.content === exotic || commons.indexOf(b.content) >= commons.length - 1) return false;
+      const next = commons[commons.indexOf(b.content) + 1];
+      return !(EXOTIC_KEYS.has(next) && !EXOTIC_KEYS.has(b.content) && nEx >= MAX_EXOTICS);
+    });
     if (!cands.length) break;
     const b = cands[Math.floor(rnd() * cands.length)];
     b.content = commons[commons.indexOf(b.content) + 1];
@@ -1356,7 +1365,7 @@ function genLevel(n) { // 1-based, n >= 13. Deterministic — same n, same level
   if (!barrels.some(b => b.armor)) { const s = snacks[0]; if (s) s.armor = true; }
 
   const nFood = barrels.filter(b => b.kind === 'snack' && (CONTENT[b.content] || { cal: 0 }).cal > 0).length;
-  const balls = Math.max(8, Math.round(nFood * 0.5)); // 50% of food barrels (owner 2026-10-07)
+  const balls = Math.max(8, Math.round(nFood * 0.35)); // 35% of food barrels (owner 2026-10-13): make every shot count
   return {
     name: GEN_NAMES_A[Math.floor(rnd() * GEN_NAMES_A.length)] + ' ' +
           GEN_NAMES_B[Math.floor(rnd() * GEN_NAMES_B.length)],
