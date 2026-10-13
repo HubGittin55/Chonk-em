@@ -336,6 +336,7 @@ function onBarrelBurst(barrel, ball) {
     return;
   }
   const c = CONTENT[barrel.content];
+  if (!c) { AudioSys.burst(); return; } // unknown content: burst sound, no loot, never crash
   AudioSys.burst();
   FX.burstJuice(barrel.kind, c.cal, barrel.x, barrel.y);
   const pop = 1 - 0.35 * (c.grav - 1); // heavy loot pops weaker
@@ -361,7 +362,7 @@ function explode(x, y) {
     });
   }
   for (const b of game.barrels) {
-    if (b.cleared || b.kind === 'steel') continue; // steel is blast-proof
+    if (b.cleared || b.kind === 'steel' || b.kind === 'bumper') continue; // steel & bumpers are blast-proof: never burst
     if (Math.hypot(b.x - x, b.y - y) < 80) {
       b.cleared = true; b.popT = 0;
       onBarrelBurst(b, null); // chain: kegs recurse, loot spawns normally
