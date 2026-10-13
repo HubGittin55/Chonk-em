@@ -29,7 +29,7 @@ global.localStorage = {
 
 // ---------- boot the game ----------
 const root = path.join(__dirname, '..');
-const files = ['audio', 'physics', 'levels', 'barrels', 'conveyor', 'vacuum', 'cats', 'input', 'main'];
+const files = ['audio', 'physics', 'levels', 'barrels', 'conveyor', 'vacuum', 'cats', 'input', 'fx', 'main'];
 const src = files.map(f => fs.readFileSync(path.join(root, 'js', f + '.js'), 'utf8')).join('\n');
 vm.runInThisContext(src, { filename: 'chonk.bundle.js' });
 
@@ -216,7 +216,7 @@ T('v0.5: balls exhausted with goal missed scores a LOSS', game.over === 'lose');
 // exhaustion: no food barrels left but balls remain -> level still ends
 loadLevel(0);
 game.calories = game.goalNow;
-game.barrels.forEach(b => { if (b.kind === 'snack') b.cleared = true; });
+game.barrels.forEach(b => { if (['snack', 'mystery', 'golden'].includes(b.kind)) b.cleared = true; }); // all edible kinds
 game.shots = []; game.items = [];
 step(100);
 T('v0.5: no food barrels left ends level even with balls remaining', game.over === 'win');
@@ -500,6 +500,150 @@ T('v0.5: conveyor has 32px gaps on BOTH sides (symmetric)', (() => {
 T('v0.4: conveyor slats run left with the food', (() => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'js', 'conveyor.js'), 'utf8');
   return src.includes('40 - (this.t * this.SPEED) % 40');
+})());
+
+// 19. daily 2026-10-13: mystery / golden / cucumber barrels + FX bus + juice pass
+T('deal: exactly 1 golden jackpot per level, content = level top snack', (() => {
+  loadLevel(0);
+  const g = game.barrels.filter(b => b.kind === 'golden');
+  return g.length === 1 && g[0].content === topCommonFor(1);
+})());
+T('deal: mystery barrels dealt from empties (~6%)', (() => {
+  loadLevel(0);
+  const m = game.barrels.filter(b => b.kind === 'mystery');
+  const empt0 = getLevel(0).barrels.filter(b => b.kind === 'empty').length;
+  return m.length >= 1 && m.length <= Math.ceil(empt0 * 0.06) + 1;
+})());
+T('deal: no cucumber on levels 1-3 (onboarding stays clean)', (() => {
+  loadLevel(0); const a = game.barrels.some(b => b.kind === 'cuke');
+  loadLevel(1); const b = game.barrels.some(b => b.kind === 'cuke');
+  loadLevel(2); const c = game.barrels.some(b => b.kind === 'cuke');
+  return !a && !b && !c;
+})());
+T('deal: deterministic — same level, same specials, every load', (() => {
+  loadLevel(9);
+  const k1 = game.barrels.map(b => b.kind + ':' + b.content).join('|');
+  loadLevel(9);
+  const k2 = game.barrels.map(b => b.kind + ':' + b.content).join('|');
+  return k1 === k2;
+})());
+T('deal: barrel count and food counts unchanged by dealing', (() => {
+  loadLevel(0);
+  const L = getLevel(0);
+  const nFood = game.barrels.filter(b => b.kind === 'snack' && (CONTENT[b.content] || { cal: 0 }).cal > 0).length;
+  const LFood = L.barrels.filter(b => b.kind === 'snack' && (CONTENT[b.content] || { cal: 0 }).cal > 0).length;
+  return game.barrels.length === L.barrels.length && nFood === LFood;
+})());
+T('mystery: burst resolves to a valid snack or power-up and spawns loot', (() => {
+  loadLevel(0);
+  const mb = game.barrels.find(b => b.kind === 'mystery');
+  if (!mb) return false;
+  const items0 = game.items.length;
+  onBarrelBurst(mb, null);
+  const it = game.items[game.items.length - 1];
+  const ok = game.items.length === items0 + 1 && CONTENT[it.content] &&
+    (mb.kind === 'snack' || mb.kind === 'power') &&
+    game.popups.some(p => p.text === 'MYSTERY!');
+  return ok;
+})());
+T('golden: burst pays 3x the barrel snack, with jackpot juice', (() => {
+  loadLevel(0);
+  const g = game.barrels.find(b => b.kind === 'golden');
+  if (!g) return false;
+  const base = (CONTENT[g.content] || { cal: 0 }).cal;
+  const items0 = game.items.length;
+  onBarrelBurst(g, null);
+  const it = game.items[game.items.length - 1];
+  return game.items.length === items0 + 1 && it.cal === base * 3 && it.golden === true &&
+    game.popups.some(p => p.text === 'JACKPOT ×3!') && game.shakeT > 0 && game.hitstopT > 0;
+})());
+T('cuke: burst spills a spook item (no calories)', (() => {
+  loadLevel(0);
+  const cb = game.barrels[10]; cb.kind = 'cuke'; cb.content = 'cucumber'; // deterministic placement for the test
+  const items0 = game.items.length;
+  onBarrelBurst(cb, null);
+  const it = game.items[game.items.length - 1];
+  return game.items.length === items0 + 1 && it.spook === true && it.cal === 0 && it.icon === '🥒' &&
+    typeof AudioSys.startle === 'function';
+})());
+T('cuke: delivery spooks the cat — hop, wobble, aim wobble, no calories', (() => {
+  loadLevel(0);
+  const cal0 = game.calories, combo0 = game.combo;
+  game.weightLb = 20;
+  deliver({ spook: true, cal: 0, x: 300, y: 600 });
+  const ok = game.cukeT === 4 && game.scareJump === 110 && game.face === 'sad' &&
+    game.wob.belly.v > 0 && game.calories === cal0 && game.combo === combo0 &&
+    game.popups.some(p => p.text === 'SPOOKED! aim wobbles!');
+  game.cukeT = 0; game.scareJump = 0;
+  return ok;
+})());
+T('cuke: aim angle wobbles while spooked, steady when calm', (() => {
+  loadLevel(0);
+  game.cukeT = 4;
+  game.time = 0; const a1 = aimAngleFor(300, 500);
+  game.time = 0.2; const a2 = aimAngleFor(300, 500);
+  game.cukeT = 0;
+  game.time = 0; const a3 = aimAngleFor(300, 500);
+  game.time = 0.2; const a4 = aimAngleFor(300, 500);
+  return a1 !== a2 && a3 === a4;
+})());
+T('exhaustion: unresolved mystery barrels count as food left', (() => {
+  loadLevel(0);
+  game.barrels.forEach(b => { if (b.kind === 'snack') b.cleared = true; });
+  game.balls = 5; game.shots = []; game.items = [];
+  step(100);
+  const hasMystery = game.barrels.some(b => b.kind === 'mystery' && !b.cleared);
+  return hasMystery ? game.over === null : true;
+})());
+T('fx: hit-stop freezes the world', (() => {
+  loadLevel(0);
+  const ball = { x: 300, y: 300, vx: 100, vy: 100, r: 10, life: 0, slowT: 0, bounces: 0 };
+  game.shots.push(ball);
+  FX.hitstop(0.2);
+  const x0 = ball.x;
+  step(12); // 0.1s < 0.2s
+  const frozen = ball.x === x0;
+  step(24); // hit-stop consumed, world resumes
+  return frozen && ball.x !== x0;
+})());
+T('fx: slowmo dips timeScale under frenzy/slow-mo', (() => {
+  loadLevel(0);
+  FX.slowmo(0.4, 1.0);
+  tick(1 / 120);
+  const dipped = game.timeScale === 0.4;
+  for (let i = 0; i < 130; i++) tick(1 / 120); // 1.08s > 1.0s
+  return dipped && game.timeScale === 1;
+})());
+T('fx: final-ball win triggers the dramatic slow-mo beat', (() => {
+  loadLevel(0);
+  game.balls = 1; game.goalMet = true;
+  fireShot(300, 500);
+  const ok = game.balls === 0 && game.fxSlowT > 0;
+  game.fxSlowT = 0;
+  return ok;
+})());
+T('fx: burst juice scales with calories (hit-stop on 10+ cal, shake on 25+)', (() => {
+  loadLevel(0);
+  const mk = cal => ({ x: 300, y: 300, r: 10, kind: 'snack', content: 'tuna', cleared: false });
+  const b1 = mk(); game.hitstopT = 0; game.shakeT = 0;
+  // 5-cal snack: no juice
+  const saveCal = CONTENT.tuna.cal; CONTENT.tuna.cal = 5;
+  onBarrelBurst(b1, null);
+  const none = game.hitstopT === 0 && game.shakeT === 0;
+  // 30-cal: shake + hit-stop
+  CONTENT.tuna.cal = 30;
+  onBarrelBurst(mk(), null);
+  const big = game.hitstopT > 0 && game.shakeT > 0;
+  CONTENT.tuna.cal = saveCal;
+  return none && big;
+})());
+T('fx: exotic delivery rains confetti', (() => {
+  loadLevel(0);
+  const p0 = game.particles.length;
+  deliver({ cal: 15, x: 100, y: 700 });
+  const p1 = game.particles.length;
+  deliver({ cal: 3, x: 100, y: 700 });
+  return p1 > p0;
 })());
 
 console.log(`\n${pass} passed, ${fail} failed`);
