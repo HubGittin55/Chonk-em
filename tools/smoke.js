@@ -710,3 +710,20 @@ T('fx: exotic delivery rains confetti', (() => {
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
+T('keg chain never bursts bumpers (no CONTENT[null] crash)', (() => {
+  loadLevel(0);
+  // plant a keg right next to a bumper and detonate it
+  const bumper = game.barrels.find(b => b.kind === 'bumper') || (() => {
+    const b = { x: 300, y: 400, r: 16, kind: 'bumper', content: null, cleared: false };
+    game.barrels.push(b); return b;
+  })();
+  game.barrels.push({ x: bumper.x + 40, y: bumper.y, r: 14, kind: 'keg', content: null, cleared: false });
+  try { explode(bumper.x + 40, bumper.y); } catch (e) { return false; }
+  return bumper.cleared === false; // bumpers are blast-proof
+})());
+T('burst with unknown content never throws', (() => {
+  loadLevel(0);
+  const b = { x: 300, y: 300, r: 14, kind: 'snack', content: 'nope-not-real', cleared: false };
+  try { onBarrelBurst(b, null); } catch (e) { return false; }
+  return game.items.length >= 0;
+})());
