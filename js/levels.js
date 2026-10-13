@@ -1,8 +1,10 @@
 'use strict';
-/* Level data. kind: 'snack' | 'veggie' | 'power' | 'empty' | 'steel' | 'keg' | 'bumper'. content keys must exist in CONTENT (barrels.js).
+/* Level data. kind: 'snack' | 'veggie' | 'power' | 'empty' | 'steel' | 'keg' | 'bumper' | 'mystery' | 'golden' | 'cuke'. content keys must exist in CONTENT (barrels.js).
    Levels 1-12 handcrafted; 13-100 generated deterministically by genLevel(n).
    Food tiers: new exotic every 5 levels (+5 cal); raw cal follows 55+4*(n-1).
-   Balls: 75% of food barrels (owner directive 2026-10-07). */
+   Balls: 75% of food barrels (owner directive 2026-10-07).
+   Special barrels (mystery/golden/cuke) are dealt from empty slots at load time
+   by dealSpecialBarrels() — LEVELS stays untouched so the static tests hold. */
 
 const LEVELS = [
   {
@@ -1370,4 +1372,35 @@ function getLevel(i) { // 0-based index → level def; 0..11 handcrafted, 12+ pr
   const n = i + 1;
   if (!_genCache[n]) _genCache[n] = genLevel(n);
   return _genCache[n];
+}
+
+// Special-barrel dealing: converts a deterministic slice of a level's empty slots.
+// - exactly 1 'golden' jackpot per level (3x the level's top snack)
+// - ~6% 'mystery' barrels (min 1 when the field is big enough)
+// - rare 'cuke': levels 4+, ~40% of levels get one
+// Runs on the runtime barrel copy in loadLevel — LEVELS itself is never touched.
+function topCommonFor(n) {
+  const cs = tierCommons(n);
+  return cs[cs.length - 1];
+}
+function dealSpecialBarrels(barrels, n) { // n: 1-based level number
+  const rnd = mulberry32(n * 2654435761 + 97);
+  const empt = barrels.filter(b => b.kind === 'empty');
+  for (let i = empt.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [empt[i], empt[j]] = [empt[j], empt[i]]; }
+  let k = 0;
+  if (k < empt.length) { // one golden jackpot per level
+    empt[k].kind = 'golden';
+    empt[k].content = topCommonFor(n);
+    k++;
+  }
+  const nMyst = empt.length >= 12 ? Math.max(1, Math.round(empt.length * 0.06)) : 0;
+  for (let i = 0; i < nMyst && k < empt.length; i++, k++) {
+    empt[k].kind = 'mystery';
+    empt[k].content = null;
+  }
+  if (n >= 4 && rnd() < 0.4 && k < empt.length) { // rare: the cucumber
+    empt[k].kind = 'cuke';
+    empt[k].content = 'cucumber';
+    k++;
+  }
 }
