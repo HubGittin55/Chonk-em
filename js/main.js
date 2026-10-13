@@ -477,11 +477,12 @@ function rawCal(L) {
   return L.barrels.filter(b => b.kind === 'snack')
     .reduce((a, b) => a + ((CONTENT[b.content] || {}).cal || 0), 0);
 }
-// Stars are WEIGHT stars now: 1 = goal met, 2 = 75% of the level's food delivered, 3 = 90%.
+// Stars are WEIGHT stars now: 1 = goal met, 2 = 70% of the level's food delivered, 3 = 82%.
+// (Relaxed 2026-10-13: 75/90% punished normal item losses; breaking everything should star.)
 function starsFor(lb, L) {
   const max = START_LB + LB_PER_CAL * rawCal(L);
   const frac = (lb - START_LB) / Math.max(1, max - START_LB);
-  return frac >= 0.9 ? 3 : frac >= 0.75 ? 2 : 1;
+  return frac >= 0.82 ? 3 : frac >= 0.7 ? 2 : 1;
 }
 
 function endGame(win) {
@@ -517,7 +518,8 @@ function showResults(nStars) {
     const sp = document.getElementById('rs' + k);
     sp.textContent = '☆'; sp.className = '';
   }
-  document.getElementById('res-title').textContent = 'WEIGH-IN!';
+  document.getElementById('res-title').textContent =
+    `⚖ Level ${game.levelIndex + 1}: ${game.level.name} — WEIGH-IN! ⚖`;
   document.getElementById('res-sub').textContent = '';
   for (const id of ['res-retry', 'res-menu', 'res-next']) document.getElementById(id).style.visibility = 'hidden';
   document.getElementById('res-next').style.display = game.levelIndex + 1 < NUM_LEVELS ? '' : 'none';
@@ -551,7 +553,7 @@ function updateWeigh(dt) { // real-time, called from tick()
   // star pops as the needle crosses each star's weight — cumulative: earning
   // star N lights stars 1..N (the old code left star 1 dark on 2- and 3-star wins)
   const max = START_LB + LB_PER_CAL * rawCal(game.level);
-  const need = [0, 0, START_LB + 0.75 * (max - START_LB), START_LB + 0.9 * (max - START_LB)];
+  const need = [0, 0, START_LB + 0.7 * (max - START_LB), START_LB + 0.82 * (max - START_LB)];
   const span = i => document.getElementById('rs' + i);
   const lightTo = (st) => {
     for (let s = 0; s < st; s++) {
@@ -975,8 +977,29 @@ function drawFrenzy() {
   ctx.fillRect(W / 2 - 60, 128, 120 * Math.max(0, game.frenzy / 6), 6);
 }
 
+function drawWalls() { // thin wooden side walls: the visible face of the ball/item physics bounds
+  const top = 40, bot = 700, w = 12;
+  for (const x0 of [12, 576]) {
+    const g = ctx.createLinearGradient(x0, 0, x0 + w, 0);
+    g.addColorStop(0, '#8d6e63'); g.addColorStop(0.5, '#a1887f'); g.addColorStop(1, '#6d4c41');
+    ctx.fillStyle = g;
+    ctx.fillRect(x0, top, w, bot - top);
+    ctx.strokeStyle = 'rgba(62,39,35,0.55)'; ctx.lineWidth = 1;
+    for (const gx of [0.3, 0.65]) { // wood grain
+      ctx.beginPath(); ctx.moveTo(x0 + w * gx, top + 4); ctx.lineTo(x0 + w * gx, bot - 4); ctx.stroke();
+    }
+    ctx.fillStyle = '#5d4037'; // pegs
+    for (let y = top + 40; y < bot; y += 110) {
+      ctx.beginPath(); ctx.arc(x0 + w / 2, y, 2.4, 0, 7); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'; // inner shadow lip
+    ctx.fillRect(x0 === 12 ? x0 + w - 2 : x0, top, 2, bot - top);
+  }
+}
+
 function render() {
   drawBackground();
+  drawWalls();
   ctx.save();
   if (game.shakeT > 0) {
     const mag = (game.shakeAmt || 36) * game.shakeT;
