@@ -32,7 +32,7 @@ global.localStorage = {
 Object.keys = ((orig) => (o) => o === global.localStorage ? [...lsStore.keys()] : orig(o))(Object.keys);
 
 const root = path.join(__dirname, '..');
-const files = ['audio', 'physics', 'levels', 'barrels', 'conveyor', 'vacuum', 'cats', 'input', 'fx', 'main'];
+const files = ['audio', 'physics', 'levels', 'barrels', 'conveyor', 'vacuum', 'catphysics', 'cats', 'input', 'fx', 'main'];
 const src = files.map(f => fs.readFileSync(path.join(root, 'js', f + '.js'), 'utf8')).join('\n');
 vm.runInThisContext(src, { filename: 'chonk.bundle.js' });
 
