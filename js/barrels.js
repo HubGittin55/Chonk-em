@@ -100,6 +100,19 @@ function drawBarrels(ctx, barrels, time) {
     const c = CONTENT[b.content] || {};
     const r = b.r;
 
+    // Mover track: dashed telegraph of the oscillation path, drawn under the barrel.
+    if (b.mv) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      const a = b.mv.amp;
+      ctx.beginPath();
+      if (b.mv.axis === 'x') { ctx.moveTo(b.hx - a - r * 0.7, b.hy); ctx.lineTo(b.hx + a + r * 0.7, b.hy); }
+      else { ctx.moveTo(b.hx, b.hy - a - r * 0.7); ctx.lineTo(b.hx, b.hy + a + r * 0.7); }
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Generated barrel skin (AoT style), vector fallback below
     if (typeof Assets !== 'undefined' && Assets.ok('barrel_' + b.content)) {
       const im = Assets.imgs['barrel_' + b.content];
