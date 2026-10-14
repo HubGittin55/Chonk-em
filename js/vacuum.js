@@ -17,12 +17,19 @@ const Vacuum = {
 
   create(speedMul) {
     return { x: 300, dir: Math.random() < 0.5 ? -1 : 1, t: Math.random() * 6.28, eaten: 0,
-             eatenThisShot: 0, speedMul: speedMul || 1 };
+             eatenThisShot: 0, gulpT: 0, speedMul: speedMul || 1 };
   },
 
   // wdt: world dt (slow-mo aware). onEaten(x, y, item) fires effects in main.js.
   tick(v, wdt, items, onEaten) {
     v.t += wdt;
+    if (v.gulpT > 0) { // digesting: sluggish crawl, NO suction — the counterplay window
+      v.gulpT -= wdt;
+      v.x += v.dir * Vacuum.SPEED * 0.35 * (v.speedMul || 1) * wdt;
+      if (v.x <= Vacuum.MIN_X) { v.x = Vacuum.MIN_X; v.dir = 1; }
+      else if (v.x >= Vacuum.MAX_X) { v.x = Vacuum.MAX_X; v.dir = -1; }
+      return;
+    }
     v.x += v.dir * Vacuum.SPEED * (v.speedMul || 1) * wdt;
     if (v.x <= Vacuum.MIN_X) { v.x = Vacuum.MIN_X; v.dir = 1; }
     else if (v.x >= Vacuum.MAX_X) { v.x = Vacuum.MAX_X; v.dir = -1; }
@@ -40,6 +47,7 @@ const Vacuum = {
         it.gone = true;
         v.eaten++;
         v.eatenThisShot = (v.eatenThisShot || 0) + 1;
+        v.gulpT = 0.4; // one short gulp per item: loot crossing the mouth mid-gulp slips past
         onEaten(it.x, it.y, it);
         continue;
       }
@@ -55,6 +63,7 @@ const Vacuum = {
 
   draw(ctx, v) {
     const y = Vacuum.BODY_Y + Math.sin(v.t * 9) * 1.5; // motor vibration
+    const gulp = v.gulpT > 0; // digesting: nozzle droops, eye goes amber, no suction rings
     ctx.save();
     ctx.translate(v.x, y);
 
@@ -78,26 +87,35 @@ const Vacuum = {
     ctx.fillStyle = '#6d727b';
     ctx.beginPath(); ctx.arc(0, -12, 16, Math.PI, 0); ctx.fill();
 
-    // angry red eye (blinks)
+    // angry red eye (blinks) — amber and heavy-lidded while digesting
     const blink = (v.t % 3) < 0.15 ? 0.25 : 1;
-    ctx.fillStyle = '#ff3b30';
-    ctx.beginPath(); ctx.ellipse(v.dir * 8, -6, 8, 5 * blink, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = gulp ? '#ffb300' : '#ff3b30';
+    ctx.beginPath(); ctx.ellipse(v.dir * 8, -6, 8, 5 * blink * (gulp ? 0.6 : 1), 0, 0, 7); ctx.fill();
 
-    // nozzle hose pointing up
+    // nozzle hose pointing up — droops while digesting
     ctx.strokeStyle = '#3a3d42'; ctx.lineWidth = 10; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(v.dir * 6, -48); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(v.dir * 6, gulp ? -38 : -48); ctx.stroke();
     // mouth
     ctx.fillStyle = '#1c1e22';
-    ctx.beginPath(); ctx.ellipse(v.dir * 6, -52, 14, 7, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(v.dir * 6, gulp ? -42 : -52, 14, 7, 0, 0, 7); ctx.fill();
 
-    // suction shimmer — rings collapsing into the mouth
-    ctx.strokeStyle = 'rgba(190,210,230,0.55)'; ctx.lineWidth = 2;
-    for (let i = 0; i < 3; i++) {
-      const rr = 26 + ((v.t * 70 + i * 26) % 52);
-      ctx.globalAlpha = 1 - (rr - 26) / 52;
-      ctx.beginPath(); ctx.arc(v.dir * 6, -52, rr, -1.2, 1.2); ctx.stroke();
+    if (!gulp) { // suction shimmer — rings collapsing into the mouth
+      ctx.strokeStyle = 'rgba(190,210,230,0.55)'; ctx.lineWidth = 2;
+      for (let i = 0; i < 3; i++) {
+        const rr = 26 + ((v.t * 70 + i * 26) % 52);
+        ctx.globalAlpha = 1 - (rr - 26) / 52;
+        ctx.beginPath(); ctx.arc(v.dir * 6, -52, rr, -1.2, 1.2); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    } else { // digesting: little contented bubbles
+      ctx.fillStyle = 'rgba(255,179,0,0.7)';
+      for (let i = 0; i < 3; i++) {
+        const by = -44 - ((v.t * 30 + i * 18) % 36);
+        ctx.globalAlpha = 1 - ((-44 - by) / 36);
+        ctx.beginPath(); ctx.arc(v.dir * 6 + (i - 1) * 9, by, 3, 0, 7); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
     }
-    ctx.globalAlpha = 1;
     ctx.restore();
   },
 };
