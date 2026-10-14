@@ -147,7 +147,32 @@ const Sprites = {
 };
 if (typeof Image === 'function') Sprites.init();
 
+// Draw the sprite as NC vertical strips (cat.phys.sprite.cy/cb/ck) so travelling belly waves,
+// head bob and tail sway show up as spatial deformation, not just whole-image squash.
+// Caller has set up the feet-anchored transform: sprite occupies x in [-w/2,w/2], y in [-H,0].
+function drawSpriteStrips(ctx, im, w, H, S) {
+  const n = S.cy.length, iw = im.width, ih = im.height;
+  // Shear is about the feet line, so at the top of the sprite neighboring strips
+  // shift horizontally by (ck[j+1]-ck[j])*H — up to ~20px in a hard tail whip.
+  // Pad every strip by the worst such gap (+1px): strips stretch slightly, never split.
+  let pad = 1;
+  for (let j = 0; j < n - 1; j++) {
+    const gp = Math.abs(S.ck[j + 1] - S.ck[j]) * H;
+    if (gp + 1 > pad) pad = gp + 1;
+  }
+  for (let j = 0; j < n; j++) {
+    const s0 = Math.round(j * iw / n), s1 = Math.round((j + 1) * iw / n);
+    const d0 = -w / 2 + (j / n + S.cb[j]) * w - pad;
+    const d1 = -w / 2 + ((j + 1) / n + S.cb[j + 1]) * w + pad;
+    ctx.save();
+    ctx.transform(1, 0, S.ck[j], S.cy[j], 0, 0);              // scale about the feet line, shear for tail sway
+    ctx.drawImage(im, s0, 0, s1 - s0, ih, d0, -H, d1 - d0, H);
+    ctx.restore();
+  }
+}
+
 const Cats = {
+  STRIPS: true,   // false = whole-image params only (cheapest); true = per-column deformation when the cat is moving
   // Shooter cat perched at the top. aimAng in radians (canvas coords), loaded = yarn ready.
   drawShooter(ctx, x, y, aimAng, loaded) {
     if (Assets.ok('shooter')) {
@@ -236,44 +261,59 @@ const Cats = {
   },
 
   // Main cat beside the bowl.
-  // cat = { t: chonk factor 0..1 from lifetime weight, wob: {belly,cheek,tail} springs,
-  //         nomT, face, time }
+  // cat = { t: chonk factor 0..1 from lifetime weight, phys: CatPhysics instance (preferred),
+  //         wob: legacy {belly,cheek,tail,sub} springs (used only when phys is absent),
+  //         lb: pass phys.shownLb (holds the old sprite during the size-up crouch), nomT, face, time }
   // Every part grows at its own rate: belly sags, jowls bloom, haunches emerge,
   // paws chunk and splay, tail thickens — the head barely grows, like a real cat.
   drawMain(ctx, x, y, cat) {
     const t = Math.max(0, Math.min(1, cat.t || 0));
     const wob = cat.wob || { belly: { x: 0 }, cheek: { x: 0 }, tail: { x: 0 }, sub: { x: 0 } };
     const nomT = cat.nomT || 0, face = cat.face || 'normal', time = cat.time || 0;
-    const jB = wob.belly.x || 0, jC = wob.cheek.x || 0, jT = wob.tail.x || 0;
+    const phys = cat.phys || null;
+    if (phys) phys.pose();                                 // idempotent per sim update
+    const V = phys ? phys.vec : null;                      // vector adapter output
+    const jB = V ? V.belly : (wob.belly.x || 0), jC = V ? V.jowl : (wob.cheek.x || 0), jT = V ? V.tail : (wob.tail.x || 0);
     const bob = nomT > 0 ? Math.abs(Math.sin(nomT * 28)) * 5 : 0;
 
-    // ---- Generated-sprite path: HARD stage cut (no crossfade — owner: crossfade ghosts),
-    // squash-and-stretch jiggle with lagging sub-belly, pop on size-up ----
+    // ---- Generated-sprite path: HARD stage cut (no crossfade — owner: crossfade ghosts) ----
     if (typeof Image === 'function' && Sprites.ok()) {
       const row = Sprites.imgs[Math.max(0, Math.min(CAT_VARS.length - 1, cat.var | 0))];
       const idx = stageIdxForLb(cat.lb != null ? cat.lb : 10 + t * 70);
-      if (idx !== Cats._lastIdx) { Cats._lastIdx = idx; Cats._popT0 = cat.time || 0; }
-      const growAge = (cat.time || 0) - (Cats._popT0 || 0);
-      const growK = Math.max(0, Math.min(1, growAge / 0.6));
-      const grow = 1 + 0.20 * Math.sin(growK * Math.PI); // gentle 20% grow pulse, both axes (owner 2026-10-07)
       const H = 122 + (idx / (STAGE_LBS.length - 1)) * 58;   // stepped height, no ghost blend
-      const jS = (wob.sub && wob.sub.x) || 0;
-      const sy = (1 + jB * 0.13 + jS * 0.06) * (1 - bob * 0.012) * grow;
-      const sx = (1 - jB * 0.06 - jS * 0.03) * grow;
-      const baseY = y + 74;                          // feet anchor
-      ctx.save();
-      ctx.translate(x, baseY - H * sy / 2 - bob);
-      ctx.scale(sx, sy);
+      const baseY = y + 74;                                  // feet anchor
       const im = row[idx];
       const w = H * (im.width / im.height);
-      ctx.drawImage(im, -w / 2, -H / 2, w, H);
+      ctx.save();
+      if (phys) {
+        // Physics-driven: whole-body params (crouch/pop/breath/roll) + optional column strips.
+        const S = phys.sprite;
+        ctx.translate(x + S.ox * w, baseY - bob + S.oy * H);
+        ctx.rotate(S.rot);
+        ctx.transform(1, 0, S.skew, 1, 0, 0);
+        ctx.scale(S.sx * S.grow, S.sy * S.grow * (1 - bob * 0.012));
+        if (Cats.STRIPS && S.strips) drawSpriteStrips(ctx, im, w, H, S);
+        else ctx.drawImage(im, -w / 2, -H, w, H);
+      } else {
+        // Legacy (no phys supplied, e.g. weigh-in ceremony): old springs + envelope pop.
+        if (idx !== Cats._lastIdx) { Cats._lastIdx = idx; Cats._popT0 = cat.time || 0; }
+        const growAge = (cat.time || 0) - (Cats._popT0 || 0);
+        const growK = Math.max(0, Math.min(1, growAge / 0.6));
+        const grow = 1 + 0.20 * Math.sin(growK * Math.PI);  // gentle 20% grow pulse, both axes (owner 2026-10-07)
+        const jS = (wob.sub && wob.sub.x) || 0;
+        const sy = (1 + jB * 0.13 + jS * 0.06) * (1 - bob * 0.012) * grow;
+        const sx = (1 - jB * 0.06 - jS * 0.03) * grow;
+        ctx.translate(x, baseY - bob);
+        ctx.scale(sx, sy);
+        ctx.drawImage(im, -w / 2, -H, w, H);
+      }
       ctx.restore();
       void face; void jC; void jT;
       return;
     }
 
     // ---- Vector fallback ----
-    const breathe = 1 + 0.018 * Math.sin(time * 2.4);
+    const breathe = V ? 1 : 1 + 0.018 * Math.sin(time * 2.4);   // phys: breathing lives in the global body transform
 
     const rx = 62 + t * 88;
     const ry = 58 + t * 14;
@@ -286,8 +326,18 @@ const Cats = {
     ctx.fillStyle = 'rgba(60,35,10,0.18)';
     ctx.beginPath(); ctx.ellipse(0, ry + 16 + t * 6, rx * (1.02 + t * 0.06), 12 + t * 4, 0, 0, 7); ctx.fill();
 
+    // Whole-body physics transform about the feet line (crouch, pop, roll, breath) — shared with the sprite path
+    if (V) {
+      const feetY = ry * 0.78 + 9 + t * 11;
+      ctx.translate(0, feetY);
+      ctx.rotate(V.rot);
+      ctx.transform(1, 0, V.skew, 1, 0, 0);
+      ctx.scale(V.sx * V.grow, V.sy * V.grow);
+      ctx.translate(0, -feetY);
+    }
+
     // Tail: thickens with chonk, wobble feeds the swish
-    const swish = Math.sin(time * 2.2) * 8 + jT * 26;
+    const swish = (V ? 0 : Math.sin(time * 2.2) * 8) + jT * (V ? 34 : 26);   // phys tail already includes the idle swish
     const tailW = 13 + t * 9;
     ctx.strokeStyle = FUR; ctx.lineWidth = tailW; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(rx - 8, 12);
@@ -299,13 +349,15 @@ const Cats = {
     // Haunch (thigh): emerges once there's real chonk, rear side
     const haunchT = Math.max(0, Math.min(1, (t - 0.15) / 0.35));
     if (haunchT > 0.01) {
-      const hr = (10 + t * 26) * haunchT;
-      const hg2 = ctx.createRadialGradient(rx * 0.5 - hr * 0.3, ry * 0.4 - hr * 0.3, hr * 0.2, rx * 0.5, ry * 0.4, hr);
+      const rumpK = V ? V.rump : 0;                              // haunch jiggles on its own
+      const hr = (10 + t * 26) * haunchT * (1 + rumpK * 0.06);
+      const hcy = ry * 0.42 + rumpK * 9;
+      const hg2 = ctx.createRadialGradient(rx * 0.5 - hr * 0.3, hcy - ry * 0.02 - hr * 0.3, hr * 0.2, rx * 0.5, hcy - ry * 0.02, hr);
       hg2.addColorStop(0, '#fbc783'); hg2.addColorStop(1, '#e8963f');
       ctx.fillStyle = hg2;
-      ctx.beginPath(); ctx.arc(rx * 0.52, ry * 0.42, hr, 0, 7); ctx.fill();
-      furEdge(ctx, rx * 0.52, ry * 0.42, hr, hr, 'rgba(217,138,53,0.75)', 12);
-      tabby(ctx, rx * 0.52, ry * 0.42, hr, hr, 'rgba(200,120,40,0.6)');
+      ctx.beginPath(); ctx.arc(rx * 0.52, hcy, hr, 0, 7); ctx.fill();
+      furEdge(ctx, rx * 0.52, hcy, hr, hr, 'rgba(217,138,53,0.75)', 12);
+      tabby(ctx, rx * 0.52, hcy, hr, hr, 'rgba(200,120,40,0.6)');
     }
 
     // Torso
@@ -354,7 +406,7 @@ const Cats = {
     }
 
     // Head: barely grows (like a real cat), sinks toward the loaf as the neck vanishes
-    const hx = -rx - 12 + t * 16, hy = -54 + bob + t * 10;
+    const hx = -rx - 12 + t * 16, hy = -54 + bob + t * 10 + (V ? V.head * 9 : 0);   // head lags the body
     if (t < 0.35) {
       // visible neck while slim
       ctx.fillStyle = CREAM;
@@ -363,13 +415,14 @@ const Cats = {
     }
     // Ears: fixed absolute size — adorably small on a chonky head
     for (const s of [-1, 1]) {
+      const eF = V ? V.ear * 5 * (s > 0 ? 1 : 0.4) : 0;           // ear flick / follow-through
       ctx.fillStyle = CREAM;
       ctx.beginPath();
-      ctx.moveTo(hx + s * 15, hy - 28); ctx.lineTo(hx + s * 30, hy - 56); ctx.lineTo(hx + s * 4, hy - 40);
+      ctx.moveTo(hx + s * 15, hy - 28); ctx.lineTo(hx + s * 30, hy - 56 - eF); ctx.lineTo(hx + s * 4, hy - 40);
       ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#e88ca0';
       ctx.beginPath();
-      ctx.moveTo(hx + s * 17, hy - 32); ctx.lineTo(hx + s * 25, hy - 47); ctx.lineTo(hx + s * 10, hy - 38);
+      ctx.moveTo(hx + s * 17, hy - 32); ctx.lineTo(hx + s * 25, hy - 47 - eF * 0.8); ctx.lineTo(hx + s * 10, hy - 38);
       ctx.closePath(); ctx.fill();
       ctx.strokeStyle = 'rgba(255,235,205,0.8)'; ctx.lineWidth = 1.4;
       ctx.beginPath();
@@ -383,7 +436,7 @@ const Cats = {
     furEdge(ctx, hx, hy, 38, 38, 'rgba(217,138,53,0.7)', 22);
 
     // JOWLS: cheek pouches blooming beside the muzzle — the chonk signature
-    const jowlR = t * 15 + Math.max(0, jC) * 5;
+    const jowlR = t * 15 + Math.max(0, jC) * (V ? 9 : 5);
     if (jowlR > 0.5) {
       ctx.fillStyle = CREAM;
       for (const s of [-1, 1]) {
@@ -462,7 +515,7 @@ const Cats = {
       for (const wy of [-2, 6, 14]) {
         ctx.beginPath();
         ctx.moveTo(hx + s * 30, hy + wy);
-        ctx.quadraticCurveTo(hx + s * 45, hy + wy - 6 + t * 4, hx + s * 60, hy + wy - 3 + t * 6);
+        ctx.quadraticCurveTo(hx + s * 45, hy + wy - 6 + t * 4 + jC * 3, hx + s * 60, hy + wy - 3 + t * 6 + jC * 5);
         ctx.stroke();
       }
     }
