@@ -1,3 +1,18 @@
+## 2026-10-14 — stunkus: movers + vacuum v2 + music loader + world-map menu (daily polish)
+Four chunks, all local on `stunkus/daily-polish`. Hands off cats.js / catphysics.js (Sleve's v2 untouched).
+- **mover-barrels** (world 4+, level 31+): the Peggle staple. `dealMovers()` in levels.js converts a deterministic slice of leftover empty slots into snack barrels on slow sinusoidal tracks (x/y axis, 22–36 px, 3.2–5.6 s period, slow-mo aware, vertical tracks clamped above the belt). Dashed track-line telegraphs under both render paths; collision/burst/keg-chains all read the live position. Level-31 splash announces them.
+- **vacuum-v2**: 0.4 s gulp pause after every eaten item (amber eye, drooping nozzle, contented bubbles, no suction — real counterplay windows; the 2-per-shot meal cap survives), and speed now scales with world (`×(1 + 0.05·world)`, multiplicative with difficulty).
+- **music-loader**: `AudioSys.music` wires `assets/music/` playback — menu/gameplay/frenzy/weighin tracks auto-switch with game state (frenzy → frenzy → gameplay on expiry, weigh-in ceremony → weighin), 1.5 s crossfade, 0.32 level under SFX, mute toggle respected. Fully silent until Qwenny's files land; every call is a safe no-op headless.
+- **menu-worlds**: level select is now a world map — 10 collapsible world sections (★ totals per world), per-level best-cal readout, current level highlighted; plus a first-run 3-step "How to play" panel (dismiss persists).
+Smoke 142/142 (+12 new tests; two old vacuum tests re-timed for the gulp). Tap-fuzz clean on 7 levels (incl. level 41 movers, level 6 vacuum). Cat physics untouched.
+
+## 2026-10-13 — stunkus: branch discipline switch (Blarmo's call)
+One-task-one-branch is retired. Two branches only from here: `main` and
+`stunkus/daily-polish` — no per-task branches. Claim tasks in TASKS.md before
+coding, commit onto `stunkus/daily-polish`. COLLAB.md updated to match (rules,
+merging, push-approval sections). Pages test link deploys from
+`stunkus/daily-polish`, tracking main via merge (never rebase).
+
 ## 2026-10-13 — stunkus: mystery + golden + cucumber barrels, FX bus + juice pass (daily polish)
 Three new barrel kinds, dealt deterministically from empty slots at load time
 (LEVELS untouched): **mystery** (purple ?, orbiting sparkles; burst reveals a tier
