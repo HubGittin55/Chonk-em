@@ -30,6 +30,7 @@ const AudioSys = {
   toggle() {
     this.muted = !this.muted;
     try { localStorage.setItem('chonk-em:mute', this.muted ? '1' : '0'); } catch (e) {}
+    if (this.music) this.music.applyMute();
     return this.muted;
   },
 
@@ -113,4 +114,62 @@ const AudioSys = {
     });
   },
   lose()   { this.sfx('jingle_lose', function() { [400, 350, 300, 220].forEach((f, i) => setTimeout(() => this.tone(f, 0.20, 'sawtooth', 0.07), i * 140)); }); },
+};
+
+/* Music: drop generated seamless loops in assets/music/<name>.mp3 (see MUSIC_SPEC.md).
+   Silent until the files land — every call is a safe no-op without them or without
+   an AudioContext. Tracks: menu / gameplay / frenzy / weighin. */
+const MUSIC_LEVEL = 0.32; // music sits UNDER the SFX
+AudioSys.music = {
+  track: null, src: null, gainNode: null, bufs: {}, pending: {},
+  async ensure(name) {
+    if (this.bufs[name] !== undefined) return this.bufs[name];
+    if (!AudioSys.ctx) return (this.bufs[name] = null);
+    if (this.pending[name]) return this.pending[name];
+    this.pending[name] = (async () => {
+      try {
+        const r = await fetch('assets/music/' + name + '.mp3');
+        if (!r.ok) return (this.bufs[name] = null);
+        const buf = await AudioSys.ctx.decodeAudioData(await r.arrayBuffer());
+        return (this.bufs[name] = buf);
+      } catch (e) { return (this.bufs[name] = null); }
+    })();
+    return this.pending[name];
+  },
+  setTrack(name) { // switch music by game state; fades out the old, fades in the new
+    if (this.track === name) return;
+    this.track = name;
+    this._stopSrc();
+    if (!name || AudioSys.muted) return;
+    this.ensure(name).then(buf => {
+      if (this.track !== name || !buf || !AudioSys.ctx || AudioSys.muted) return;
+      const src = AudioSys.ctx.createBufferSource();
+      src.buffer = buf; src.loop = true;
+      const g = AudioSys.ctx.createGain();
+      g.gain.value = 0;
+      src.connect(g); g.connect(AudioSys.ctx.destination);
+      try { src.start(); } catch (e) { return; }
+      g.gain.linearRampToValueAtTime(MUSIC_LEVEL, AudioSys.ctx.currentTime + 1.5);
+      this.src = src; this.gainNode = g;
+    });
+  },
+  _stopSrc() {
+    const s = this.src, g = this.gainNode;
+    this.src = null; this.gainNode = null;
+    if (!s) return;
+    try {
+      if (g && AudioSys.ctx) {
+        const t = AudioSys.ctx.currentTime;
+        g.gain.cancelScheduledValues(t);
+        g.gain.setValueAtTime(g.gain.value, t);
+        g.gain.linearRampToValueAtTime(0.0001, t + 0.4);
+      }
+      setTimeout(() => { try { s.stop(); } catch (e) {} }, 500);
+    } catch (e) { /* already gone */ }
+  },
+  stop() { this.track = null; this._stopSrc(); },
+  applyMute() { // mute toggle: drop music instantly, restore the current track on unmute
+    if (AudioSys.muted) this._stopSrc();
+    else if (this.track) { const t = this.track; this.track = null; this.setTrack(t); }
+  },
 };
