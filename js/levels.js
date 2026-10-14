@@ -1392,6 +1392,36 @@ function topCommonFor(n) {
   const cs = tierCommons(n);
   return cs[cs.length - 1];
 }
+
+function worldForLevel(n) { return Math.floor((n - 1) / 10); } // 1-based level → 0-based world (10 levels each)
+
+// Moving barrels (world 4+, the Peggle staple): deterministic slice of the slots
+// left over after the specials. They become snack barrels riding a slow
+// sinusoidal track — collision, burst and render all read the live b.x/b.y,
+// so the sim needs no other special-casing. Slow-mo aware via wdt.
+function dealMovers(barrels, n) {
+  if (n < 31) return;
+  const rnd = mulberry32(n * 2246822519 + 331);
+  const cands = barrels.filter(b => b.kind === 'empty');
+  for (let i = cands.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [cands[i], cands[j]] = [cands[j], cands[i]]; }
+  const nMv = Math.min(6, Math.max(2, Math.round(cands.length * 0.08)));
+  const commons = tierCommons(n).filter(k => ((CONTENT[k] || {}).cal || 0) > 0);
+  for (let i = 0; i < nMv && i < cands.length; i++) {
+    const b = cands[i];
+    b.kind = 'snack';
+    b.content = commons[Math.floor(rnd() * commons.length)] || 'kibble';
+    b.hx = b.x; b.hy = b.y; b.mt = 0;
+    const axis = rnd() < 0.6 ? 'x' : 'y';
+    let amp = 22 + rnd() * 14; // 22–36 px of travel
+    if (axis === 'y') amp = Math.min(amp, Math.max(14, 684 - b.hy - (b.r || 15))); // never clips the belt
+    b.mv = {
+      axis,
+      amp,
+      period: 3.2 + rnd() * 2.4,   // slow — readable, dodgeable
+      phase: rnd() * Math.PI * 2,
+    };
+  }
+}
 function dealSpecialBarrels(barrels, n) { // n: 1-based level number
   const rnd = mulberry32(n * 2654435761 + 97);
   const empt = barrels.filter(b => b.kind === 'empty');
