@@ -1261,7 +1261,42 @@ const GEN_NAMES_A = ['Grand', 'Mega', 'Hyper', 'Secret', 'Neon', 'Turbo', 'Royal
 const GEN_NAMES_B = ['Feast', 'Pounce', 'Banquet', 'Gorge', 'Snackening', 'Munch', 'Chomp', 'Larder'];
 
 function genLevel(n) { // 1-based, n >= 13. Deterministic — same n, same level, every load.
-  const rnd = mulberry32(n * 7919 + 13);
+  const tier = tierForLevel(n);
+  return Object.assign(
+    genLevelSeeded(n * 7919 + 13, tier, rawTarget(n), n % 3 === 0),
+    { _srcLevel: n });
+}
+
+function hashStr(s) { // djb2 — small, deterministic string → uint32
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return h >>> 0;
+}
+
+// Date-seeded daily challenge level. Same code path as genLevel, different seed
+// and a mid-game tier that rotates with the day of year so no two days feel alike.
+function dailyKey(d) { // Date → 'YYYYMMDD' in local time
+  d = d || new Date();
+  return d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+}
+const _dailyCache = {};
+function genDailyLevel(dateStr) {
+  if (_dailyCache[dateStr]) return _dailyCache[dateStr];
+  const y = +dateStr.slice(0, 4), m = +dateStr.slice(4, 6), dd = +dateStr.slice(6, 8);
+  const doy = Math.floor((new Date(y, m - 1, dd) - new Date(y, 0, 0)) / 864e5);
+  const tier = 5 + (doy % 11); // tiers 5..15: mid-game variety, rotates yearly
+  const L = genLevelSeeded(hashStr('chonk-daily-' + dateStr), tier,
+    Math.round(55 + 4 * (tier * 5 - 1)), doy % 3 === 0);
+  L.name = 'Daily: ' + L.name;
+  L._daily = dateStr;
+  _dailyCache[dateStr] = L;
+  return L;
+}
+
+// The procedural level core: seed + food tier + calorie target + vacuum flag.
+// genLevel (campaign) and genDailyLevel (daily challenge) both build through here.
+function genLevelSeeded(seed, tier, target, vacuum) {
+  const rnd = mulberry32(seed);
   const R = 10, DX = 21, DY = 18.2;
   const pts = [];
   let row = 0;
@@ -1292,9 +1327,9 @@ function genLevel(n) { // 1-based, n >= 13. Deterministic — same n, same level
     final = final.filter(q => !(q.x === p.x && q.y === p.y) && !(q.x === mx && q.y === p.y));
   }
 
-  const tier = tierForLevel(n), maxCal = tierMaxCal(n), exotic = tierExotic(n);
-  const commons = tierCommons(n);
-  const target = rawTarget(n);
+  const maxCal = 5 + 5 * tier, exotic = tier >= 2 ? EXOTICS[tier - 2][0] : null;
+  const _tieredLevel = tier * 5 + 1; // tierCommons/exotics expect a 1-based level number
+  const commons = tierCommons(_tieredLevel);
   const order = final.slice();
   for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
   const nB = order.length;
@@ -1370,7 +1405,7 @@ function genLevel(n) { // 1-based, n >= 13. Deterministic — same n, same level
     name: GEN_NAMES_A[Math.floor(rnd() * GEN_NAMES_A.length)] + ' ' +
           GEN_NAMES_B[Math.floor(rnd() * GEN_NAMES_B.length)],
     balls, par: Math.round(balls * 0.75), goal: Math.round(raw * 0.6), r: R,
-    vacuum: n % 3 === 0,
+    vacuum,
     barrels,
   };
 }
