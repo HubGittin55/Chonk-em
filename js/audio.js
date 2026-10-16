@@ -24,12 +24,14 @@ const AudioSys = {
   },
 
   loadMute() {
+    if (typeof Profile !== 'undefined') { this.muted = !!Profile.setting('mute', false); return; }
     try { this.muted = localStorage.getItem('chonk-em:mute') === '1'; } catch (e) {}
   },
 
   toggle() {
     this.muted = !this.muted;
-    try { localStorage.setItem('chonk-em:mute', this.muted ? '1' : '0'); } catch (e) {}
+    if (typeof Profile !== 'undefined') Profile.setSetting('mute', this.muted);
+    else { try { localStorage.setItem('chonk-em:mute', this.muted ? '1' : '0'); } catch (e) {} }
     if (this.music) this.music.applyMute();
     return this.muted;
   },

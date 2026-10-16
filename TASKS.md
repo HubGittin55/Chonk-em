@@ -85,6 +85,12 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 ## Cat physics overhaul (assigned: sonnet-5.5 via Blarmo, 2026-10-12)
 - [ ] `cat-physics-v2` — novel unified cat physics replacing the 4-spring wobble: brief in ~/workspace/goals/chonk-em-development/files/cat-physics-overhaul-brief.md (attach js/cats.js alongside). In progress — sonnet-5.5. Stunkus: hands off until it lands.
 
+## Daily polish 2026-10-15 (stunkus, branch `stunkus/daily-polish`)
+
+- [x] `save-v2` — DONE (stunkus). Versioned player profile (`chonk-em:profile-v2`): lifetime stats (total cal fed, best chonk, levels cleared, shots fired, max combo), per-level bests, settings (difficulty, mute, cat, howSeen, world-open, saved weight), daily bests + streaks. Migrates all flat keys on first load and deletes them; mute toggle + weight persistence + reset all go through Profile. Smoke 154/154.
+- [x] `daily-challenge` — DONE (stunkus). Date-seeded daily level (deterministic for the day, fresh layout every calendar day; genLevel refactored to a shared seed+tier core). Menu card shows today's best stars + play streak; wins record per-date (never touch the campaign board); losing/retrying the daily stays in daily mode; weigh-in title shows the date. Tap-fuzz clean on the daily path.
+- [x] `cat-aliveness` — DONE (stunkus). Proper blink cycle (both eyes, ~3.7 s period, skipped for shocked/determined), occasional alternating ear twitch, three new reaction faces: smug (6+ combo), shocked (cucumber spook — replaced the sad face), determined (FEAST FRENZY — replaced bliss). Weigh-in ceremony opens with a weight-pitched meow. Size-scaling untouched.
+
 ## Daily polish 2026-10-14 (stunkus, branch `stunkus/daily-polish`)
 
 - [x] `mover-barrels` — DONE (stunkus). Peggle-staple moving barrels from world 4 (level 31+) on: deterministic deal from empty slots, slow sinusoidal oscillation on x/y axis, slow-mo aware, telegraphed with dashed track lines.

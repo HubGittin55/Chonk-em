@@ -32,7 +32,7 @@ global.localStorage = {
 Object.keys = ((orig) => (o) => o === global.localStorage ? [...lsStore.keys()] : orig(o))(Object.keys);
 
 const root = path.join(__dirname, '..');
-const files = ['audio', 'physics', 'levels', 'barrels', 'conveyor', 'vacuum', 'catphysics', 'cats', 'input', 'fx', 'main'];
+const files = ['audio', 'save', 'physics', 'levels', 'barrels', 'conveyor', 'vacuum', 'catphysics', 'cats', 'input', 'fx', 'weighin', 'main'];
 const src = files.map(f => fs.readFileSync(path.join(root, 'js', f + '.js'), 'utf8')).join('\n');
 vm.runInThisContext(src, { filename: 'chonk.bundle.js' });
 
@@ -50,8 +50,10 @@ const step = (n) => { for (let i = 0; i < n; i++) tick(1 / 120); };
 let stuckShots = 0, exceptions = 0, stuckAim = 0, levelsPlayed = 0;
 const rand = (a, b) => a + Math.random() * (b - a);
 
-for (const lvl of [0, 3, 5, 8, 11, 20, 40]) {
-  loadLevel(lvl); levelsPlayed++;
+for (const lvl of [0, 3, 5, 8, 11, 20, 40, 'daily']) {
+  if (lvl === 'daily') { loadDaily(); } else { loadLevel(lvl); }
+  levelsPlayed++;
+  const label = lvl === 'daily' ? 'daily' : 'lvl ' + (lvl + 1);
   game.menuOpen = false;
   let ticks = 0;
   const maxTicks = 120 * 240; // 4 minutes of game time per level, plenty
@@ -67,17 +69,17 @@ for (const lvl of [0, 3, 5, 8, 11, 20, 40]) {
       step(30); ticks += 30;
       // stuck-shot watchdog: no ball may live longer than ~16s of game time
       for (const s of game.shots) {
-        if (s.life > 16) { stuckShots++; console.log(`  STUCK BALL lvl ${lvl + 1}: life=${s.life.toFixed(1)} x=${s.x.toFixed(0)} y=${s.y.toFixed(0)}`); s.life = 999; }
+        if (s.life > 16) { stuckShots++; console.log(`  STUCK BALL ${label}: life=${s.life.toFixed(1)} x=${s.x.toFixed(0)} y=${s.y.toFixed(0)}`); s.life = 999; }
       }
       // input watchdog: balls left, nothing in flight, level not over, but can't aim for 5s
       if (!game.shots.length && game.balls > 0 && !game.over) {
         // canAim is the input hook's gate; replicate it
         const canAim = !game.over && !game.menuOpen && !game.shots.length && game.balls > 0;
-        if (!canAim) { stuckAim++; console.log(`  STUCK AIM lvl ${lvl + 1}`); break; }
+        if (!canAim) { stuckAim++; console.log(`  STUCK AIM ${label}`); break; }
       }
-    } catch (e) { exceptions++; console.log(`  EXCEPTION lvl ${lvl + 1}: ${e.message}`); break; }
+    } catch (e) { exceptions++; console.log(`  EXCEPTION ${label}: ${e.message}`); break; }
   }
-  console.log(`level ${lvl + 1}: ${game.over ? 'ended' : 'TIMEOUT'} after ${(ticks / 120).toFixed(0)}s, balls left ${game.balls}`);
+  console.log(`${label}: ${game.over ? 'ended' : 'TIMEOUT'} after ${(ticks / 120).toFixed(0)}s, balls left ${game.balls}`);
 }
 
 console.log(`\nlevels: ${levelsPlayed}, stuck balls: ${stuckShots}, stuck aim: ${stuckAim}, exceptions: ${exceptions}`);

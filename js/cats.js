@@ -80,6 +80,19 @@ function tabby(ctx, cx, cy, rx, ry, stripe) {
 
 function eyesMain(ctx, hx, hy, ex, face, time) {
   // green iris, slit pupil, specular dot; lids for happy/disgust
+  // blink: one shared 120 ms blink every ~3.7 s — both eyes together, like a real cat
+  const blink = ((time % 3.7) < 0.12) && face !== 'shocked' && face !== 'determined';
+  // determined: angry brows; shocked: raised brows + wide eyes
+  if (face === 'determined' || face === 'shocked') {
+    ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (const s of [-1, 1]) {
+      const exx = hx + s * ex;
+      ctx.beginPath();
+      if (face === 'determined') { ctx.moveTo(exx - 8, hy - 16); ctx.lineTo(exx + 8, hy - 11); } // angled down-in
+      else { ctx.moveTo(exx - 8, hy - 18); ctx.lineTo(exx + 8, hy - 18); } // raised high
+      ctx.stroke();
+    }
+  }
   for (const s of [-1, 1]) {
     const exx = hx + s * ex;
     if (face === 'disgust') {
@@ -95,22 +108,34 @@ function eyesMain(ctx, hx, hy, ex, face, time) {
       ctx.beginPath(); ctx.arc(exx, hy - 3, 7, Math.PI, 2 * Math.PI); ctx.stroke();
       continue;
     }
-    const blink = Math.sin(time * 0.7 + s) > 0.988;
+    if (face === 'smug') { // half-lidded side-eye: iris under a heavy lid
+      const g = ctx.createRadialGradient(exx, hy - 2, 1, exx, hy - 2, 6);
+      g.addColorStop(0, '#9ccf6a'); g.addColorStop(1, '#4e7d2f');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(exx, hy - 2, 6, 5, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#1a120a';
+      ctx.beginPath(); ctx.ellipse(exx + s * 2, hy - 2, 1.6, 4, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 3; ctx.lineCap = 'round'; // heavy lid
+      ctx.beginPath(); ctx.moveTo(exx - 7, hy - 6); ctx.lineTo(exx + 7, hy - 4); ctx.stroke();
+      continue;
+    }
     if (blink) {
       ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(exx - 6, hy - 5); ctx.lineTo(exx + 6, hy - 5); ctx.stroke();
       continue;
     }
     // iris
+    const wide = face === 'shocked';
     const g = ctx.createRadialGradient(exx, hy - 5, 1, exx, hy - 5, 6.5);
     g.addColorStop(0, '#9ccf6a'); g.addColorStop(1, '#4e7d2f');
     ctx.fillStyle = g;
-    ctx.beginPath(); ctx.ellipse(exx, hy - 5, 6, 6.5, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(exx, hy - 5, wide ? 8 : 6, wide ? 8 : 6.5, 0, 0, 7); ctx.fill();
     ctx.strokeStyle = '#2c1f12'; ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.ellipse(exx, hy - 5, 6, 6.5, 0, 0, 7); ctx.stroke();
-    // slit pupil
+    ctx.beginPath(); ctx.ellipse(exx, hy - 5, wide ? 8 : 6, wide ? 8 : 6.5, 0, 0, 7); ctx.stroke();
+    // slit pupil (round and dilated when shocked)
     ctx.fillStyle = '#1a120a';
-    ctx.beginPath(); ctx.ellipse(exx, hy - 5, 1.8, 5.4, 0, 0, 7); ctx.fill();
+    if (wide) { ctx.beginPath(); ctx.arc(exx, hy - 5, 3.4, 0, 7); ctx.fill(); }
+    else { ctx.beginPath(); ctx.ellipse(exx, hy - 5, 1.8, 5.4, 0, 0, 7); ctx.fill(); }
     // specular highlight
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.beginPath(); ctx.arc(exx - 2, hy - 8, 1.6, 0, 7); ctx.fill();
@@ -414,15 +439,18 @@ const Cats = {
       ctx.beginPath(); ctx.ellipse(hx + 30, hy + 26, nw, 22, 0.5, 0, 7); ctx.fill();
     }
     // Ears: fixed absolute size — adorably small on a chonky head
+    const twPhase = time % 4.3;                                     // occasional ear twitch, alternating ears
+    const tw = twPhase < 0.15 ? (Math.floor(time / 4.3) % 2 === 0 ? 1 : -1) : 0;
     for (const s of [-1, 1]) {
       const eF = V ? V.ear * 5 * (s > 0 ? 1 : 0.4) : 0;           // ear flick / follow-through
+      const twF = tw === s ? 7 : 0;                                // twitch flick, this ear only
       ctx.fillStyle = CREAM;
       ctx.beginPath();
-      ctx.moveTo(hx + s * 15, hy - 28); ctx.lineTo(hx + s * 30, hy - 56 - eF); ctx.lineTo(hx + s * 4, hy - 40);
+      ctx.moveTo(hx + s * 15, hy - 28); ctx.lineTo(hx + s * 30, hy - 56 - eF - twF); ctx.lineTo(hx + s * 4, hy - 40);
       ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#e88ca0';
       ctx.beginPath();
-      ctx.moveTo(hx + s * 17, hy - 32); ctx.lineTo(hx + s * 25, hy - 47 - eF * 0.8); ctx.lineTo(hx + s * 10, hy - 38);
+      ctx.moveTo(hx + s * 17, hy - 32); ctx.lineTo(hx + s * 25, hy - 47 - eF * 0.8 - twF * 0.8); ctx.lineTo(hx + s * 10, hy - 38);
       ctx.closePath(); ctx.fill();
       ctx.strokeStyle = 'rgba(255,235,205,0.8)'; ctx.lineWidth = 1.4;
       ctx.beginPath();
@@ -502,6 +530,17 @@ const Cats = {
       ctx.beginPath(); ctx.arc(hx - 1, hy + 22, 8, 1.1 * Math.PI, 1.9 * Math.PI); ctx.stroke();
       ctx.fillStyle = '#e88ca0'; // tongue of regret
       ctx.beginPath(); ctx.ellipse(hx + 10, hy + 22, 6, 9, 0.3, 0, 7); ctx.fill();
+    } else if (face === 'smug') { // crooked little smirk
+      ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(hx - 9, hy + 14); ctx.quadraticCurveTo(hx - 1, hy + 18, hx + 9, hy + 10);
+      ctx.stroke();
+    } else if (face === 'shocked') { // small oval of pure alarm
+      ctx.fillStyle = '#5a2f22';
+      ctx.beginPath(); ctx.ellipse(hx - 1, hy + 20, 7, 10, 0, 0, 7); ctx.fill();
+    } else if (face === 'determined') { // flat, businesslike line
+      ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(hx - 8, hy + 16); ctx.lineTo(hx + 6, hy + 16); ctx.stroke();
     } else {
       ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
       ctx.beginPath();
