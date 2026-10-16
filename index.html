@@ -32,8 +32,19 @@
   <div id="menuOverlay">
     <h1>CHONK &rsquo;EM</h1>
     <p class="sub">pick a level &middot; fatten the cat</p>
+    <div id="howto" class="hidden">
+      <h2>How to play</h2>
+      <ol>
+        <li><b>Aim</b> &mdash; drag on the playfield to line up the shot (desktop) or touch and drag (mobile).</li>
+        <li><b>Shoot</b> &mdash; release to fire a yarn ball. Burst barrels to shake the food loose.</li>
+        <li><b>Feed</b> &mdash; food rides the conveyor into the bowl. Reach the calorie goal before the yarn runs out!</li>
+      </ol>
+      <button id="howtoGo">Got it &mdash; feed the cat</button>
+    </div>
     <div id="diffRow"></div>
     <div id="catRow"></div>
+    <div id="dailyRow"></div>
+    <div id="lifeRow"></div>
     <div id="levelGrid"></div>
     <button id="resetGame">&#128465; reset everything</button>
   </div>
@@ -49,8 +60,12 @@
 <script src="js/barrels.js"></script>
 <script src="js/conveyor.js"></script>
 <script src="js/vacuum.js"></script>
+<script src="js/catphysics.js"></script>
 <script src="js/cats.js"></script>
 <script src="js/input.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/save.js"></script>
+<script src="js/weighin.js"></script>
 <script src="js/main.js"></script>
 <!-- pages rebuild nudge -->
 </body>

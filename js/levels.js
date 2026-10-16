@@ -1,13 +1,17 @@
 'use strict';
-/* Level data. kind: 'snack' | 'veggie' | 'power' | 'empty' | 'steel' | 'keg' | 'bumper'. content keys must exist in CONTENT (barrels.js).
+/* Level data. kind: 'snack' | 'veggie' | 'power' | 'empty' | 'steel' | 'keg' | 'bumper' | 'mystery' | 'golden' | 'cuke'. content keys must exist in CONTENT (barrels.js).
    Levels 1-12 handcrafted; 13-100 generated deterministically by genLevel(n).
    Food tiers: new exotic every 5 levels (+5 cal); raw cal follows 55+4*(n-1).
-   Balls: 50% of food barrels (owner directive 2026-10-07). Veggies quartered (owner 2026-10-07). */
+   Balls: 35% of food barrels (owner directive 2026-10-13). Veggies quartered (owner 2026-10-07).
+   Exotics capped at 3 per level (owner 2026-10-13): the raw-cal tuning loop may not
+   mint more high-tier barrels than the seeded ones.
+   Special barrels (mystery/golden/cuke) are dealt from empty slots at load time
+   by dealSpecialBarrels() — LEVELS stays untouched so the static tests hold. */
 
 const LEVELS = [
   {
     name: 'First Breakfast',
-    balls: 11,
+    balls: 8,
     par: 8,
     goal: 35,
     r: 10,
@@ -77,7 +81,7 @@ const LEVELS = [
   },
   {
     name: 'Pyramid Pounce',
-    balls: 10,
+    balls: 8,
     par: 8,
     goal: 37,
     r: 10,
@@ -151,7 +155,7 @@ const LEVELS = [
   },
   {
     name: 'Starstruck',
-    balls: 16,
+    balls: 11,
     par: 12,
     goal: 39,
     r: 10,
@@ -232,7 +236,7 @@ const LEVELS = [
   },
   {
     name: 'Heartbreaker',
-    balls: 11,
+    balls: 8,
     par: 8,
     goal: 42,
     r: 10,
@@ -319,7 +323,7 @@ const LEVELS = [
   },
   {
     name: 'Smiley Face',
-    balls: 16,
+    balls: 11,
     par: 12,
     goal: 44,
     r: 10,
@@ -412,7 +416,7 @@ const LEVELS = [
   },
   {
     name: 'Diagonal Dash',
-    balls: 16,
+    balls: 11,
     par: 12,
     goal: 47,
     r: 10,
@@ -511,7 +515,7 @@ const LEVELS = [
   },
   {
     name: 'Twin Peaks',
-    balls: 17,
+    balls: 12,
     par: 13,
     goal: 49,
     r: 10,
@@ -616,7 +620,7 @@ const LEVELS = [
   },
   {
     name: 'The Gauntlet',
-    balls: 13,
+    balls: 9,
     par: 10,
     goal: 51,
     r: 10,
@@ -724,7 +728,7 @@ const LEVELS = [
   },
   {
     name: 'Star Invader',
-    balls: 19,
+    balls: 13,
     par: 14,
     goal: 54,
     r: 10,
@@ -840,7 +844,7 @@ const LEVELS = [
   },
   {
     name: 'Veggie Minefield',
-    balls: 22,
+    balls: 15,
     par: 17,
     goal: 56,
     r: 10,
@@ -959,7 +963,7 @@ const LEVELS = [
   },
   {
     name: 'Power Tower',
-    balls: 22,
+    balls: 15,
     par: 17,
     goal: 59,
     r: 10,
@@ -1082,7 +1086,7 @@ const LEVELS = [
   },
   {
     name: 'The Grand Feast',
-    balls: 21,
+    balls: 14,
     par: 16,
     goal: 61,
     r: 10,
@@ -1257,7 +1261,42 @@ const GEN_NAMES_A = ['Grand', 'Mega', 'Hyper', 'Secret', 'Neon', 'Turbo', 'Royal
 const GEN_NAMES_B = ['Feast', 'Pounce', 'Banquet', 'Gorge', 'Snackening', 'Munch', 'Chomp', 'Larder'];
 
 function genLevel(n) { // 1-based, n >= 13. Deterministic — same n, same level, every load.
-  const rnd = mulberry32(n * 7919 + 13);
+  const tier = tierForLevel(n);
+  return Object.assign(
+    genLevelSeeded(n * 7919 + 13, tier, rawTarget(n), n % 3 === 0),
+    { _srcLevel: n });
+}
+
+function hashStr(s) { // djb2 — small, deterministic string → uint32
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return h >>> 0;
+}
+
+// Date-seeded daily challenge level. Same code path as genLevel, different seed
+// and a mid-game tier that rotates with the day of year so no two days feel alike.
+function dailyKey(d) { // Date → 'YYYYMMDD' in local time
+  d = d || new Date();
+  return d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+}
+const _dailyCache = {};
+function genDailyLevel(dateStr) {
+  if (_dailyCache[dateStr]) return _dailyCache[dateStr];
+  const y = +dateStr.slice(0, 4), m = +dateStr.slice(4, 6), dd = +dateStr.slice(6, 8);
+  const doy = Math.floor((new Date(y, m - 1, dd) - new Date(y, 0, 0)) / 864e5);
+  const tier = 5 + (doy % 11); // tiers 5..15: mid-game variety, rotates yearly
+  const L = genLevelSeeded(hashStr('chonk-daily-' + dateStr), tier,
+    Math.round(55 + 4 * (tier * 5 - 1)), doy % 3 === 0);
+  L.name = 'Daily: ' + L.name;
+  L._daily = dateStr;
+  _dailyCache[dateStr] = L;
+  return L;
+}
+
+// The procedural level core: seed + food tier + calorie target + vacuum flag.
+// genLevel (campaign) and genDailyLevel (daily challenge) both build through here.
+function genLevelSeeded(seed, tier, target, vacuum) {
+  const rnd = mulberry32(seed);
   const R = 10, DX = 21, DY = 18.2;
   const pts = [];
   let row = 0;
@@ -1288,9 +1327,9 @@ function genLevel(n) { // 1-based, n >= 13. Deterministic — same n, same level
     final = final.filter(q => !(q.x === p.x && q.y === p.y) && !(q.x === mx && q.y === p.y));
   }
 
-  const tier = tierForLevel(n), maxCal = tierMaxCal(n), exotic = tierExotic(n);
-  const commons = tierCommons(n);
-  const target = rawTarget(n);
+  const maxCal = 5 + 5 * tier, exotic = tier >= 2 ? EXOTICS[tier - 2][0] : null;
+  const _tieredLevel = tier * 5 + 1; // tierCommons/exotics expect a 1-based level number
+  const commons = tierCommons(_tieredLevel);
   const order = final.slice();
   for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
   const nB = order.length;
@@ -1317,10 +1356,17 @@ function genLevel(n) { // 1-based, n >= 13. Deterministic — same n, same level
   }
   // tune total raw cal to the curve
   const calOf = b => (CONTENT[b.content] || { cal: 0 }).cal;
+  const EXOTIC_KEYS = new Set(EXOTICS.map(e => e[0]));
+  const MAX_EXOTICS = 3; // owner 2026-10-13: no more than 3 upgraded-food barrels per level
   let raw = snacks.reduce((a, b) => a + calOf(b), 0);
   guard = 0;
   while (raw < target - 3 && guard++ < 600) {
-    const cands = snacks.filter(b => b.content !== exotic && commons.indexOf(b.content) < commons.length - 1);
+    const nEx = snacks.filter(b => EXOTIC_KEYS.has(b.content)).length;
+    const cands = snacks.filter(b => {
+      if (b.content === exotic || commons.indexOf(b.content) >= commons.length - 1) return false;
+      const next = commons[commons.indexOf(b.content) + 1];
+      return !(EXOTIC_KEYS.has(next) && !EXOTIC_KEYS.has(b.content) && nEx >= MAX_EXOTICS);
+    });
     if (!cands.length) break;
     const b = cands[Math.floor(rnd() * cands.length)];
     b.content = commons[commons.indexOf(b.content) + 1];
@@ -1354,12 +1400,12 @@ function genLevel(n) { // 1-based, n >= 13. Deterministic — same n, same level
   if (!barrels.some(b => b.armor)) { const s = snacks[0]; if (s) s.armor = true; }
 
   const nFood = barrels.filter(b => b.kind === 'snack' && (CONTENT[b.content] || { cal: 0 }).cal > 0).length;
-  const balls = Math.max(8, Math.round(nFood * 0.5)); // 50% of food barrels (owner 2026-10-07)
+  const balls = Math.max(8, Math.round(nFood * 0.35)); // 35% of food barrels (owner 2026-10-13): make every shot count
   return {
     name: GEN_NAMES_A[Math.floor(rnd() * GEN_NAMES_A.length)] + ' ' +
           GEN_NAMES_B[Math.floor(rnd() * GEN_NAMES_B.length)],
     balls, par: Math.round(balls * 0.75), goal: Math.round(raw * 0.6), r: R,
-    vacuum: n % 3 === 0,
+    vacuum,
     barrels,
   };
 }
@@ -1370,4 +1416,65 @@ function getLevel(i) { // 0-based index → level def; 0..11 handcrafted, 12+ pr
   const n = i + 1;
   if (!_genCache[n]) _genCache[n] = genLevel(n);
   return _genCache[n];
+}
+
+// Special-barrel dealing: converts a deterministic slice of a level's empty slots.
+// - exactly 1 'golden' jackpot per level (3x the level's top snack)
+// - ~6% 'mystery' barrels (min 1 when the field is big enough)
+// - rare 'cuke': levels 4+, ~40% of levels get one
+// Runs on the runtime barrel copy in loadLevel — LEVELS itself is never touched.
+function topCommonFor(n) {
+  const cs = tierCommons(n);
+  return cs[cs.length - 1];
+}
+
+function worldForLevel(n) { return Math.floor((n - 1) / 10); } // 1-based level → 0-based world (10 levels each)
+
+// Moving barrels (world 4+, the Peggle staple): deterministic slice of the slots
+// left over after the specials. They become snack barrels riding a slow
+// sinusoidal track — collision, burst and render all read the live b.x/b.y,
+// so the sim needs no other special-casing. Slow-mo aware via wdt.
+function dealMovers(barrels, n) {
+  if (n < 31) return;
+  const rnd = mulberry32(n * 2246822519 + 331);
+  const cands = barrels.filter(b => b.kind === 'empty');
+  for (let i = cands.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [cands[i], cands[j]] = [cands[j], cands[i]]; }
+  const nMv = Math.min(6, Math.max(2, Math.round(cands.length * 0.08)));
+  const commons = tierCommons(n).filter(k => ((CONTENT[k] || {}).cal || 0) > 0);
+  for (let i = 0; i < nMv && i < cands.length; i++) {
+    const b = cands[i];
+    b.kind = 'snack';
+    b.content = commons[Math.floor(rnd() * commons.length)] || 'kibble';
+    b.hx = b.x; b.hy = b.y; b.mt = 0;
+    const axis = rnd() < 0.6 ? 'x' : 'y';
+    let amp = 22 + rnd() * 14; // 22–36 px of travel
+    if (axis === 'y') amp = Math.min(amp, Math.max(14, 684 - b.hy - (b.r || 15))); // never clips the belt
+    b.mv = {
+      axis,
+      amp,
+      period: 3.2 + rnd() * 2.4,   // slow — readable, dodgeable
+      phase: rnd() * Math.PI * 2,
+    };
+  }
+}
+function dealSpecialBarrels(barrels, n) { // n: 1-based level number
+  const rnd = mulberry32(n * 2654435761 + 97);
+  const empt = barrels.filter(b => b.kind === 'empty');
+  for (let i = empt.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [empt[i], empt[j]] = [empt[j], empt[i]]; }
+  let k = 0;
+  if (k < empt.length) { // one golden jackpot per level
+    empt[k].kind = 'golden';
+    empt[k].content = topCommonFor(n);
+    k++;
+  }
+  const nMyst = empt.length >= 12 ? Math.max(1, Math.round(empt.length * 0.06)) : 0;
+  for (let i = 0; i < nMyst && k < empt.length; i++, k++) {
+    empt[k].kind = 'mystery';
+    empt[k].content = null;
+  }
+  if (n >= 4 && rnd() < 0.4 && k < empt.length) { // rare: the cucumber
+    empt[k].kind = 'cuke';
+    empt[k].content = 'cucumber';
+    k++;
+  }
 }

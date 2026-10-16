@@ -73,3 +73,27 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 - [ ] proper vacuum asset (unclaimed — current vector Roomba is placeholder)
 - [ ] 18 exotic food sprites: caviar, lobster, wagyu, btruffle, saffron, bluefin, foiegras, goldkib, kingcrab, uni, kobe, matsutake, beluga, iberico, amberjack, wtruffle, saffris, imperial (unclaimed — emoji fallback live)
 - [ ] cat chonk stages 90-150 lb (unclaimed — w80 sprite stretches past 80 for now)
+
+## Daily polish 2026-10-13 (stunkus, branch `stunkus/daily-polish`)
+
+- [x] `mystery-barrels` — DONE (stunkus). Purple ? barrels, sparkle hint; burst reveals tier snack / power-up / rare veggie dud. Dealt ~6% from empties. Smoke 112/112.
+- [x] `cucumber` — DONE (stunkus). Rare green barrel (L4+, ~40% of levels); burst spills a cucumber, cat gets SPOOKED: comedic hop + wobble + 4s aim wobble, no calories. `AudioSys.startle()` synth.
+- [x] `golden-barrel` — DONE (stunkus). One per level: radiant gold jackpot paying 3x the level's top snack, with fanfare + shake/hit-stop/confetti.
+- [x] `fx-bus` — DONE (stunkus). `js/fx.js`: FX.popup/shake/hitstop/slowmo/confetti/burstJuice one-liner API, REDUCED-safe.
+- [x] `juice-pass` — DONE (stunkus). Hit-stop on 10+ cal bursts, cal-scaled shake, confetti on 15+ cal exotic deliveries, slow-mo beat on final-ball wins. Hands off cats.js (cat-physics-v2 pending).
+
+## Cat physics overhaul (assigned: sonnet-5.5 via Blarmo, 2026-10-12)
+- [ ] `cat-physics-v2` — novel unified cat physics replacing the 4-spring wobble: brief in ~/workspace/goals/chonk-em-development/files/cat-physics-overhaul-brief.md (attach js/cats.js alongside). In progress — sonnet-5.5. Stunkus: hands off until it lands.
+
+## Daily polish 2026-10-15 (stunkus, branch `stunkus/daily-polish`)
+
+- [x] `save-v2` — DONE (stunkus). Versioned player profile (`chonk-em:profile-v2`): lifetime stats (total cal fed, best chonk, levels cleared, shots fired, max combo), per-level bests, settings (difficulty, mute, cat, howSeen, world-open, saved weight), daily bests + streaks. Migrates all flat keys on first load and deletes them; mute toggle + weight persistence + reset all go through Profile. Smoke 154/154.
+- [x] `daily-challenge` — DONE (stunkus). Date-seeded daily level (deterministic for the day, fresh layout every calendar day; genLevel refactored to a shared seed+tier core). Menu card shows today's best stars + play streak; wins record per-date (never touch the campaign board); losing/retrying the daily stays in daily mode; weigh-in title shows the date. Tap-fuzz clean on the daily path.
+- [x] `cat-aliveness` — DONE (stunkus). Proper blink cycle (both eyes, ~3.7 s period, skipped for shocked/determined), occasional alternating ear twitch, three new reaction faces: smug (6+ combo), shocked (cucumber spook — replaced the sad face), determined (FEAST FRENZY — replaced bliss). Weigh-in ceremony opens with a weight-pitched meow. Size-scaling untouched.
+
+## Daily polish 2026-10-14 (stunkus, branch `stunkus/daily-polish`)
+
+- [x] `mover-barrels` — DONE (stunkus). Peggle-staple moving barrels from world 4 (level 31+) on: deterministic deal from empty slots, slow sinusoidal oscillation on x/y axis, slow-mo aware, telegraphed with dashed track lines.
+- [x] `vacuum-v2` — DONE (stunkus). Vacuum gets smarter: gulp pause after each eaten item (no suction while digesting, telegraphed nozzle droop), speed scales with world.
+- [x] `music-loader` — DONE (stunkus). Wire assets/music/ playback: menu/gameplay/frenzy/weighin tracks auto-switch with game state, graceful silence until Qwenny's files land, mute toggle respected.
+- [x] `menu-worlds` — DONE (stunkus). World-grouped level select (10 worlds x 10 levels, star totals per world, collapsible) + first-run "How to play" 3-step panel.

@@ -80,6 +80,19 @@ function tabby(ctx, cx, cy, rx, ry, stripe) {
 
 function eyesMain(ctx, hx, hy, ex, face, time) {
   // green iris, slit pupil, specular dot; lids for happy/disgust
+  // blink: one shared 120 ms blink every ~3.7 s — both eyes together, like a real cat
+  const blink = ((time % 3.7) < 0.12) && face !== 'shocked' && face !== 'determined';
+  // determined: angry brows; shocked: raised brows + wide eyes
+  if (face === 'determined' || face === 'shocked') {
+    ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (const s of [-1, 1]) {
+      const exx = hx + s * ex;
+      ctx.beginPath();
+      if (face === 'determined') { ctx.moveTo(exx - 8, hy - 16); ctx.lineTo(exx + 8, hy - 11); } // angled down-in
+      else { ctx.moveTo(exx - 8, hy - 18); ctx.lineTo(exx + 8, hy - 18); } // raised high
+      ctx.stroke();
+    }
+  }
   for (const s of [-1, 1]) {
     const exx = hx + s * ex;
     if (face === 'disgust') {
@@ -95,22 +108,34 @@ function eyesMain(ctx, hx, hy, ex, face, time) {
       ctx.beginPath(); ctx.arc(exx, hy - 3, 7, Math.PI, 2 * Math.PI); ctx.stroke();
       continue;
     }
-    const blink = Math.sin(time * 0.7 + s) > 0.988;
+    if (face === 'smug') { // half-lidded side-eye: iris under a heavy lid
+      const g = ctx.createRadialGradient(exx, hy - 2, 1, exx, hy - 2, 6);
+      g.addColorStop(0, '#9ccf6a'); g.addColorStop(1, '#4e7d2f');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(exx, hy - 2, 6, 5, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#1a120a';
+      ctx.beginPath(); ctx.ellipse(exx + s * 2, hy - 2, 1.6, 4, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 3; ctx.lineCap = 'round'; // heavy lid
+      ctx.beginPath(); ctx.moveTo(exx - 7, hy - 6); ctx.lineTo(exx + 7, hy - 4); ctx.stroke();
+      continue;
+    }
     if (blink) {
       ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(exx - 6, hy - 5); ctx.lineTo(exx + 6, hy - 5); ctx.stroke();
       continue;
     }
     // iris
+    const wide = face === 'shocked';
     const g = ctx.createRadialGradient(exx, hy - 5, 1, exx, hy - 5, 6.5);
     g.addColorStop(0, '#9ccf6a'); g.addColorStop(1, '#4e7d2f');
     ctx.fillStyle = g;
-    ctx.beginPath(); ctx.ellipse(exx, hy - 5, 6, 6.5, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(exx, hy - 5, wide ? 8 : 6, wide ? 8 : 6.5, 0, 0, 7); ctx.fill();
     ctx.strokeStyle = '#2c1f12'; ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.ellipse(exx, hy - 5, 6, 6.5, 0, 0, 7); ctx.stroke();
-    // slit pupil
+    ctx.beginPath(); ctx.ellipse(exx, hy - 5, wide ? 8 : 6, wide ? 8 : 6.5, 0, 0, 7); ctx.stroke();
+    // slit pupil (round and dilated when shocked)
     ctx.fillStyle = '#1a120a';
-    ctx.beginPath(); ctx.ellipse(exx, hy - 5, 1.8, 5.4, 0, 0, 7); ctx.fill();
+    if (wide) { ctx.beginPath(); ctx.arc(exx, hy - 5, 3.4, 0, 7); ctx.fill(); }
+    else { ctx.beginPath(); ctx.ellipse(exx, hy - 5, 1.8, 5.4, 0, 0, 7); ctx.fill(); }
     // specular highlight
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.beginPath(); ctx.arc(exx - 2, hy - 8, 1.6, 0, 7); ctx.fill();
@@ -147,7 +172,42 @@ const Sprites = {
 };
 if (typeof Image === 'function') Sprites.init();
 
+// Draw the sprite as NC vertical strips (cat.phys.sprite.cy/cb/ck) so travelling belly waves,
+// head bob and tail sway show up as spatial deformation, not just whole-image squash.
+// Caller has set up the feet-anchored transform: sprite occupies x in [-w/2,w/2], y in [-H,0].
+function drawSpriteStrips(ctx, im, w, H, S) {
+  const n = S.cy.length, iw = im.width, ih = im.height;
+  const maxPad = (w / n) * 1.5; // past this a hairline gap beats a smeared stretch
+  for (let j = 0; j < n; j++) {
+    const s0 = Math.round(j * iw / n), s1 = Math.round((j + 1) * iw / n);
+    // Shear is about the feet line: strip j's top edge sits at x - ck[j]*cy[j]*H.
+    // A gap opens at a boundary only when THIS strip's top shift exceeds its
+    // neighbour's — so pad that side by exactly that gap. (A global worst-case
+    // pad stretched every strip 3-4x over its neighbours: doubled, smeared cat.)
+    const tj = S.ck[j] * H;
+    const tl = j > 0 ? S.ck[j - 1] * H : tj;
+    const tr = j < n - 1 ? S.ck[j + 1] * H : tj;
+    const padL = Math.min(Math.max(tj - tl, 0) + 0.6, maxPad);
+    const padR = Math.min(Math.max(tj - tr, 0) + 0.6, maxPad);
+    // Source bleed so overlaps paint real neighbouring pixels, not resampled
+    // edge fuzz — this is what kills the seam line on flat linework. Sized to
+    // about one destination pixel of source (the filter footprint), min 1px.
+    const e0 = -w / 2 + (j / n + S.cb[j]) * w;
+    const e1 = -w / 2 + ((j + 1) / n + S.cb[j + 1]) * w;
+    const k = (e1 - e0) / ((s1 - s0) || 1);            // destination px per source px
+    const bl = Math.min(Math.max(1, Math.ceil(1 / (k || 1))), (s1 - s0) >> 1);
+    const b0 = s0 > bl ? s0 - bl : s0, b1 = s1 < iw - bl ? s1 + bl : s1;
+    ctx.save();
+    ctx.transform(1, 0, S.ck[j], S.cy[j], 0, 0);              // scale about the feet line, shear for tail sway
+    ctx.drawImage(im, b0, 0, b1 - b0, ih,
+      e0 - padL - (s0 - b0) * k, -H,
+      (b1 - b0) * k + padL + padR, H);
+    ctx.restore();
+  }
+}
+
 const Cats = {
+  STRIPS: true,   // false = whole-image params only (cheapest); true = per-column deformation when the cat is moving
   // Shooter cat perched at the top. aimAng in radians (canvas coords), loaded = yarn ready.
   drawShooter(ctx, x, y, aimAng, loaded) {
     if (Assets.ok('shooter')) {
@@ -236,44 +296,59 @@ const Cats = {
   },
 
   // Main cat beside the bowl.
-  // cat = { t: chonk factor 0..1 from lifetime weight, wob: {belly,cheek,tail} springs,
-  //         nomT, face, time }
+  // cat = { t: chonk factor 0..1 from lifetime weight, phys: CatPhysics instance (preferred),
+  //         wob: legacy {belly,cheek,tail,sub} springs (used only when phys is absent),
+  //         lb: pass phys.shownLb (holds the old sprite during the size-up crouch), nomT, face, time }
   // Every part grows at its own rate: belly sags, jowls bloom, haunches emerge,
   // paws chunk and splay, tail thickens — the head barely grows, like a real cat.
   drawMain(ctx, x, y, cat) {
     const t = Math.max(0, Math.min(1, cat.t || 0));
     const wob = cat.wob || { belly: { x: 0 }, cheek: { x: 0 }, tail: { x: 0 }, sub: { x: 0 } };
     const nomT = cat.nomT || 0, face = cat.face || 'normal', time = cat.time || 0;
-    const jB = wob.belly.x || 0, jC = wob.cheek.x || 0, jT = wob.tail.x || 0;
+    const phys = cat.phys || null;
+    if (phys) phys.pose();                                 // idempotent per sim update
+    const V = phys ? phys.vec : null;                      // vector adapter output
+    const jB = V ? V.belly : (wob.belly.x || 0), jC = V ? V.jowl : (wob.cheek.x || 0), jT = V ? V.tail : (wob.tail.x || 0);
     const bob = nomT > 0 ? Math.abs(Math.sin(nomT * 28)) * 5 : 0;
 
-    // ---- Generated-sprite path: HARD stage cut (no crossfade — owner: crossfade ghosts),
-    // squash-and-stretch jiggle with lagging sub-belly, pop on size-up ----
+    // ---- Generated-sprite path: HARD stage cut (no crossfade — owner: crossfade ghosts) ----
     if (typeof Image === 'function' && Sprites.ok()) {
       const row = Sprites.imgs[Math.max(0, Math.min(CAT_VARS.length - 1, cat.var | 0))];
       const idx = stageIdxForLb(cat.lb != null ? cat.lb : 10 + t * 70);
-      if (idx !== Cats._lastIdx) { Cats._lastIdx = idx; Cats._popT0 = cat.time || 0; }
-      const growAge = (cat.time || 0) - (Cats._popT0 || 0);
-      const growK = Math.max(0, Math.min(1, growAge / 0.6));
-      const grow = 1 + 0.20 * Math.sin(growK * Math.PI); // gentle 20% grow pulse, both axes (owner 2026-10-07)
       const H = 122 + (idx / (STAGE_LBS.length - 1)) * 58;   // stepped height, no ghost blend
-      const jS = (wob.sub && wob.sub.x) || 0;
-      const sy = (1 + jB * 0.13 + jS * 0.06) * (1 - bob * 0.012) * grow;
-      const sx = (1 - jB * 0.06 - jS * 0.03) * grow;
-      const baseY = y + 74;                          // feet anchor
-      ctx.save();
-      ctx.translate(x, baseY - H * sy / 2 - bob);
-      ctx.scale(sx, sy);
+      const baseY = y + 74;                                  // feet anchor
       const im = row[idx];
       const w = H * (im.width / im.height);
-      ctx.drawImage(im, -w / 2, -H / 2, w, H);
+      ctx.save();
+      if (phys) {
+        // Physics-driven: whole-body params (crouch/pop/breath/roll) + optional column strips.
+        const S = phys.sprite;
+        ctx.translate(x + S.ox * w, baseY - bob + S.oy * H);
+        ctx.rotate(S.rot);
+        ctx.transform(1, 0, S.skew, 1, 0, 0);
+        ctx.scale(S.sx * S.grow, S.sy * S.grow * (1 - bob * 0.012));
+        if (Cats.STRIPS && S.strips) drawSpriteStrips(ctx, im, w, H, S);
+        else ctx.drawImage(im, -w / 2, -H, w, H);
+      } else {
+        // Legacy (no phys supplied, e.g. weigh-in ceremony): old springs + envelope pop.
+        if (idx !== Cats._lastIdx) { Cats._lastIdx = idx; Cats._popT0 = cat.time || 0; }
+        const growAge = (cat.time || 0) - (Cats._popT0 || 0);
+        const growK = Math.max(0, Math.min(1, growAge / 0.6));
+        const grow = 1 + 0.20 * Math.sin(growK * Math.PI);  // gentle 20% grow pulse, both axes (owner 2026-10-07)
+        const jS = (wob.sub && wob.sub.x) || 0;
+        const sy = (1 + jB * 0.13 + jS * 0.06) * (1 - bob * 0.012) * grow;
+        const sx = (1 - jB * 0.06 - jS * 0.03) * grow;
+        ctx.translate(x, baseY - bob);
+        ctx.scale(sx, sy);
+        ctx.drawImage(im, -w / 2, -H, w, H);
+      }
       ctx.restore();
       void face; void jC; void jT;
       return;
     }
 
     // ---- Vector fallback ----
-    const breathe = 1 + 0.018 * Math.sin(time * 2.4);
+    const breathe = V ? 1 : 1 + 0.018 * Math.sin(time * 2.4);   // phys: breathing lives in the global body transform
 
     const rx = 62 + t * 88;
     const ry = 58 + t * 14;
@@ -286,8 +361,18 @@ const Cats = {
     ctx.fillStyle = 'rgba(60,35,10,0.18)';
     ctx.beginPath(); ctx.ellipse(0, ry + 16 + t * 6, rx * (1.02 + t * 0.06), 12 + t * 4, 0, 0, 7); ctx.fill();
 
+    // Whole-body physics transform about the feet line (crouch, pop, roll, breath) — shared with the sprite path
+    if (V) {
+      const feetY = ry * 0.78 + 9 + t * 11;
+      ctx.translate(0, feetY);
+      ctx.rotate(V.rot);
+      ctx.transform(1, 0, V.skew, 1, 0, 0);
+      ctx.scale(V.sx * V.grow, V.sy * V.grow);
+      ctx.translate(0, -feetY);
+    }
+
     // Tail: thickens with chonk, wobble feeds the swish
-    const swish = Math.sin(time * 2.2) * 8 + jT * 26;
+    const swish = (V ? 0 : Math.sin(time * 2.2) * 8) + jT * (V ? 34 : 26);   // phys tail already includes the idle swish
     const tailW = 13 + t * 9;
     ctx.strokeStyle = FUR; ctx.lineWidth = tailW; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(rx - 8, 12);
@@ -299,13 +384,15 @@ const Cats = {
     // Haunch (thigh): emerges once there's real chonk, rear side
     const haunchT = Math.max(0, Math.min(1, (t - 0.15) / 0.35));
     if (haunchT > 0.01) {
-      const hr = (10 + t * 26) * haunchT;
-      const hg2 = ctx.createRadialGradient(rx * 0.5 - hr * 0.3, ry * 0.4 - hr * 0.3, hr * 0.2, rx * 0.5, ry * 0.4, hr);
+      const rumpK = V ? V.rump : 0;                              // haunch jiggles on its own
+      const hr = (10 + t * 26) * haunchT * (1 + rumpK * 0.06);
+      const hcy = ry * 0.42 + rumpK * 9;
+      const hg2 = ctx.createRadialGradient(rx * 0.5 - hr * 0.3, hcy - ry * 0.02 - hr * 0.3, hr * 0.2, rx * 0.5, hcy - ry * 0.02, hr);
       hg2.addColorStop(0, '#fbc783'); hg2.addColorStop(1, '#e8963f');
       ctx.fillStyle = hg2;
-      ctx.beginPath(); ctx.arc(rx * 0.52, ry * 0.42, hr, 0, 7); ctx.fill();
-      furEdge(ctx, rx * 0.52, ry * 0.42, hr, hr, 'rgba(217,138,53,0.75)', 12);
-      tabby(ctx, rx * 0.52, ry * 0.42, hr, hr, 'rgba(200,120,40,0.6)');
+      ctx.beginPath(); ctx.arc(rx * 0.52, hcy, hr, 0, 7); ctx.fill();
+      furEdge(ctx, rx * 0.52, hcy, hr, hr, 'rgba(217,138,53,0.75)', 12);
+      tabby(ctx, rx * 0.52, hcy, hr, hr, 'rgba(200,120,40,0.6)');
     }
 
     // Torso
@@ -354,7 +441,7 @@ const Cats = {
     }
 
     // Head: barely grows (like a real cat), sinks toward the loaf as the neck vanishes
-    const hx = -rx - 12 + t * 16, hy = -54 + bob + t * 10;
+    const hx = -rx - 12 + t * 16, hy = -54 + bob + t * 10 + (V ? V.head * 9 : 0);   // head lags the body
     if (t < 0.35) {
       // visible neck while slim
       ctx.fillStyle = CREAM;
@@ -362,14 +449,18 @@ const Cats = {
       ctx.beginPath(); ctx.ellipse(hx + 30, hy + 26, nw, 22, 0.5, 0, 7); ctx.fill();
     }
     // Ears: fixed absolute size — adorably small on a chonky head
+    const twPhase = time % 4.3;                                     // occasional ear twitch, alternating ears
+    const tw = twPhase < 0.15 ? (Math.floor(time / 4.3) % 2 === 0 ? 1 : -1) : 0;
     for (const s of [-1, 1]) {
+      const eF = V ? V.ear * 5 * (s > 0 ? 1 : 0.4) : 0;           // ear flick / follow-through
+      const twF = tw === s ? 7 : 0;                                // twitch flick, this ear only
       ctx.fillStyle = CREAM;
       ctx.beginPath();
-      ctx.moveTo(hx + s * 15, hy - 28); ctx.lineTo(hx + s * 30, hy - 56); ctx.lineTo(hx + s * 4, hy - 40);
+      ctx.moveTo(hx + s * 15, hy - 28); ctx.lineTo(hx + s * 30, hy - 56 - eF - twF); ctx.lineTo(hx + s * 4, hy - 40);
       ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#e88ca0';
       ctx.beginPath();
-      ctx.moveTo(hx + s * 17, hy - 32); ctx.lineTo(hx + s * 25, hy - 47); ctx.lineTo(hx + s * 10, hy - 38);
+      ctx.moveTo(hx + s * 17, hy - 32); ctx.lineTo(hx + s * 25, hy - 47 - eF * 0.8 - twF * 0.8); ctx.lineTo(hx + s * 10, hy - 38);
       ctx.closePath(); ctx.fill();
       ctx.strokeStyle = 'rgba(255,235,205,0.8)'; ctx.lineWidth = 1.4;
       ctx.beginPath();
@@ -383,7 +474,7 @@ const Cats = {
     furEdge(ctx, hx, hy, 38, 38, 'rgba(217,138,53,0.7)', 22);
 
     // JOWLS: cheek pouches blooming beside the muzzle — the chonk signature
-    const jowlR = t * 15 + Math.max(0, jC) * 5;
+    const jowlR = t * 15 + Math.max(0, jC) * (V ? 9 : 5);
     if (jowlR > 0.5) {
       ctx.fillStyle = CREAM;
       for (const s of [-1, 1]) {
@@ -449,6 +540,17 @@ const Cats = {
       ctx.beginPath(); ctx.arc(hx - 1, hy + 22, 8, 1.1 * Math.PI, 1.9 * Math.PI); ctx.stroke();
       ctx.fillStyle = '#e88ca0'; // tongue of regret
       ctx.beginPath(); ctx.ellipse(hx + 10, hy + 22, 6, 9, 0.3, 0, 7); ctx.fill();
+    } else if (face === 'smug') { // crooked little smirk
+      ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(hx - 9, hy + 14); ctx.quadraticCurveTo(hx - 1, hy + 18, hx + 9, hy + 10);
+      ctx.stroke();
+    } else if (face === 'shocked') { // small oval of pure alarm
+      ctx.fillStyle = '#5a2f22';
+      ctx.beginPath(); ctx.ellipse(hx - 1, hy + 20, 7, 10, 0, 0, 7); ctx.fill();
+    } else if (face === 'determined') { // flat, businesslike line
+      ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(hx - 8, hy + 16); ctx.lineTo(hx + 6, hy + 16); ctx.stroke();
     } else {
       ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
       ctx.beginPath();
@@ -462,7 +564,7 @@ const Cats = {
       for (const wy of [-2, 6, 14]) {
         ctx.beginPath();
         ctx.moveTo(hx + s * 30, hy + wy);
-        ctx.quadraticCurveTo(hx + s * 45, hy + wy - 6 + t * 4, hx + s * 60, hy + wy - 3 + t * 6);
+        ctx.quadraticCurveTo(hx + s * 45, hy + wy - 6 + t * 4 + jC * 3, hx + s * 60, hy + wy - 3 + t * 6 + jC * 5);
         ctx.stroke();
       }
     }

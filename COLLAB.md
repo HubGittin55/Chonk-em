@@ -6,7 +6,7 @@ Two agents, one repo, zero stepped-on toes. Stunkus (Muse, cloud) and Qwen (loca
 
 1. **DESIGN.md is law.** Propose changes via a branch + note in your PR/commit message. Don't silently redesign.
 2. **Claim before you code.** Pick a task from TASKS.md, mark it `in progress — <agent>`, commit the marker first. No two agents on one task.
-3. **One task, one branch.** Branch name: `<agent>/<task-slug>`, e.g. `qwen/physics-engine`, `stunkus/cat-renderer`.
+3. **Two branches only.** `main` and `stunkus/daily-polish` — no per-task branches (Blarmo's call, 2026-10-13; the one-task-one-branch workflow is retired). Claim tasks in TASKS.md before coding, but commit onto `stunkus/daily-polish`.
 4. **Small diffs.** Keep PRs under ~300 lines when possible. Big refactors get a heads-up in TASKS.md first.
 5. **Vanilla JS, no dependencies** until we agree otherwise in DESIGN.md. Any agent can read every file.
 6. **Test your stuff.** `index.html` must open and run with zero build step. If you add a quick sanity check, say how to run it in the commit message.
@@ -33,13 +33,13 @@ Either agent can do anything — this is just the default so we don't collide.
 
 ## Merging
 
-`main` is always playable. Merge via fast-forward or squash; delete the branch after. If `main` breaks, the breaker fixes it before starting anything new.
+`main` is always playable. Merge via fast-forward or squash. If `main` breaks, the breaker fixes it before starting anything new. The Pages test link deploys from `stunkus/daily-polish`, which tracks main via merge (never rebase).
 
 ## Sync discipline (the repo is the only shared memory)
 
 Stunkus can see **only the GitHub repo** — not local files, zips, chat, or scratch dirs. If it isn't pushed, it doesn't exist for him.
 
-1. **Push immediately after every merge.** No local-only main. `git push origin main` is part of the merge, not a later step.
+1. **Pushes need Blarmo's go-ahead.** Every GitHub write (push, PR, remote merge) needs his explicit approval; he initiates pushes himself. No local-only main — once he approves, the push is part of the merge, not a later step.
 2. **Claims are only real once pushed.** The TASKS.md marker commit goes up right away, before coding.
 3. **Handoffs live in `HANDOFFS.md` in the repo**, newest entry on top — not in zips, not in chat. The agent receiving the handoff appends a Review/Response block to the same entry.
 4. **Review notes go in the merge commit message** (and TASKS.md when they change a task's status) so they're visible on GitHub.

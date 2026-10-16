@@ -1,3 +1,59 @@
+## 2026-10-16 — qwen: owner playtest round 2 (sharpness, feel, text bugs, yarn)
+- **N64 fuzz FIXED**: `fitCanvas` backed the canvas with a fixed 600x900*dpr while CSS stretched it to ~940px wide. Now backing store = displayed CSS size x dpr (transform scales W/H to match) — sharp at any window size.
+- **Text behind barrels**: `\U0001F9E8`-style escapes are NOT valid JS (backslash-U doesn't exist) — keg label and all 4 CAT_UNLOCKS icons rendered as literal "U0001F431" etc. Fixed to `\u{...}` form. Grep for `'\\U000` is now clean.
+- **Hint text**: "drag or tap to aim" was drawn mid-board on EVERY level forever; now levels 1-2 only, before the first shot.
+- **Cat physics feel** (owner: rear too active, floaty/wavy, belly should lead): tail shear 0.22→0.10, tailCouple 2.5→1.5, idle swish 1.0→0.55, tail tau 1.0→0.45; belly strip gain 0.065→0.095; ring times cut ~45% (0.70/2.2/0.14 → 0.38/1.2/0.08), body settle 0.7→0.45x, popZeta 0.40→0.55. Measured: belly 1.13 vs rear 1px on eats; 1-2s window <0.2 (was floaty).
+- **Yarn -20%**: DIFFS balls 1.3/1.0/0.8 → 1.05/0.8/0.64 (L1 normal: 8→6 balls).
+- Smoke 155/155 (5 tests updated to new intent + 1 new "damped not floaty" test; wobble test now samples a window — single-sample hit zero crossings).
+
+## 2026-10-15 — qwen: strip renderer hotfix (owner: cat "doubled, distorted, nasty seams")
+Blamed and fixed on `stunkus/daily-polish` (deploy branch — this was live). Root cause: `drawSpriteStrips` padded EVERY strip by the WORST shear gap of the whole body (up to 13px on a 9.4px strip = 3.7x-wide overlapping stretched copies = doubled/smeared cat), plus per-strip bilinear resample fuzz on flat AoT linework (seams). Fix, keeping strips (owner directive: no fallback to whole-image bounce):
+- `cats.js drawSpriteStrips`: per-side pad — a strip only stretches across a boundary whose shear actually opens, by exactly that gap, clamped to 1.5x strip width. Source rect bleeds ~1 destination px so overlaps paint real pixels, not resampled edge fuzz.
+- `catphysics.js`: `W_TAIL` ramp widened 0.80-0.93 → 0.60-0.95 so the tail shear spreads over ~8 columns (per-column shear step 11px → 3-4px; no more staircase silhouette). Sprite shear path only — vector adapter untouched.
+- `main.js fitCanvas`: `imageSmoothingQuality='high'` (per-strip downscales were using the 'low' filter).
+Verified: 600-frame worst case never gaps; max stretch 1.64x at the one active boundary (was 3.7x everywhere). Firefox headless before/after harness: old = doubled stripes, new = crisp. Smoke 154/154. Review notes on the rest of the branch coming separately (campaign balls/par rebalance is intentional per owner directives; 4 generated levels shift layout as a side effect of the MAX_EXOTICS cap changing RNG draws — flag for owner).
+
+## 2026-10-15 — stunkus: weigh-in module extraction + smoke suite split (Blarmo's call)
+Two refactors, both local on `stunkus/daily-polish`.
+- **weigh-in module**: the results ceremony (`endGame`, `showResults`/`hideResults`, `updateWeigh`, `drawScale`, `starsFor`/`rawCal`) moved out of main.js into `js/weighin.js` (191 lines). main.js drops 1255 → 1068 lines. No behavior change; callers (tick, buttons) hit the same globals. Also fixes a real find from the aliveness review: the sprite renderer ignores `face` (`void face`), so all expression work — old and new — only ever ran in the vector fallback. **Blarmo's directive: no more development time on the vector fallback renderer** (quality will never match sprites; it stays as-is, nothing new goes there).
+- **smoke split**: `tools/smoke.js` was a 1016-line monolith. Now it's a thin runner (`node tools/smoke.js [--only=core,save,...]`) over `tools/smoke/harness.js` + 7 domain suites: core (17), systems (20), levels (33), barrels (46), catphysics (15), save (5), ui (18). Same 154 tests, same globals, byte-identical coverage verified. `--only=` gives targeted runs; unknown names error out.
+Smoke 154/154, tap-fuzz clean on 8 levels.
+
+## 2026-10-15 — stunkus: save-v2 + daily challenge + cat aliveness (daily polish)
+Three chunks, all local on `stunkus/daily-polish`.
+- **save-v2** (roadmap P0, finally done): one versioned profile blob `chonk-em:profile-v2` — lifetime stats (total cal fed, best chonk, levels cleared, shots fired, max combo), per-level bests, settings (difficulty/mute/cat/howSeen/world-open), saved weight, daily bests + streaks. First load migrates every flat key (`best/difficulty/cat/howSeen/mute/weight/worldopen:*`) and deletes them. New `js/save.js`; menu shows a lifetime-stats line; mute toggle + weight save + full reset all go through `Profile`.
+- **daily-challenge** (roadmap P2): one fresh date-seeded level per calendar day — `genLevel` refactored into a shared `genLevelSeeded(seed, tier, target, vacuum)` core so campaign and daily build through the same code path (campaign behavior byte-identical). Daily tier rotates 5–15 with the day of year; movers always dealt, golden/mystery/cuke eligible. Menu card shows today's best stars + streak; wins record per date without touching the campaign board; retry/next buttons are daily-aware; weigh-in title shows the date.
+- **cat-aliveness** (roadmap P1): proper blink cycle (both eyes together, ~3.7 s, suppressed for shocked/determined), alternating ear twitch every ~4.3 s, three new faces — smug (6+ combo smirk), shocked (cucumber spook, replaced the old sad face), determined (FEAST FRENZY, replaced bliss). Weigh-in ceremony now opens with a weight-pitched `AudioSys.meow`. Size-scaling logic untouched.
+Smoke 154/154 (+13 new tests; 7 legacy tests updated to the Profile API). Tap-fuzz clean on 8 levels incl. the daily. Cat physics (Sleve's v2) untouched.
+
+## 2026-10-14 — stunkus: movers + vacuum v2 + music loader + world-map menu (daily polish)
+Four chunks, all local on `stunkus/daily-polish`. Hands off cats.js / catphysics.js (Sleve's v2 untouched).
+- **mover-barrels** (world 4+, level 31+): the Peggle staple. `dealMovers()` in levels.js converts a deterministic slice of leftover empty slots into snack barrels on slow sinusoidal tracks (x/y axis, 22–36 px, 3.2–5.6 s period, slow-mo aware, vertical tracks clamped above the belt). Dashed track-line telegraphs under both render paths; collision/burst/keg-chains all read the live position. Level-31 splash announces them.
+- **vacuum-v2**: 0.4 s gulp pause after every eaten item (amber eye, drooping nozzle, contented bubbles, no suction — real counterplay windows; the 2-per-shot meal cap survives), and speed now scales with world (`×(1 + 0.05·world)`, multiplicative with difficulty).
+- **music-loader**: `AudioSys.music` wires `assets/music/` playback — menu/gameplay/frenzy/weighin tracks auto-switch with game state (frenzy → frenzy → gameplay on expiry, weigh-in ceremony → weighin), 1.5 s crossfade, 0.32 level under SFX, mute toggle respected. Fully silent until Qwenny's files land; every call is a safe no-op headless.
+- **menu-worlds**: level select is now a world map — 10 collapsible world sections (★ totals per world), per-level best-cal readout, current level highlighted; plus a first-run 3-step "How to play" panel (dismiss persists).
+Smoke 142/142 (+12 new tests; two old vacuum tests re-timed for the gulp). Tap-fuzz clean on 7 levels (incl. level 41 movers, level 6 vacuum). Cat physics untouched.
+
+## 2026-10-13 — stunkus: branch discipline switch (Blarmo's call)
+One-task-one-branch is retired. Two branches only from here: `main` and
+`stunkus/daily-polish` — no per-task branches. Claim tasks in TASKS.md before
+coding, commit onto `stunkus/daily-polish`. COLLAB.md updated to match (rules,
+merging, push-approval sections). Pages test link deploys from
+`stunkus/daily-polish`, tracking main via merge (never rebase).
+
+## 2026-10-13 — stunkus: mystery + golden + cucumber barrels, FX bus + juice pass (daily polish)
+Three new barrel kinds, dealt deterministically from empty slots at load time
+(LEVELS untouched): **mystery** (purple ?, orbiting sparkles; burst reveals a tier
+snack 65% / power-up 20% / veggie dud 15%), **golden** (one per level, radiant gold,
+pays 3x the level's top snack + fanfare + shake/hit-stop/confetti), **cucumber**
+(rare, levels 4+: spills a cucumber — the cat gets SPOOKED: comedic hop, full-body
+wobble, aim wobbles 4s, no calories, no combo change; `AudioSys.startle()`).
+New **FX bus** (`js/fx.js`): `FX.popup/shake/hitstop/slowmo/confetti/burstJuice`,
+one-liner juice anywhere, REDUCED-safe. Juice pass: hit-stop on 10+ cal bursts,
+cal-scaled shake (25+/50+ cal), confetti on 15+ cal exotic deliveries, slow-mo beat
+on final-ball wins; keg shake now routes through FX. Hands off cats.js entirely
+(sonnet-5.5's cat-physics-v2 still pending). Smoke 112/112 (+16 new tests).
+
 ## 2026-10-07 — stunkus: steel + keg + bumper barrels (same branch)
 Blarmo asked for unbreakable steel obstacles + two of my picks: **powder keg**
 (chain explosion, 80px, steel immune, screen shake) and **bumper** (chrome dome,
