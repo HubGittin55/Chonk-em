@@ -177,21 +177,31 @@ if (typeof Image === 'function') Sprites.init();
 // Caller has set up the feet-anchored transform: sprite occupies x in [-w/2,w/2], y in [-H,0].
 function drawSpriteStrips(ctx, im, w, H, S) {
   const n = S.cy.length, iw = im.width, ih = im.height;
-  // Shear is about the feet line, so at the top of the sprite neighboring strips
-  // shift horizontally by (ck[j+1]-ck[j])*H — up to ~20px in a hard tail whip.
-  // Pad every strip by the worst such gap (+1px): strips stretch slightly, never split.
-  let pad = 1;
-  for (let j = 0; j < n - 1; j++) {
-    const gp = Math.abs(S.ck[j + 1] - S.ck[j]) * H;
-    if (gp + 1 > pad) pad = gp + 1;
-  }
+  const maxPad = (w / n) * 1.5; // past this a hairline gap beats a smeared stretch
   for (let j = 0; j < n; j++) {
     const s0 = Math.round(j * iw / n), s1 = Math.round((j + 1) * iw / n);
-    const d0 = -w / 2 + (j / n + S.cb[j]) * w - pad;
-    const d1 = -w / 2 + ((j + 1) / n + S.cb[j + 1]) * w + pad;
+    // Shear is about the feet line: strip j's top edge sits at x - ck[j]*cy[j]*H.
+    // A gap opens at a boundary only when THIS strip's top shift exceeds its
+    // neighbour's — so pad that side by exactly that gap. (A global worst-case
+    // pad stretched every strip 3-4x over its neighbours: doubled, smeared cat.)
+    const tj = S.ck[j] * H;
+    const tl = j > 0 ? S.ck[j - 1] * H : tj;
+    const tr = j < n - 1 ? S.ck[j + 1] * H : tj;
+    const padL = Math.min(Math.max(tj - tl, 0) + 0.6, maxPad);
+    const padR = Math.min(Math.max(tj - tr, 0) + 0.6, maxPad);
+    // Source bleed so overlaps paint real neighbouring pixels, not resampled
+    // edge fuzz — this is what kills the seam line on flat linework. Sized to
+    // about one destination pixel of source (the filter footprint), min 1px.
+    const e0 = -w / 2 + (j / n + S.cb[j]) * w;
+    const e1 = -w / 2 + ((j + 1) / n + S.cb[j + 1]) * w;
+    const k = (e1 - e0) / ((s1 - s0) || 1);            // destination px per source px
+    const bl = Math.min(Math.max(1, Math.ceil(1 / (k || 1))), (s1 - s0) >> 1);
+    const b0 = s0 > bl ? s0 - bl : s0, b1 = s1 < iw - bl ? s1 + bl : s1;
     ctx.save();
     ctx.transform(1, 0, S.ck[j], S.cy[j], 0, 0);              // scale about the feet line, shear for tail sway
-    ctx.drawImage(im, s0, 0, s1 - s0, ih, d0, -H, d1 - d0, H);
+    ctx.drawImage(im, b0, 0, b1 - b0, ih,
+      e0 - padL - (s0 - b0) * k, -H,
+      (b1 - b0) * k + padL + padR, H);
     ctx.restore();
   }
 }

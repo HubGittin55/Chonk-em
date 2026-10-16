@@ -31,6 +31,10 @@ function fitCanvas() {
   canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // Sprite strips are downscaled ~2-3x per strip; the default 'low' filter makes
+  // each strip a blurry block with hard edges. 'high' = sharp, seam-free chonk.
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
 }
 window.addEventListener('resize', fitCanvas);
 fitCanvas();

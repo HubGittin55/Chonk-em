@@ -129,7 +129,10 @@ const CatPhysics = (function () {
     for (let j = 0; j < NC; j++) {
       const u = (j + 0.5) / NC;
       W_HEAD[j] = 1 - smooth(0.12, 0.36, u);
-      W_TAIL[j] = smooth(0.80, 0.93, u);
+      // Wide ramp (was 0.80-0.93): spreading the tail shear over ~8 sprite
+      // columns keeps the per-strip shear step small, so the strip renderer
+      // fills it with a thin overlap instead of a visible staircase/gap.
+      W_TAIL[j] = smooth(0.60, 0.95, u);
     }
     const region = (out, a, b, c, d) => {
       let sum = 0;
