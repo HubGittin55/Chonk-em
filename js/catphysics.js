@@ -68,10 +68,10 @@ const CatPhysics = (function () {
     bellySpread: 2.7,    // Hz added per mode index (dispersion: wave speed)
     slowdown: 0.30,      // heavy/light frequency ratio of the slow "mass" modes (150 lb vs 10 lb)
     skinSlowdown: 0.72,  // same ratio for the fast "skin" modes (closer to 1 = skin stays quick)
-    // 2. settle
-    ringLight: 0.70,     // seconds for the slow belly mode to decay by 1/e at 10 lb
-    ringHeavy: 2.2,      // ... at 150 lb
-    skinRing: 0.14,      // ... for the fastest skin ripples
+    // 2. settle — owner 2026-10-16: was too floaty/wavy, ring times cut ~45%
+    ringLight: 0.38,     // seconds for the slow belly mode to decay by 1/e at 10 lb
+    ringHeavy: 1.2,      // ... at 150 lb
+    skinRing: 0.08,      // ... for the fastest skin ripples
     // 3. impact
     impact: 0.032,       // eat(): momentum -> mode velocity gain
     inertia: 0.35,       // impulse is divided by (lb/10)^inertia (heavier = harder to move)
@@ -87,7 +87,7 @@ const CatPhysics = (function () {
     crouchTime: 0.15,    // seconds of anticipation at 10 lb (grows ~+0.12 s at 150 lb)
     pop: 0.20,           // peak uniform grow pulse on release (owner-approved 20%)
     popHz: 1.6,          // settle frequency of the pop at 10 lb (slowed by weight)
-    popZeta: 0.40,       // pop damping ratio (lower = more bounces / deeper undershoot)
+    popZeta: 0.55,       // pop damping ratio (lower = more bounces / deeper undershoot)
     // 6. stomach load (cumulative eating)
     stomachCal: 40,      // calories to fill the stomach to 1.0
     stomachTau: 7,       // seconds for the load to drain by 1/e
@@ -95,14 +95,14 @@ const CatPhysics = (function () {
     loadMass: 0.35,      // effective extra mass at full load (slows everything)
     // 7. life
     breath: 1.0,         // breathing depth multiplier
-    swish: 1.0,          // tail idle swish multiplier
+    swish: 0.55,         // tail idle swish multiplier (owner: rear end was the star of the show)
     // 8. safety
     maxAmp: 2.5,         // hard cap on belly modal amplitude (RMS over modes)
     maxImpulse: 30,      // per-call cap on injected momentum
     gulpCal: 18,         // meals at/above this schedule a delayed gulp slosh
     // secondary-motion couplings (rarely touched)
     bodyHz: 2.0, headHz: 3.0, jowlHz: 6.0, earHz: 9.0, tailHz: 1.8,
-    bodyKick: 0.30, headCouple: 6.0, jowlCouple: 4.0, earCouple: 3.0, tailCouple: 2.5
+    bodyKick: 0.30, headCouple: 6.0, jowlCouple: 4.0, earCouple: 3.0, tailCouple: 1.5
   };
 
   const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
@@ -351,7 +351,7 @@ const CatPhysics = (function () {
         this.inj[k] = wRef * Math.pow(w / wRef, P.skinKick);
       }
       const pm = Math.pow(P.slowdown, um), ps = Math.pow(P.skinSlowdown, um);
-      this._setOsc(O_BODY, P.bodyHz * pm, ringMass * 0.7);
+      this._setOsc(O_BODY, P.bodyHz * pm, ringMass * 0.45);
       let w = TAU * P.popHz * pm;
       this.ow[O_POP] = w; coef(this.oA, O_POP, w, P.popZeta);
       this._setOsc(O_HEAD, P.headHz * Math.pow(P.slowdown, 0.5 * um), 0.5);
@@ -359,7 +359,7 @@ const CatPhysics = (function () {
       this._setOsc(O_EAR, P.earHz, 0.2);
       for (let k = 0; k < NT; k++) {
         w = TAU * P.tailHz * Math.pow(2 * k + 1, 0.85) * Math.pow(P.slowdown, 0.6 * um);
-        this.tw[k] = w; coef(this.tA, k, w, zetaFor(w, 1.0 / (k + 1)));
+        this.tw[k] = w; coef(this.tA, k, w, zetaFor(w, 0.45 / (k + 1)));
       }
       // life phasors
       const bHz = lerp(0.62, 0.42, this.heft) * (1 + 0.3 * this.load);
@@ -578,8 +578,8 @@ const CatPhysics = (function () {
         for (let k = 0; k < NM; k++) h += bx[k] * PHI[k * NC + j];
         h = soft(A * h, L);
         const a = h < 0 ? -h : h; if (a > mx) mx = a;
-        S.cy[j] = 1 + 0.065 * h + W_HEAD[j] * 0.045 * headSc;
-        S.ck[j] = W_TAIL[j] * 0.22 * tailSc;
+        S.cy[j] = 1 + 0.095 * h + W_HEAD[j] * 0.045 * headSc;   // belly is the loudest surface (owner)
+        S.ck[j] = W_TAIL[j] * 0.10 * tailSc;                    // rear follows, does not lead
       }
       let prev = 0;
       for (let j = 0; j <= NC; j++) {

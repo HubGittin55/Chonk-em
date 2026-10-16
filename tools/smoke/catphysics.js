@@ -10,9 +10,15 @@ T('cat: STAGES flavor thresholds are exponential',
   STAGES.every((st, i) => i < 2 || st.at > STAGES[i-1].at * 2));
 loadLevel(0);
 wobbleImpulse('belly', 4);
-step(60); // 0.5s — slow springs should still be wobbling hard
-T('cat: slow wobble still oscillating at 0.5s (lazy jiggle)', Math.abs(game.wob.belly.x) > 0.05);
+step(36); // 0.3s
+let wobMax = 0;                 // max over the 0.3-0.7s window: a single sample can land on a zero crossing
+for (let i = 0; i < 48; i++) { step(1); wobMax = Math.max(wobMax, Math.abs(game.wob.belly.x)); }
+T('cat: slow wobble still oscillating at 0.5s (damped but alive)', wobMax > 0.05);
 T('cat: sub-belly lags the main spring', Math.abs(game.wob.sub.x) > 0.001);
+step(36); // to ~1.0s
+let lateMax = 0;                // owner 2026-10-16: was "very floaty" — ring times cut ~45%
+for (let i = 0; i < 120; i++) { step(1); lateMax = Math.max(lateMax, Math.abs(game.wob.belly.x)); }
+T('cat: jiggle is damped, not floaty (1-2s window under 0.2)', lateMax < 0.2);
 step(1200);
 T('cat: wobble settles eventually', Math.abs(game.wob.belly.x) < 0.05 && Math.abs(game.wob.belly.v) < 0.05);
 

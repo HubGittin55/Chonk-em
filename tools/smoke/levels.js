@@ -69,7 +69,7 @@ T('v0.5: hard mode = 20% fewer balls than normal, goals kept', (() => {
 })());
 T('v0.4: difficulty setting scales balls and goal', (() => {
   Profile.setSetting('difficulty', 'hard'); loadLevel(0);
-  const ok = game.goalNow === Math.round(LEVELS[0].goal * 1.2) && game.balls === Math.round(LEVELS[0].balls * 0.8);
+  const ok = game.goalNow === Math.round(LEVELS[0].goal * 1.2) && game.balls === Math.round(LEVELS[0].balls * 0.64);
   Profile.setSetting('difficulty', 'normal'); loadLevel(0);
   return ok;
 })());

@@ -1,12 +1,12 @@
 /* CHONK'EM smoke suite: boot, shots, power-ups, fall physics, magnet, chains
    Loaded by tools/smoke.js — shares the harness globals (T, step, ctxStub, game, ...). */
 // 1. boot
-T('boot: level 1 loads with 61 barrels (r=10), 8 balls (35% of food)', game.barrels.length === 61 && game.balls === 8 && game.barrels.every(b => b.r === 10));
+T('boot: level 1 loads with 61 barrels (r=10), 6 balls (35% of food, -20% yarn 2026-10-16)', game.barrels.length === 61 && game.balls === 6 && game.barrels.every(b => b.r === 10));
 T('boot: split power barrel present (guaranteed)', game.barrels.some(b => b.kind === 'power' && b.content === 'split'));
 
 // 2. single shot
 fireShot(300, 500);
-T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 7);
+T('fire: single shot spawns 1 ball, spends 1 yarn', game.shots.length === 1 && game.balls === 5);
 step(1200); // 10s: ball bursts the center column, then falls out
 T('fire: ball dies out cleanly', game.shots.length === 0);
 
@@ -14,7 +14,7 @@ T('fire: ball dies out cleanly', game.shots.length === 0);
 loadLevel(0);
 game.multiShots = 1;
 fireShot(300, 500);
-T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 5);
+T('multi: fires 3 balls, spends 3 yarn', game.shots.length === 3 && game.balls === 3);
 T('multi: consumed after firing', game.multiShots === 0);
 game.shots = [];
 

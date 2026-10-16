@@ -226,7 +226,7 @@ function drawBarrels(ctx, barrels, time) {
       ctx.strokeStyle = '#2a0d08'; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(b.x, b.y, r * pulse - 1.5, 0, 7); ctx.stroke();
       ctx.font = Math.round(r * 1.1) + 'px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('\U0001F9E8', b.x, b.y + 1);
+      ctx.fillText('\u{1F9E8}', b.x, b.y + 1);
       continue;
     }
     if (b.kind === 'bumper') {

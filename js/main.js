@@ -27,10 +27,17 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 }
 
 function fitCanvas() {
+  // Back the canvas with as many pixels as it DISPLAYS, not a fixed 600x900:
+  // a 100%-CSS canvas stretched to 940px from a 600px backing was N64-fuzzy.
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  canvas.width = Math.round(W * dpr);
-  canvas.height = Math.round(H * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const r = canvas.getBoundingClientRect();
+  const bw = Math.max(1, Math.round((r.width || W) * dpr));
+  const bh = Math.max(1, Math.round((r.height || H) * dpr));
+  if (canvas.width !== bw || canvas.height !== bh) {
+    canvas.width = bw;
+    canvas.height = bh;
+  }
+  ctx.setTransform(bw / W, 0, 0, bh / H, 0, 0);
   // Sprite strips are downscaled ~2-3x per strip; the default 'low' filter makes
   // each strip a blurry block with hard edges. 'high' = sharp, seam-free chonk.
   ctx.imageSmoothingEnabled = true;
@@ -61,10 +68,11 @@ const STAGES = [
 const LB_PER_CAL = 0.3, START_LB = 5.0, MAX_VIS_LB = 80, MAX_LB = 150; // even bigger chonk
 // Species unlocks: total stars are never spent, they just gate the roster.
 const CAT_UNLOCKS = [
-  { name: 'Tabby',  icon: '\U0001F431', stars: 0 },
-  { name: 'Orange', icon: '\U0001F408', stars: 8 },
-  { name: 'Tuxedo', icon: '\U0001F408\u200D\u2B1B', stars: 25 },
-  { name: 'Calico', icon: '\U0001F43E', stars: 60 },
+  // NB: '\U0001...' is NOT a JS escape — must be '\u{1F431}' form (was rendering raw "U0001F431").
+  { name: 'Tabby',  icon: '\u{1F431}', stars: 0 },
+  { name: 'Orange', icon: '\u{1F408}', stars: 8 },
+  { name: 'Tuxedo', icon: '\u{1F408}\u200D\u2B1B', stars: 25 },
+  { name: 'Calico', icon: '\u{1F43E}', stars: 60 },
 ];
 // 10 worlds × 10 levels — the world-map level select groups by these.
 const WORLDS = [
@@ -78,9 +86,10 @@ function selectedCat() {
   return catUnlocked(i) ? i : 0;
 } // 0.3 lb/cal: 100 cal = 30 lb; food in the barrels is the only limit
 const DIFFS = {
-  easy:   { balls: 1.3, goal: 0.8,  vacuum: 0.8,  label: '😌 Easy' },
-  normal: { balls: 1.0, goal: 1.0,  vacuum: 1.0,  label: '😼 Normal' },
-  hard:   { balls: 0.8, goal: 1.2,  vacuum: 1.25, label: '🙀 Hard' },
+  // balls cut 20% across the board (owner 2026-10-16: too much yarn on high levels)
+  easy:   { balls: 1.05, goal: 0.8,  vacuum: 0.8,  label: '😌 Easy' },
+  normal: { balls: 0.8, goal: 1.0,  vacuum: 1.0,  label: '😼 Normal' },
+  hard:   { balls: 0.64, goal: 1.2,  vacuum: 1.25, label: '🙀 Hard' },
 };
 const LB_MILESTONES = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150];
 const chonkT = (lb) => Math.max(0, Math.min(1, (lb - 10) / (MAX_VIS_LB - 10)));
@@ -799,6 +808,9 @@ function drawPowerHUD() {
 }
 
 function drawHint() {
+  // Teaching hint: first two levels only, before the player's first shot —
+  // it used to haunt the middle of the board on every level forever.
+  if (game.levelIndex > 1 || game.shotsFired > 0) return;
   if (game.over || game.shots.length || game.aim || game.balls <= 0) return;
   const pulse = 0.55 + 0.25 * Math.sin(game.time * 3);
   ctx.globalAlpha = pulse;

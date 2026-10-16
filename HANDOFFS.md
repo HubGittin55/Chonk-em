@@ -1,3 +1,11 @@
+## 2026-10-16 — qwen: owner playtest round 2 (sharpness, feel, text bugs, yarn)
+- **N64 fuzz FIXED**: `fitCanvas` backed the canvas with a fixed 600x900*dpr while CSS stretched it to ~940px wide. Now backing store = displayed CSS size x dpr (transform scales W/H to match) — sharp at any window size.
+- **Text behind barrels**: `\U0001F9E8`-style escapes are NOT valid JS (backslash-U doesn't exist) — keg label and all 4 CAT_UNLOCKS icons rendered as literal "U0001F431" etc. Fixed to `\u{...}` form. Grep for `'\\U000` is now clean.
+- **Hint text**: "drag or tap to aim" was drawn mid-board on EVERY level forever; now levels 1-2 only, before the first shot.
+- **Cat physics feel** (owner: rear too active, floaty/wavy, belly should lead): tail shear 0.22→0.10, tailCouple 2.5→1.5, idle swish 1.0→0.55, tail tau 1.0→0.45; belly strip gain 0.065→0.095; ring times cut ~45% (0.70/2.2/0.14 → 0.38/1.2/0.08), body settle 0.7→0.45x, popZeta 0.40→0.55. Measured: belly 1.13 vs rear 1px on eats; 1-2s window <0.2 (was floaty).
+- **Yarn -20%**: DIFFS balls 1.3/1.0/0.8 → 1.05/0.8/0.64 (L1 normal: 8→6 balls).
+- Smoke 155/155 (5 tests updated to new intent + 1 new "damped not floaty" test; wobble test now samples a window — single-sample hit zero crossings).
+
 ## 2026-10-15 — qwen: strip renderer hotfix (owner: cat "doubled, distorted, nasty seams")
 Blamed and fixed on `stunkus/daily-polish` (deploy branch — this was live). Root cause: `drawSpriteStrips` padded EVERY strip by the WORST shear gap of the whole body (up to 13px on a 9.4px strip = 3.7x-wide overlapping stretched copies = doubled/smeared cat), plus per-strip bilinear resample fuzz on flat AoT linework (seams). Fix, keeping strips (owner directive: no fallback to whole-image bounce):
 - `cats.js drawSpriteStrips`: per-side pad — a strip only stretches across a boundary whose shear actually opens, by exactly that gap, clamped to 1.5x strip width. Source rect bleeds ~1 destination px so overlaps paint real pixels, not resampled edge fuzz.
