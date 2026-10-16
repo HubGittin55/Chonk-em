@@ -150,5 +150,12 @@ body {
 #catRow button { font-size: 15px; padding: 6px 12px; border-radius: 999px; border: 2px solid transparent; background: #4e342e; color: #fff; cursor: pointer; }
 #catRow button.sel { border-color: #ffb300; }
 #catRow button:disabled { opacity: .45; cursor: default; }
+#dailyRow { display: flex; justify-content: center; margin: 6px 0; }
+#dailyRow button {
+  font-size: 16px; font-weight: bold; padding: 9px 22px; border-radius: 999px; cursor: pointer;
+  border: 2px solid #ffb300; background: #5d3a1a; color: #ffe0b2;
+}
+#dailyRow button small { display: block; font-weight: normal; font-size: 12px; opacity: .85; }
+#lifeRow { text-align: center; font-size: 13px; color: #d7b98c; margin: 2px 0 6px; }
 #errtoast { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: #b71c1c; color: #fff; font: 13px/1.4 sans-serif; padding: 6px 12px; border-radius: 8px; z-index: 99; max-width: 90%; }
 #errtoast.hidden { display: none; }

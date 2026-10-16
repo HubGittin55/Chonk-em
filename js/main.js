@@ -67,13 +67,10 @@ const WORLDS = [
   'Kitchen', 'Pantry', 'Garden', 'Fish Market', 'Bakery',
   'Diner', 'Farm', 'Park Picnic', 'Candy Shop', 'Banquet Hall',
 ];
-function totalStars() {
-  const b = store.get('best', {});
-  return Object.values(b).reduce((a, r) => a + ((r && r.stars) || 0), 0);
-}
+function totalStars() { return Profile.totalStars(); }
 function catUnlocked(i) { return totalStars() >= CAT_UNLOCKS[i].stars; }
 function selectedCat() {
-  const i = Math.max(0, Math.min(3, store.get('cat', 0) | 0));
+  const i = Math.max(0, Math.min(3, Profile.setting('cat', 0) | 0));
   return catUnlocked(i) ? i : 0;
 } // 0.3 lb/cal: 100 cal = 30 lb; food in the barrels is the only limit
 const DIFFS = {
@@ -85,20 +82,16 @@ const LB_MILESTONES = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 1
 const chonkT = (lb) => Math.max(0, Math.min(1, (lb - 10) / (MAX_VIS_LB - 10)));
 const catRx = (t) => 62 + t * 88; // body half-width from chonk factor
 
-// localStorage helpers (best stars, settings)
+// save helpers → Profile v2 (js/save.js). `store` survives for legacy read-only
+// compat in the smoke harness; all live code goes through Profile.
 const store = {
   get(k, d) { try { const v = localStorage.getItem('chonk-em:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem('chonk-em:' + k, JSON.stringify(v)); } catch (e) {} },
 };
-function saveBest(idx, stars, cal) {
-  const best = store.get('best', {});
-  const cur = best[idx] || { stars: 0, cal: 0 };
-  best[idx] = { stars: Math.max(cur.stars, stars), cal: Math.max(cur.cal, cal) };
-  store.set('best', best);
-}
+function saveBest(idx, stars, cal) { Profile.saveBest(idx, stars, cal); }
 
 const game = {
-  levelIndex: 0, level: null,
+  levelIndex: 0, level: null, daily: null, // daily: { date } when playing the daily challenge
   balls: 0, shots: [], items: [], barrels: [], particles: [],
   multiShots: 0, slowT: 0, magnetT: 0, bridgeT: 0, shotsFired: 0,
   calories: 0, stage: 0, combo: 0, mult: 1,
@@ -118,14 +111,24 @@ function stageFor(cal) {
   return s;
 }
 
-function loadLevel(i) {
-  const L = getLevel(i);
+function loadLevel(i) { game.daily = null; startLevel(getLevel(i), i); }
+
+function loadDaily() { // one fresh date-seeded level per calendar day
+  const date = dailyKey();
+  game.daily = { date };
+  startLevel(genDailyLevel(date), -1);
+  showDailySplash(date);
+}
+
+function startLevel(L, i) {
+  const daily = !!game.daily;
+  const dn = daily ? 100000 + (hashStr('chonk-deals-' + game.daily.date) % 800000) : i + 1; // 1-based deal number
   game.levelIndex = i;
   game.level = L;
   game.catVar = selectedCat(); // player's unlocked species
   game.particles = [];
   nextBtn.classList.add('hidden');
-  game.diffKey = store.get('difficulty', 'normal');
+  game.diffKey = Profile.setting('difficulty', 'normal');
   const D = DIFFS[game.diffKey] || DIFFS.normal;
   game.balls = Math.round(L.balls * D.balls);
   game.par = Math.round(L.par * D.balls);
@@ -137,11 +140,11 @@ function loadLevel(i) {
   game.lbPerCal = LB_PER_CAL; // flat 0.3 lb/cal — the food in the barrels is the only limit
   game.items = [];
   game.popups = [];
-  game.vacuum = L.vacuum ? Vacuum.create((DIFFS[game.diffKey] || DIFFS.normal).vacuum * (1 + 0.05 * worldForLevel(i + 1))) : null;
+  game.vacuum = L.vacuum ? Vacuum.create((DIFFS[game.diffKey] || DIFFS.normal).vacuum * (1 + 0.05 * (daily ? 5 : worldForLevel(i + 1)))) : null;
   if (game.vacuum) addPopup(W / 2, 330, '⚠ VACUUM PATROL ⚠', '#c62828');
   game.barrels = L.barrels.map(b => ({ x: b.x, y: b.y, r: L.r || 15, kind: b.kind, content: b.content, armor: !!b.armor, cracked: false, cleared: false }));
-  dealSpecialBarrels(game.barrels, i + 1); // golden + mystery + rare cuke, dealt from empty slots
-  dealMovers(game.barrels, i + 1); // world 4+: moving snack barrels on slow sinusoidal tracks
+  dealSpecialBarrels(game.barrels, dn); // golden + mystery + rare cuke, dealt from empty slots
+  dealMovers(game.barrels, dn); // world 4+: moving snack barrels on slow sinusoidal tracks
   game.calories = 0;
   game.stage = 0;
   game.combo = 0; game.mult = 1.5;
@@ -275,7 +278,7 @@ function resolveMystery() {
 // The cucumber event: comedic hop, full-body wobble, aim wobbles for 4s. No calories, no combo change.
 function spookCat(item) {
   game.nomT = 0.6;
-  game.face = 'sad'; game.faceT = 2.2;
+  game.face = 'shocked'; game.faceT = 2.2;
   game.cukeT = 4;
   game.scareJump = 110;
   wobbleImpulse('belly', 6); wobbleImpulse('cheek', 3.5); wobbleImpulse('tail', 4);
@@ -417,7 +420,7 @@ function deliver(item) {
   if (item.cal > 0) {
     const beforeLb = game.weightLb;
     game.weightLb = Math.min(MAX_LB, game.weightLb + item.cal * (game.lbPerCal || LB_PER_CAL));
-    store.set('weight', game.weightLb);
+    Profile.setWeight(game.weightLb);
     checkLbMilestones(beforeLb, game.weightLb);
     // Size-up ceremony: crouch on the old sprite, hard cut, pop settle (shownLb holds the old stage)
     if (typeof stageIdxForLb === 'function' && stageIdxForLb(game.weightLb) > stageIdxForLb(beforeLb))
@@ -446,6 +449,7 @@ function deliver(item) {
     if (game.combo >= 2) {
       addPopup(Conveyor.BOWL_X + 96, Conveyor.BOWL_Y - 96,
         'COMBO ×' + game.combo + (game.mult > 1 ? '  (×' + game.mult + ' cal)' : ''), '#ff8f00');
+      if (game.combo >= 6 && game.faceT < 1) { game.face = 'smug'; game.faceT = 1.6; } // the cat knows it's good
     }
   }
 
@@ -470,7 +474,7 @@ function triggerFrenzy() {
   game.frenzy = 6;          // seconds of slow-mo
   game.timeScale = 0.35;
   game.balls += 2;          // the cat demands MORE
-  game.face = 'bliss'; game.faceT = 6;
+  game.face = 'determined'; game.faceT = 6;
   wobbleImpulse('belly', 3); wobbleImpulse('cheek', 2); wobbleImpulse('tail', 2);
   addPopup(300, 420, 'FEAST FRENZY! +2 YARN', '#ff6f00');
   AudioSys.frenzy();
@@ -486,188 +490,6 @@ function loseItem(item) {
   addPopup(Math.max(40, Math.min(W - 40, item.x)), H - 70, 'lost…', '#8a7a66');
 }
 
-function rawCal(L) {
-  return L.barrels.filter(b => b.kind === 'snack')
-    .reduce((a, b) => a + ((CONTENT[b.content] || {}).cal || 0), 0);
-}
-// Stars are WEIGHT stars now: 1 = goal met, 2 = 70% of the level's food delivered, 3 = 82%.
-// (Relaxed 2026-10-13: 75/90% punished normal item losses; breaking everything should star.)
-function starsFor(lb, L) {
-  const max = START_LB + LB_PER_CAL * rawCal(L);
-  const frac = (lb - START_LB) / Math.max(1, max - START_LB);
-  return frac >= 0.82 ? 3 : frac >= 0.7 ? 2 : 1;
-}
-
-function endGame(win) {
-  if (game.over) return;
-  game.over = win ? 'win' : 'lose';
-  if (win) {
-    const before = CAT_UNLOCKS.filter((c, i) => i > 0 && catUnlocked(i)).length;
-    const n = starsFor(game.weightLb, game.level);
-    saveBest(game.levelIndex, n, game.calories);
-    const after = CAT_UNLOCKS.filter((c, i) => i > 0 && catUnlocked(i)).length;
-    game.justUnlocked = after > before ? CAT_UNLOCKS[after].name : null;
-    showResults(n);
-  } else {
-    AudioSys.lose();
-    overlayTitle.textContent = 'Still scrawny…';
-    overlaySub.textContent = `${game.calories}/${game.goalNow} calories. The cat demands another try.`;
-    nextBtn.classList.add('hidden');
-    overlay.classList.remove('hidden');
-  }
-}
-
-/* ---------------- weigh-in results ceremony ---------------- */
-const resultsEl = () => document.getElementById('results');
-const scaleCv = () => document.getElementById('scaleCanvas');
-
-function showResults(nStars) {
-  const w = game.weigh = {
-    t: 0, dur: 2.6, shown: START_LB, target: game.weightLb, stars: nStars,
-    lit: 0, ticked: START_LB, finale: false, confetti: [],
-    stageIdx: (typeof stageIdxForLb === 'function') ? stageIdxForLb(START_LB) : 0,
-  };
-  for (let k = 0; k < 3; k++) {
-    const sp = document.getElementById('rs' + k);
-    sp.textContent = '☆'; sp.className = '';
-  }
-  document.getElementById('res-title').textContent =
-    `Level ${game.levelIndex + 1} — Weigh-In`;
-  document.getElementById('res-sub').textContent = '';
-  for (const id of ['res-retry', 'res-menu', 'res-next']) document.getElementById(id).style.visibility = 'hidden';
-  document.getElementById('res-next').style.display = game.levelIndex + 1 < NUM_LEVELS ? '' : 'none';
-  AudioSys.sfx('splash', function() { this.tone(400, 0.25, 'sine', 0.06, 800); });
-  resultsEl().classList.remove('hidden');
-  drawScale(w);
-  if (AudioSys.music) AudioSys.music.setTrack('weighin'); // music-box waltz for the ceremony
-}
-
-function hideResults() {
-  resultsEl().classList.add('hidden'); game.weigh = null;
-  if (AudioSys.music) AudioSys.music.setTrack(game.menuOpen ? 'menu' : 'gameplay');
-}
-
-function updateWeigh(dt) { // real-time, called from tick()
-  const w = game.weigh;
-  if (!w) return;
-  w.t += dt;
-  const k = Math.min(1, w.t / w.dur);
-  const ease = 1 - Math.pow(1 - k, 3);
-  w.shown = START_LB + (w.target - START_LB) * ease;
-  // tick sounds as the needle climbs — each tick jiggles the chonk
-  while (w.ticked + 2 <= w.shown) {
-    w.ticked += 2; AudioSys.tick(600 + w.ticked * 9);
-    wobbleImpulse('belly', 2);
-  }
-  // stage-up: the cat visibly size-pops with a big bounce
-  if (typeof stageIdxForLb === 'function') {
-    const idx = stageIdxForLb(w.shown);
-    if (idx > w.stageIdx) {
-      w.stageIdx = idx;
-      wobbleImpulse('belly', 5); wobbleImpulse('cheek', 1.5); wobbleImpulse('tail', 1);
-    }
-  }
-  // star pops as the needle crosses each star's weight — cumulative: earning
-  // star N lights stars 1..N (the old code left star 1 dark on 2- and 3-star wins)
-  const max = START_LB + LB_PER_CAL * rawCal(game.level);
-  const need = [0, 0, START_LB + 0.7 * (max - START_LB), START_LB + 0.82 * (max - START_LB)];
-  const span = i => document.getElementById('rs' + i);
-  const lightTo = (st) => {
-    for (let s = 0; s < st; s++) {
-      const el = span(s);
-      if (el.textContent !== '★') { el.textContent = '★'; el.className = 'lit pop'; }
-    }
-    if (w.lit < st) { w.lit = st; AudioSys.starPop(); }
-  };
-  for (let st = 2; st <= w.stars; st++) if (w.shown >= need[st]) lightTo(st);
-  if (k >= 1) lightTo(w.stars); // first star always lights at the end
-  drawScale(w);
-  if (k >= 1 && !w.finale) {
-    w.finale = true;
-    const sub = document.getElementById('res-sub');
-    if (w.stars === 1) {
-      AudioSys.trombone();
-      sub.textContent = `${game.calories} cal · best combo ×${game.maxCombo || 1} · ${w.target.toFixed(1)} lb — the cat wanted more snacks. Womp womp.`;
-    } else if (w.stars === 2) {
-      AudioSys.jingle();
-      sub.textContent = `${game.calories} cal · best combo ×${game.maxCombo || 1} · ${w.target.toFixed(1)} lb — a respectable chonk.`;
-    } else {
-      AudioSys.fanfare();
-      for (let i = 0; i < 90; i++) w.confetti.push({
-        x: 160 + (Math.random() - 0.5) * 120, y: -10 - Math.random() * 60,
-        vx: (Math.random() - 0.5) * 60, vy: 60 + Math.random() * 120,
-        c: ['#e91e63', '#ff9800', '#ffeb3b', '#4caf50', '#2196f3', '#9c27b0'][i % 6],
-        r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 10,
-      });
-      sub.textContent = `${game.calories} cal · best combo ×${game.maxCombo || 1} · ${w.target.toFixed(1)} lb — certified maximum chonk.`;
-    }
-    if (game.justUnlocked) {
-      sub.textContent += ` \U0001F408 NEW CAT UNLOCKED: ${game.justUnlocked}!`;
-      AudioSys.sfx('unlock', function() { [660, 880, 1108, 1318].forEach((f, i) => setTimeout(() => this.tone(f, 0.14, 'triangle', 0.10), i * 100)); });
-    }
-    if (game.levelIndex + 1 >= NUM_LEVELS) sub.textContent += ' All levels chonked!';
-    for (const id of ['res-retry', 'res-menu', 'res-next']) document.getElementById(id).style.visibility = 'visible';
-  }
-  // confetti physics
-  for (const c of w.confetti) { c.x += c.vx * dt; c.y += c.vy * dt; c.r += c.vr * dt; }
-  w.confetti = w.confetti.filter(c => c.y < 260);
-  if (w.confetti.length) drawScale(w);
-}
-
-function drawScale(w) {
-  const cv = scaleCv(); if (!cv) return;
-  const ctx = cv.getContext('2d');
-  const lb = w.shown;
-  ctx.clearRect(0, 0, 320, 250);
-  const cx = 160, cy = 132, R = 92;
-  const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25;
-  const ang = l => a0 + (Math.min(l, MAX_LB) / MAX_LB) * (a1 - a0);
-  // dial face
-  ctx.beginPath(); ctx.arc(cx, cy, R + 10, 0, 7); ctx.fillStyle = '#fffdf5'; ctx.fill();
-  ctx.beginPath(); ctx.arc(cx, cy, R, a0, a1); ctx.lineWidth = 12; ctx.strokeStyle = '#ffe9c4'; ctx.stroke();
-  for (let v = 0; v <= MAX_LB; v += 10) {
-    const a = ang(v), big = v % 30 === 0, r1 = R - (big ? 15 : 9), r2 = R - 3;
-    ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
-    ctx.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2);
-    ctx.lineWidth = big ? 3 : 1.5; ctx.strokeStyle = '#5d4037'; ctx.stroke();
-    if (big) {
-      ctx.fillStyle = '#5d4037'; ctx.font = '10px sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(v, cx + Math.cos(a) * (R - 26), cy + Math.sin(a) * (R - 26));
-    }
-  }
-  // needle
-  const a = ang(lb);
-  ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
-  ctx.fillStyle = '#d32f2f';
-  ctx.beginPath(); ctx.moveTo(-8, -3.5); ctx.lineTo(R - 10, 0); ctx.lineTo(-8, 3.5); ctx.closePath(); ctx.fill();
-  ctx.restore();
-  ctx.beginPath(); ctx.arc(cx, cy, 9, 0, 7); ctx.fillStyle = '#5d4037'; ctx.fill();
-  // scale platform + the chonk under test (squashes as the needle climbs)
-  ctx.fillStyle = '#8d6e63';
-  ctx.beginPath(); ctx.roundRect(70, 208, 180, 14, 6); ctx.fill();
-  ctx.fillStyle = '#5d4037';
-  ctx.beginPath(); ctx.roundRect(140, 222, 40, 8, 3); ctx.fill();
-  // the actual chonk under test: real sprite asset, cycling 10 lb -> final size
-  // as the needle climbs, jiggling on the live wobble springs
-  ctx.save();
-  ctx.translate(160, 208); ctx.scale(0.62, 0.62);
-  Cats.drawMain(ctx, 0, -74, {
-    t: chonkT(lb), lb: lb, phys: game.phys, wob: game.wob, var: game.catVar,
-    nomT: 0, face: 'happy', time: game.time,
-  });
-  ctx.restore();
-  // digital readout
-  ctx.fillStyle = '#212121'; ctx.font = 'bold 24px monospace';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  ctx.fillText(lb.toFixed(1) + ' lb', 160, 226);
-  // confetti
-  for (const c of w.confetti) {
-    ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.r);
-    ctx.fillStyle = c.c; ctx.fillRect(-4, -2.5, 8, 5); ctx.restore();
-  }
-}
 
 function hideOverlay() { overlay.classList.add('hidden'); }
 
@@ -1061,7 +883,7 @@ muteBtn.addEventListener('click', (e) => {
 });
 AudioSys.loadMute();
 refreshMute();
-game.weightLb = store.get('weight', START_LB);
+game.weightLb = Profile.weight();
 
 Input.init({
   canAim: () => !game.over && !game.menuOpen && !game.shots.length && game.balls > 0,
@@ -1083,13 +905,13 @@ loadLevel(0);
 game.menuOpen = false;
 const menuOverlay = document.getElementById('menuOverlay');
 const levelGrid = document.getElementById('levelGrid');
-function getBest() { return store.get('best', {}); }
+function getBest() { return Profile.best(); }
 function showMenu() {
   game.menuOpen = true;
   game.aim = null; game.aimAng = null;
   hideOverlay();
   const b = getBest();
-  const dk = store.get('difficulty', 'normal');
+  const dk = Profile.setting('difficulty', 'normal');
   const D = DIFFS[dk] || DIFFS.normal;
   const diffRow = document.getElementById('diffRow');
   diffRow.innerHTML = '<span>Difficulty:</span>';
@@ -1097,7 +919,7 @@ function showMenu() {
     const btn = document.createElement('button');
     btn.textContent = DIFFS[k].label;
     if (k === dk) btn.className = 'sel';
-    btn.addEventListener('click', (e) => { e.stopPropagation(); store.set('difficulty', k); showMenu(); });
+    btn.addEventListener('click', (e) => { e.stopPropagation(); Profile.setSetting('difficulty', k); showMenu(); });
     diffRow.appendChild(btn);
   });
   // species picker — total stars gate, never spent
@@ -1111,21 +933,38 @@ function showMenu() {
     btn.title = un ? c.name : `Earn ${c.stars} total stars to unlock ${c.name}`;
     if (i === sel) btn.className = 'sel';
     if (!un) btn.disabled = true;
-    btn.addEventListener('click', (e) => { e.stopPropagation(); store.set('cat', i); showMenu(); });
+    btn.addEventListener('click', (e) => { e.stopPropagation(); Profile.setSetting('cat', i); showMenu(); });
     catRow.appendChild(btn);
   });
+  // daily challenge card + lifetime stats line
+  const date = dailyKey();
+  const dBest = Profile.dailyBest(date);
+  const dRow = document.getElementById('dailyRow');
+  dRow.innerHTML = '';
+  const dBtn = document.createElement('button');
+  const streak = Profile.streak();
+  dBtn.innerHTML = '📅 Daily Challenge' +
+    '<small>' + (dBest ? 'today: ' + '★'.repeat(dBest.stars) + ' · best ' + dBest.cal + ' cal' : 'fresh level, new every day') +
+    (streak > 1 ? ' · 🔥 ' + streak + '-day streak' : '') + '</small>';
+  dBtn.addEventListener('click', (e) => { e.stopPropagation(); hideMenu(); loadDaily(); });
+  dRow.appendChild(dBtn);
+  const L = Profile.lifetime();
+  document.getElementById('lifeRow').textContent =
+    L.levelsCleared > 0
+      ? `lifetime: ${L.totalCal} cal fed · best chonk ${L.bestChonk.toFixed(1)} lb · ${L.levelsCleared} levels cleared · max combo ×${L.maxCombo}`
+      : '';
   levelGrid.innerHTML = '';
   for (let w = 0; w < 10; w++) { // world-map level select: collapsible world sections
     let wStars = 0;
     for (let i = w * 10; i < w * 10 + 10; i++) wStars += (b[i] || { stars: 0 }).stars || 0;
-    const open = store.get('worldopen:' + w, w === Math.floor(game.levelIndex / 10));
+    const open = Profile.worldOpen(w, w === Math.floor(game.levelIndex / 10));
     const sec = document.createElement('div');
     sec.className = 'world';
     const head = document.createElement('button');
     head.className = 'worldhead' + (open ? ' open' : '');
     head.innerHTML = '<span>World ' + (w + 1) + ' · ' + WORLDS[w] + '</span>' +
       '<span class="wstars">★ ' + wStars + '/30</span><span class="caret">' + (open ? '▾' : '▸') + '</span>';
-    head.addEventListener('click', (e) => { e.stopPropagation(); store.set('worldopen:' + w, !open); showMenu(); });
+    head.addEventListener('click', (e) => { e.stopPropagation(); Profile.setWorldOpen(w, !open); showMenu(); });
     sec.appendChild(head);
     if (open) {
       const grid = document.createElement('div');
@@ -1148,23 +987,23 @@ function showMenu() {
     levelGrid.appendChild(sec);
   }
   menuOverlay.classList.remove('hidden');
-  if (!store.get('howSeen', 0)) document.getElementById('howto').classList.remove('hidden'); // first-run tutorial
+  if (!Profile.setting('howSeen', 0)) document.getElementById('howto').classList.remove('hidden'); // first-run tutorial
   if (AudioSys.music) AudioSys.music.setTrack('menu'); // light, curious, playful
 }
 function hideMenu() { game.menuOpen = false; menuOverlay.classList.add('hidden'); }
 document.getElementById('menuBtn').addEventListener('click', (e) => { e.stopPropagation(); showMenu(); });
 document.getElementById('howtoGo').addEventListener('click', (e) => {
   e.stopPropagation();
-  store.set('howSeen', 1);
+  Profile.setSetting('howSeen', 1);
   document.getElementById('howto').classList.add('hidden');
 });
-document.getElementById('res-retry').addEventListener('click', () => { hideResults(); loadLevel(game.levelIndex); });
+document.getElementById('res-retry').addEventListener('click', () => { hideResults(); if (game.daily) loadDaily(); else loadLevel(game.levelIndex); });
 document.getElementById('res-menu').addEventListener('click', () => { hideResults(); showMenu(); });
 document.getElementById('res-next').addEventListener('click', () => { hideResults(); loadLevel(game.levelIndex + 1); showSplash(game.levelIndex); });
 document.getElementById('resetGame').addEventListener('click', (e) => {
   e.stopPropagation();
-  if (confirm('Reset CHONK\'EM? This wipes best stars and the cat\'s saved weight.')) {
-    Object.keys(localStorage).filter(k => k.startsWith('chonk-em:')).forEach(k => localStorage.removeItem(k));
+  if (confirm('Reset CHONK\'EM? This wipes best stars, lifetime stats and the cat\'s saved weight.')) {
+    Profile.reset();
     location.reload();
   }
 });
@@ -1175,7 +1014,7 @@ window.addEventListener('keydown', (e) => {
 // Level intro splash card
 function showSplash(i) {
   const L = getLevel(i);
-  const D = DIFFS[store.get('difficulty', 'normal')] || DIFFS.normal;
+  const D = DIFFS[Profile.setting('difficulty', 'normal')] || DIFFS.normal;
   document.getElementById('splashTitle').textContent = (i + 1) + '. ' + L.name;
   let sub = 'Goal ' + Math.round(L.goal * D.goal) + ' cal · ' + Math.round(L.balls * D.balls) + ' yarn · ' + D.label;
   if (tierExotic(i + 1) && !tierExotic(i)) sub += ' · 🆕 NEW: ' + tierExoticName(i + 1) + ' (' + tierMaxCal(i + 1) + ' cal)!';
@@ -1185,6 +1024,20 @@ function showSplash(i) {
   sp.classList.remove('hidden');
   clearTimeout(showSplash._t);
   showSplash._t = setTimeout(() => sp.classList.add('hidden'), 1800);
+}
+
+// Daily-challenge splash card
+function showDailySplash(date) {
+  const L = genDailyLevel(date);
+  const D = DIFFS[Profile.setting('difficulty', 'normal')] || DIFFS.normal;
+  document.getElementById('splashTitle').textContent = '📅 Daily Challenge';
+  document.getElementById('splashSub').textContent =
+    L.name + ' · goal ' + Math.round(L.goal * D.goal) + ' cal · ' +
+    Math.round(L.balls * D.balls) + ' yarn · ' + D.label + ' · one fresh level per day';
+  const sp = document.getElementById('levelSplash');
+  sp.classList.remove('hidden');
+  clearTimeout(showSplash._t);
+  showSplash._t = setTimeout(() => sp.classList.add('hidden'), 2200);
 }
 
 showMenu(); // boot into the level select
