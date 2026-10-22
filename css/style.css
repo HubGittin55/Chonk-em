@@ -47,8 +47,70 @@ body {
   border-radius: 8px; padding: 28px 18px; overflow-y: auto;
 }
 #menuOverlay.hidden { display: none; }
-#menuOverlay h1 { font-size: 44px; letter-spacing: 2px; color: #ffb14e; }
+#menuOverlay h1 { font-size: 44px; letter-spacing: 2px; color: #ffb14e; animation: chonk-bounce 2.6s ease-in-out infinite; }
+@keyframes chonk-bounce {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-7px) rotate(1deg); }
+}
+@media (prefers-reduced-motion: reduce) { #menuOverlay h1 { animation: none; } }
 #menuOverlay .sub { font-size: 15px; opacity: 0.75; margin: 4px 0 18px; }
+/* menu mascot (2026-10-21): CSS-drawn cat head; pupils track the pointer via
+   Mascot.aimAt, lids blink via .blink, pet squish via .pet. Desktop-first. */
+#mascot {
+  --mfur: #b08968;
+  --mhead: radial-gradient(circle at 35% 28%, #c79f72, #a37f5c 78%);
+  position: relative; width: 78px; height: 68px; margin: 0 0 12px; cursor: pointer;
+  flex: 0 0 auto;
+}
+#mascot .m-ear {
+  position: absolute; top: 2px; width: 24px; height: 24px;
+  background: var(--mfur); transform: rotate(45deg); border-radius: 7px 5px 5px 5px;
+}
+#mascot .m-ear.left { left: 9px; }
+#mascot .m-ear.right { right: 9px; }
+#mascot .m-ear::after {
+  content: ''; position: absolute; inset: 7px;
+  background: #f0a0ae; border-radius: 3px;
+}
+#mascot .m-head {
+  position: absolute; left: 7px; right: 7px; top: 12px; bottom: 0;
+  background: var(--mhead); border-radius: 50%;
+}
+#mascot .m-eye {
+  position: absolute; top: 15px; width: 17px; height: 20px;
+  background: #fff; border-radius: 50%; overflow: hidden;
+}
+#mascot .m-eye.left { left: 12px; }
+#mascot .m-eye.right { right: 12px; }
+#mascot .m-pupil {
+  position: absolute; left: 5px; top: 4px; width: 7px; height: 12px;
+  background: #20242b; border-radius: 50%;
+  transition: transform 90ms ease-out;
+}
+#mascot .m-eye::after { /* lid: fur-colored shutter for the blink */
+  content: ''; position: absolute; inset: -1px;
+  background: var(--mfur); border-radius: 50%;
+  transform: scaleY(0); transform-origin: top;
+  transition: transform 70ms ease-in;
+}
+#mascot.blink .m-eye::after { transform: scaleY(1); }
+#mascot .m-nose {
+  position: absolute; left: 50%; top: 37px; width: 9px; height: 7px; margin-left: -4.5px;
+  background: #e0788a; border-radius: 2px;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+#mascot.pet .m-head { animation: m-squish 320ms ease-out; }
+@keyframes m-squish {
+  0% { transform: scale(1, 1); }
+  35% { transform: scale(1.18, 0.78); }
+  70% { transform: scale(0.94, 1.08); }
+  100% { transform: scale(1, 1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #mascot .m-pupil { transition: none; }
+  #mascot.pet .m-head { animation: none; }
+  #mascot .m-eye::after { transition: none; }
+}
 #levelGrid {
   display: block; width: 100%; max-width: 480px;
 }
@@ -156,6 +218,81 @@ body {
   border: 2px solid #ffb300; background: #5d3a1a; color: #ffe0b2;
 }
 #dailyRow button small { display: block; font-weight: normal; font-size: 12px; opacity: .85; }
+#endlessRow { display: flex; justify-content: center; margin: 0 0 6px; }
+#endlessRow button {
+  font-size: 16px; font-weight: bold; padding: 9px 22px; border-radius: 999px; cursor: pointer;
+  border: 2px solid #9c27b0; background: #3a1a4d; color: #e8c8ff;
+}
+#endlessRow button small { display: block; font-weight: normal; font-size: 12px; opacity: .85; }
 #lifeRow { text-align: center; font-size: 13px; color: #d7b98c; margin: 2px 0 6px; }
 #errtoast { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: #b71c1c; color: #fff; font: 13px/1.4 sans-serif; padding: 6px 12px; border-radius: 8px; z-index: 99; max-width: 90%; }
 #errtoast.hidden { display: none; }
+
+/* 2026-10-19 daily polish: pause button/overlay, trophy toast + menu panel. */
+#pauseBtn {
+  position: absolute; top: 10px; right: 110px; z-index: 5;
+  font-size: 18px; line-height: 1;
+  width: 42px; height: 42px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.8); border: none; cursor: pointer;
+}
+#pauseBtn:active { transform: scale(0.92); }
+
+#pauseOverlay {
+  position: absolute; inset: 0; z-index: 8;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: rgba(43, 33, 24, 0.78); color: #fff;
+  text-align: center; border-radius: 8px;
+}
+#pauseOverlay.hidden { display: none; }
+#pauseOverlay h2 { font-size: 36px; color: #ffb14e; letter-spacing: 2px; margin-bottom: 4px; }
+#pauseOverlay p { font-size: 15px; opacity: 0.8; margin-bottom: 18px; }
+#pauseOverlay .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+#pauseOverlay .row button {
+  font-size: 16px; font-weight: bold; padding: 10px 22px;
+  border: none; border-radius: 999px; background: #e8712b; color: #fff; cursor: pointer;
+}
+#pauseOverlay .row button:active { transform: scale(0.96); }
+#pauseOverlay #pauseQuit { background: #6d4c41; }
+
+#trophyToast {
+  position: absolute; top: 64px; left: 50%; transform: translateX(-50%);
+  z-index: 20; display: flex; align-items: center; gap: 12px;
+  max-width: 88%; padding: 10px 18px 10px 12px;
+  background: linear-gradient(135deg, #4a2c14, #2e1c0c);
+  border: 2px solid #ffb300; border-radius: 14px;
+  color: #ffe0b2; box-shadow: 0 4px 22px rgba(255, 179, 0, 0.45);
+  animation: toast-in 0.35s ease-out;
+}
+#trophyToast.hidden { display: none; }
+@keyframes toast-in { 0% { transform: translate(-50%, -18px); opacity: 0; } 100% { transform: translate(-50%, 0); opacity: 1; } }
+#trophyToast .tt-icon { font-size: 34px; }
+#trophyToast .tt-text { font-size: 15px; }
+#trophyToast .tt-text small { display: block; font-size: 12px; opacity: 0.8; margin-top: 2px; }
+@media (prefers-reduced-motion: reduce) { #trophyToast { animation: none; } }
+
+#trophyRow { display: flex; justify-content: center; margin: 0 0 6px; }
+#trophyRow button {
+  font-size: 15px; font-weight: bold; padding: 8px 20px; border-radius: 999px; cursor: pointer;
+  border: 2px solid #ffb300; background: #4a2c14; color: #ffe0b2;
+}
+#trophyPanel {
+  width: 100%; max-width: 480px; margin: 0 auto 12px; padding: 14px 16px;
+  background: rgba(61, 44, 30, 0.92); border: 2px solid #ffb300; border-radius: 12px;
+  color: #ffe9c9;
+}
+#trophyPanel.hidden { display: none; }
+#trophyPanel h2 { font-size: 20px; color: #ffb300; text-align: center; margin: 0 0 10px; }
+#trophyPanel h2 span { font-size: 14px; color: #d7b98c; font-weight: normal; }
+#trophyList { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 320px; overflow-y: auto; }
+.trophy { padding: 8px 10px; border-radius: 10px; background: #3d2c1e; border: 1px solid #6b4a2f; font-size: 13px; }
+.trophy .t-name { font-weight: bold; font-size: 13px; }
+.trophy .t-desc { font-size: 11px; opacity: 0.75; margin-top: 2px; line-height: 1.3; }
+.trophy.locked { opacity: 0.45; filter: grayscale(0.8); }
+.trophy.won { border-color: #ffb300; background: #54402a; }
+.trophy .t-date { font-size: 10px; color: #ffb300; margin-top: 2px; }
+.trophy .t-prog { font-size: 10px; color: #9fd8ff; margin-top: 2px; }
+#trophyClose {
+  display: block; margin: 12px auto 0; padding: 8px 24px; border-radius: 999px;
+  border: none; background: #ffb14e; color: #3d2c1e; font-weight: bold; font-size: 14px; cursor: pointer;
+}

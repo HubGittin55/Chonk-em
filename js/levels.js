@@ -422,7 +422,7 @@ const LEVELS = [
     r: 10,
     vacuum: true,
     barrels: [
-    { x: 272, y: 188, kind: 'empty', content: null },
+    { x: 272, y: 188, kind: 'power', content: 'emp' }, // EMP: vacuum counterplay (2026-10-18)
     { x: 328, y: 188, kind: 'empty', content: null },
     { x: 188, y: 188, kind: 'empty', content: null },
     { x: 412, y: 188, kind: 'empty', content: null },
@@ -734,7 +734,7 @@ const LEVELS = [
     r: 10,
     vacuum: true,
     barrels: [
-    { x: 202, y: 213, kind: 'empty', content: null },
+    { x: 202, y: 213, kind: 'power', content: 'emp' }, // EMP: vacuum counterplay (2026-10-18)
     { x: 398, y: 213, kind: 'empty', content: null },
     { x: 174, y: 213, kind: 'empty', content: null },
     { x: 426, y: 213, kind: 'empty', content: null },
@@ -1093,7 +1093,7 @@ const LEVELS = [
     vacuum: true,
     barrels: [
     { x: 300, y: 188, kind: 'snack', content: 'kibble' },
-    { x: 272, y: 188, kind: 'empty', content: null },
+    { x: 272, y: 188, kind: 'power', content: 'emp' }, // EMP: vacuum counterplay (2026-10-18)
     { x: 328, y: 188, kind: 'empty', content: null },
     { x: 258, y: 213, kind: 'snack', content: 'kibble' },
     { x: 342, y: 213, kind: 'snack', content: 'kibble' },
@@ -1260,10 +1260,23 @@ const ARCHETYPES = ['full', 'diamond', 'ring', 'columns', 'checker', 'twin', 'wa
 const GEN_NAMES_A = ['Grand', 'Mega', 'Hyper', 'Secret', 'Neon', 'Turbo', 'Royal', 'Cosmic'];
 const GEN_NAMES_B = ['Feast', 'Pounce', 'Banquet', 'Gorge', 'Snackening', 'Munch', 'Chomp', 'Larder'];
 
+// 2026-10-17 tuning deep-dive (Blarmo directive 2026-10-16): the high end is
+// too busy — too many calories, too easy. Food factor: -10% food barrels at
+// level 20, scaling linearly to -50% by level 100, clamped at -70% past 140.
+// Applied to the food barrel count AND the raw-calorie target (callers scale
+// the target before passing it), so goals and star thresholds stay
+// proportionally sane while the board gets leaner.
+function foodFactor(n) {
+  if (n < 20) return 1;
+  // rounded to 4dp so the anchors (0.9 / 0.5 / 0.3) compare exactly
+  return Math.max(0.30, Math.round((0.90 - 0.005 * (n - 20)) * 10000) / 10000);
+}
+
 function genLevel(n) { // 1-based, n >= 13. Deterministic — same n, same level, every load.
   const tier = tierForLevel(n);
+  const fm = foodFactor(n);
   return Object.assign(
-    genLevelSeeded(n * 7919 + 13, tier, rawTarget(n), n % 3 === 0),
+    genLevelSeeded(n * 7919 + 13, tier, Math.round(rawTarget(n) * fm), n % 3 === 0, fm),
     { _srcLevel: n });
 }
 
@@ -1293,9 +1306,27 @@ function genDailyLevel(dateStr) {
   return L;
 }
 
+// Endless Climb (2026-10-16): post-campaign survival climb. Always max food tier
+// (all 18 exotics legal from depth 1), calorie target climbs 22/depth, vacuum
+// always patrols. Death ends the run; depth clears are recorded in the profile.
+const _endlessCache = {};
+function genEndlessLevel(depth) { // depth >= 1. Deterministic — same depth, same level, every load.
+  if (_endlessCache[depth]) return _endlessCache[depth];
+  const fm = foodFactor(100 + depth); // the climb starts where the campaign's curve ends
+  const L = genLevelSeeded(hashStr('chonk-endless-' + depth), 19,
+    Math.round((450 + 22 * (depth - 1)) * fm), true, fm);
+  L.name = 'Depth ' + depth + ' · ' + L.name;
+  L._endless = depth;
+  _endlessCache[depth] = L;
+  return L;
+}
+
 // The procedural level core: seed + food tier + calorie target + vacuum flag.
 // genLevel (campaign) and genDailyLevel (daily challenge) both build through here.
-function genLevelSeeded(seed, tier, target, vacuum) {
+// foodMul (2026-10-17 tuning deep-dive): trims food barrels at the high end —
+// the caller scales the raw-cal target by the same factor.
+function genLevelSeeded(seed, tier, target, vacuum, foodMul) {
+  foodMul = (foodMul == null) ? 1 : foodMul;
   const rnd = mulberry32(seed);
   const R = 10, DX = 21, DY = 18.2;
   const pts = [];
@@ -1333,7 +1364,14 @@ function genLevelSeeded(seed, tier, target, vacuum) {
   const order = final.slice();
   for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
   const nB = order.length;
-  const nEmpty = Math.round(nB * 0.5), nVeg = Math.round(nB * 0.03); // veggies quartered (owner 2026-10-07)
+  // 2026-10-17 tuning deep-dive: foodMul trims food barrels on the curve
+  // (-10% at L20 → -50% at L100). Powers stay 3, veggies stay ~3%, obstacles
+  // still deal from the (now larger) empty pool; never drop below 8 food.
+  const nVeg = Math.round(nB * 0.03); // veggies quartered (owner 2026-10-07)
+  const nPow = 3;
+  const foodBase = nB - Math.round(nB * 0.5) - nVeg - nPow;
+  const foodKeep = Math.max(8, Math.round(foodBase * foodMul));
+  const nEmpty = nB - nVeg - nPow - foodKeep;
   const powers = ['split', 'multi', 'wide', 'slow', 'magnet'];
   const barrels = order.map((p, i) => {
     const b = { x: p.x, y: p.y, kind: 'empty', content: null };
@@ -1374,7 +1412,17 @@ function genLevelSeeded(seed, tier, target, vacuum) {
   }
   guard = 0;
   while (raw > target + 3 && guard++ < 900) {
-    const cands = snacks.filter(b => b.content !== exotic && calOf(b) > 1);
+    // shed the cheapest non-exotics first; exotics (the jackpot barrels) are only
+    // touched as a last resort — spare exotics before the tier's signature, and
+    // at least one tier-exotic barrel always survives. (2026-10-17 tuning
+    // deep-dive: the scaled high-end target can sit below the seeded exotic
+    // floor, so the loop must be able to shed them.)
+    let cands = snacks.filter(b => !EXOTIC_KEYS.has(b.content) && calOf(b) > 1);
+    if (!cands.length) {
+      const spareEx = snacks.filter(b => EXOTIC_KEYS.has(b.content) && b.content !== exotic);
+      const tierEx = snacks.filter(b => b.content === exotic);
+      cands = spareEx.length ? spareEx : tierEx.slice(0, Math.max(0, tierEx.length - 1));
+    }
     if (!cands.length) break;
     const b = cands[Math.floor(rnd() * cands.length)];
     const ci = commons.indexOf(b.content);
@@ -1393,6 +1441,13 @@ function genLevelSeeded(seed, tier, target, vacuum) {
     else if (i < nSteel + nKeg) { b.kind = 'keg'; }
     else if (i < nSteel + nKeg + nBump) { b.kind = 'bumper'; }
   });
+  // EMP short-circuit (2026-10-18): vacuum levels deal one counterplay barrel.
+  // Dealt from the empty pool after obstacles — a 4th power deal, never disturbing
+  // the 'every level keeps split' invariant. Endless (vacuum always on) gets one too.
+  if (vacuum) {
+    const slot = empt.find(b => b.kind === 'empty');
+    if (slot) { slot.kind = 'power'; slot.content = 'emp'; }
+  }
   // every level keeps: split powerup, ≥1 armored snack
   if (!barrels.some(b => b.kind === 'power' && b.content === 'split')) {
     const pw = barrels.find(b => b.kind === 'power'); if (pw) pw.content = 'split';

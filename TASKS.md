@@ -1,5 +1,9 @@
 # TASKS.md — CHONK 'EM task board
 
+## Daily polish 2026-10-22 (stunkus, branch `stunkus/daily-polish`)
+
+- [x] `trophy-progress` — DONE (stunkus, 2026-10-22). Locked trophies in the 🏆 panel show a derived progress hint ("3/10 three-star levels", "42/50 lb best chonk") from existing profile state. No new persisted fields; one-shot event trophies show no hint. Smoke 246/246 (+4).
+
 Claim a task by marking it `in progress — <agent>` and committing the marker. See COLLAB.md.
 
 ## v0.1 — Prototype (prove the fun) — DONE (stunkus, 2026-10-05)
@@ -97,3 +101,41 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 - [x] `vacuum-v2` — DONE (stunkus). Vacuum gets smarter: gulp pause after each eaten item (no suction while digesting, telegraphed nozzle droop), speed scales with world.
 - [x] `music-loader` — DONE (stunkus). Wire assets/music/ playback: menu/gameplay/frenzy/weighin tracks auto-switch with game state, graceful silence until Qwenny's files land, mute toggle respected.
 - [x] `menu-worlds` — DONE (stunkus). World-grouped level select (10 worlds x 10 levels, star totals per world, collapsible) + first-run "How to play" 3-step panel.
+
+## Daily polish 2026-10-18 (stunkus, branch `stunkus/daily-polish`)
+
+- [x] `emp-barrel` — DONE (stunkus). Vacuum counterplay power-up (answers roadmap open Q3): Short-Circuit ⚡ barrel dealt on vacuum levels (3 handcrafted + procedural/endless); burst fires an EMP shockwave ring that shorts the vacuum for 10s (no patrol, no suction, dead eye + sparks + reboot ring). Burst-immediate, not on delivery. Mystery can resolve to emp; `AudioSys.zap()` synth; `FX.empBlast` + generic ring system. Smoke 191/191 (+7).
+- [x] `aim-preview-multi` — DONE (stunkus). Multi-yarn preview draws all three ghost trajectories (outer two dimmer) — fixes the known "preview shows center ball only" quirk.
+- [x] `lastball-tension` — DONE (stunkus). Pulsing LAST BALL HUD readout + one-shot 'LAST BALL…' popup + tick when the final yarn is chambered.
+- [x] `combo-meter` — DONE (stunkus). Persistent 🔥 COMBO ×N (with multiplier) chip in the power HUD while combo ≥ 2.
+- [x] `asset-manifest` — DONE (stunkus). Declared sprite manifest in js/assets.js (roadmap P0): props/barrel_/food_/species×stage keys, single Assets loader with null-safe helpers (null = vector fallback), Sprites consolidated (no double fetch), all call sites switched. `tools/check-assets.js` gap report: 48 missing of 102 declared (tier/exotic/cuke/split/emp skins still emoji fallback), 1 stray (cat_w5.png). Smoke 197/197 (+6 manifest tests); fuzz-taps clean; tuning-curve holds.
+
+## Daily polish 2026-10-17 (stunkus, branch `stunkus/daily-polish`)
+
+- [x] `tuning-deep-dive` — Blarmo's directive (2026-10-16): deep dive on calorie, food, and difficulty tuning. The high end is too busy, too many calories, too easy — the opposite of what you want. Starting spec: -10% food barrels at level 20, scaling linearly to -50% food barrels by level 100. Validate with headless playtests across the curve; keep star thresholds, Endless Climb, and daily challenge sane. → **DONE (stunkus, 2026-10-17)**: `foodFactor(n)` in levels.js — 1 below L20, 0.90 @L20 → 0.50 @L100 (linear), floored 0.30 past L140. Applied to food-barrel deal AND raw-cal target in `genLevelSeeded(..., foodMul)`; downgrade loop can shed spare exotics (tier signature keeps ≥1) so raw converges. Endless rides the extended curve (100+depth); daily (tiers 5-15) untouched. Validated: `tools/tuning-curve.js` (new) — raw tracks scaled target, goal=60% raw, balls=35% food, star reachability, food floor ≥8, all hold L13–L120 + endless depths + 7 dailies. L100: 51→26 food barrels, raw 451→228. Note: generated layouts shift slightly (RNG draw order changed in the tuning loop) — same as the 2026-10-15 MAX_EXOTICS flag.
+- [x] `lost-food-pop-bug` — Blarmo's report (2026-10-16): food that falls down the side and should be lost sometimes pops back onto the conveyor. Repro, root-cause, fix; add a regression test. → **DONE (stunkus, 2026-10-17)**: hypothesis confirmed — the y-only catch re-caught below-belt drifters. Fixed by folding into the dual-belt redesign: `Conveyor.crossesBelt(prevY, y, vy)` requires a plane crossing. Regression test in tools/smoke/core.js (below-belt drifter never re-caught, ends lost).
+  - Root-cause hypothesis (2026-10-16, unverified — confirm with headless repro first): the belt-catch at main.js:622 (`it.y >= Conveyor.BELT_Y && it.vy > 0 && !it.sucked && Conveyor.onBelt(...)`) has no prevY plane-crossing check. Gap-fallers (32px gaps at x 40..72 / 528..560 per conveyor.js:11) drop below the belt line toward the tile floor, but magnet pull toward BOWL_X (main.js:613), per-item drift (main.js:612), and residual vx surviving tile bounces (vx *= 0.6 while re-lofting, main.js:633-634) can carry x back into [72,528] while y >= 700 and vy > 0 — the catch then snaps it to y=700: the pop. Fix sketch: capture prevY before integration and require `prevY < Conveyor.BELT_Y && it.y >= Conveyor.BELT_Y`. NOTE: the dual-belt redesign below rewrites this logic — apply the minimal fix OR fold it into the redesign, not both. → **folded into the redesign as suggested; hypothesis was correct**
+- [x] `center-bowl-duel-belts` — Blarmo's directive (2026-10-16): redesign food delivery — bowl goes in the middle, two separate belts on each side both running inward toward a center gap between them; food drops through the gap into the bowl. Replaces the current single-belt + static-gap layout. Watch interactions: vacuum patrol path, magnet→bowl pull, wide→bridge, movers near the gap, Endless Climb. → **DONE (stunkus, 2026-10-17)**: bowl at x=300; left belt 72–268 runs right, right belt 332–528 runs left, 64px center gap chutes food straight to the bowl (new `drop` path for gap-crossers). Far-end 32px gaps still lose food; Bridge spans both outer gaps; slats run inward per belt. Interactions: vacuum chute protection follows the bowl (gap approach is protected, belts still threatened); magnet pulls to center; movers clamp above the belt as before; main cat moved to x=452 (right of the bowl, same +152 offset as the old layout). Vacuum escape tosses released loot back over the belt line so it can re-land.
+
+## Daily polish 2026-10-16 (stunkus, branch `stunkus/daily-polish`)
+
+- [ ] `endless-mode` — DONE (stunkus). Endless Climb: post-campaign procedural climb with rising vacuum speed, depth records in save-v2, menu card.
+- [ ] `exotic-fx` — DONE (stunkus). Per-exotic signature burst effects (roadmap P2): table-driven particles/popup per exotic, dramatic beat on the biggest feasts.
+- [ ] `world-tints` — DONE (stunkus). Per-world background tint wash (cheap procedural take on roadmap P3 backgrounds).
+- [ ] `menu-title-anim` — DONE (stunkus). Animated menu title (P3 menu overhaul flavor).
+- [ ] `pwa` — DONE (stunkus). Web app manifest + service worker + icons (roadmap v0.3).
+
+## Daily polish 2026-10-19 (stunkus, branch `stunkus/daily-polish`)
+
+- [x] `trophies` — DONE (stunkus). Achievements system: ~20 trophies across campaign/endless/daily play (star counts, combos, cucumber spooks, EMP shorts, golden jackpots, keg demolitions, imperial feasts, streaks, level counts, weight milestones), unlock toasts in-game, 🏆 Trophies panel in the menu, persisted in save-v2.
+- [x] `pause-menu` — DONE (stunkus). Real in-game pause: P key + ⏸ HUD button, dim overlay with Resume / Restart / Quit to menu / mute toggle; tick frozen, render continues.
+- [x] `ball-trails` — DONE (stunkus). Yarn ball motion trails (fading yarn-fuzz circles behind flying balls), desktop-first juice, REDUCED-safe.
+- [x] `weighin-stats` — DONE (stunkus). Richer weigh-in results line: shots fired + barrels popped alongside cal/max combo/weight.
+
+## Daily polish 2026-10-21 (stunkus, branch `stunkus/daily-polish`)
+
+- [x] `menu-mascot` — DONE (stunkus, 2026-10-21). Roadmap P0 menu-overhaul leftover: CSS-drawn mascot cat in the level-select header; pupils track the pointer, blinks on the ~3.7s in-game cadence, click = squish + weight-pitched meow. Fur tint follows the selected species. REDUCED-safe, desktop-first. New js/mascot.js; hooks in showMenu/hideMenu/frame. Smoke 242/242 (+9).
+
+## Daily polish 2026-10-20 (stunkus, branch `stunkus/daily-polish`)
+
+- [x] `ball-food-rotation` — Blarmo's directive (2026-10-19): ball and food rotation system on top of the current physics. The yarn ball looks wrong translating with no spin — give it realistic rotation as it moves, and make the hanging yarn thread rotate with the ball instead of staying frozen. Same treatment for falling food items where it reads well. → **DONE (stunkus, 2026-10-20)**: yarn balls spin with flight velocity (vx/r, clamped ±30 rad/s so it doesn't strobe), split-yarn children inherit parent spin, and the loose thread end anchors at the rim in ball-local coords so it rotates with the ball (sprite + vector paths). Falling food/veggies/power-ups tumble with vx (capped ±12 rad/s); spin damps to 0 on the belt so loot sits flat while riding in. Smoke 233/233 (+10 new). Fuzz-taps clean: 8 levels, 0 stuck, 0 exceptions. Tuning curve invariants hold.

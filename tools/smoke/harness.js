@@ -31,7 +31,7 @@ global.localStorage = {
 
 // ---------- boot the game ----------
 const root = path.join(__dirname, '..', '..'); // tools/smoke/ -> repo root
-const files = ['audio', 'save', 'physics', 'levels', 'barrels', 'conveyor', 'vacuum', 'catphysics', 'cats', 'input', 'fx', 'weighin', 'main'];
+const files = ['audio', 'save', 'physics', 'levels', 'barrels', 'conveyor', 'vacuum', 'catphysics', 'cats', 'assets', 'input', 'fx', 'achievements', 'weighin', 'mascot', 'main'];
 const src = files.map(f => fs.readFileSync(path.join(root, 'js', f + '.js'), 'utf8')).join('\n');
 vm.runInThisContext(src, { filename: 'chonk.bundle.js' });
 

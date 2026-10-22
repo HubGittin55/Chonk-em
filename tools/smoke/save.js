@@ -48,3 +48,26 @@ T('save-v2: win on a campaign level records best + lifetime', (() => {
   return r && r.stars >= 1 && r.cal === 90 && L.levelsCleared === 1 && L.totalCal === 90 && !game.daily;
 })());
 
+
+// 2026-10-16: endless climb records
+T('save-v2: fresh profile includes the endless records shape', (() => {
+  Profile.reset(); Profile.reload();
+  const E = Profile.endlessBest();
+  return E.bestDepth === 0 && E.bestCal === 0 && E.runs === 0;
+})());
+T('save-v2: recordEndless tracks best depth/cal and run count', (() => {
+  Profile.reset(); Profile.reload();
+  Profile.recordEndless(3, 420);
+  Profile.recordEndless(5, 300); // deeper but fewer cal: both bests keep
+  const E = Profile.endlessBest();
+  return E.bestDepth === 5 && E.bestCal === 420 && E.runs === 2;
+})());
+T('save-v2: older v2 profiles without endless get normalized on load', (() => {
+  Profile.reset(); Profile.reload();
+  const raw = JSON.parse(localStorage.getItem('chonk-em:profile-v2'));
+  delete raw.endless;
+  localStorage.setItem('chonk-em:profile-v2', JSON.stringify(raw));
+  Profile.reload();
+  const E = Profile.endlessBest();
+  return E.bestDepth === 0 && E.bestCal === 0 && E.runs === 0;
+})());

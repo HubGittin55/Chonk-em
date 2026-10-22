@@ -6,7 +6,7 @@
 const SFX_FILES = ['ui_click', 'shoot', 'burst', 'bounce', 'belt_catch', 'nom',
   'combo2', 'combo3', 'combo4', 'star_pop', 'needle_tick', 'trombone', 'fanfare',
   'jingle_win', 'jingle_lose', 'slurp', 'vacuum_full', 'meow1', 'meow2', 'meow3',
-  'powerup', 'frenzy', 'splash', 'unlock', 'clang', 'boing', 'boom', 'startle'];
+  'powerup', 'frenzy', 'splash', 'unlock', 'clang', 'boing', 'boom', 'startle', 'zap'];
 
 const AudioSys = {
   ctx: null,
@@ -106,6 +106,13 @@ const AudioSys = {
     this.sfx('startle', function() {
       this.tone(880, 0.09, 'square', 0.09, 1760);
       setTimeout(() => this.tone(240, 0.25, 'sawtooth', 0.08, 90), 90);
+    });
+  },
+  zap() { // EMP short-circuit: electric crackle collapsing into a dead thud
+    this.sfx('zap', function() {
+      this.tone(1400, 0.10, 'sawtooth', 0.08, 300);
+      setTimeout(() => this.tone(2200, 0.06, 'square', 0.05, 500), 60);
+      setTimeout(() => this.tone(90, 0.22, 'square', 0.09, 45), 150);
     });
   },
   meow(big) { // big 0..1 — pitch drops as the chonk grows

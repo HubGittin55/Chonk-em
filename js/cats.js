@@ -1,53 +1,45 @@
 'use strict';
 /* Shooter cat + main cat. Vector rendering in code, with generated sprite
    assets (Qwen Image 2.1 turbo pipeline) layered on top: every draw site
-   falls back to its vector renderer if its asset is missing. */
+   falls back to its vector renderer if its asset is missing.
+   Sprite loading + the declared manifest live in js/assets.js. */
 
-// Prop sprites (barrels, bowl, yarn, shooter, kitchen bg). Per-key readiness.
-const ASSET_KEYS = ['bowl', 'yarn', 'shooter', 'kitchen_bg',
-  'barrel_kibble', 'barrel_salmon', 'barrel_tuna', 'barrel_broccoli', 'barrel_celery',
-  'barrel_multi', 'barrel_wide', 'barrel_slow', 'barrel_magnet',
-  'food_kibble', 'food_salmon', 'food_tuna', 'food_broccoli', 'food_celery',
-  'food_multi', 'food_wide', 'food_slow', 'food_magnet'];
-const Assets = {
-  imgs: (typeof Image === 'function') ? Object.fromEntries(ASSET_KEYS.map(k => {
-    const im = new Image();
-    im.src = 'assets/' + k + '.png';
-    return [k, im];
-  })) : {},
-  ok(k) {
-    const im = this.imgs[k];
-    return !!(im && im.complete && im.naturalWidth > 0);
-  },
-};
-
-function drawYarn(ctx, x, y, r) {
-  if (Assets.ok('yarn')) {
-    const im = Assets.imgs.yarn, s = r * 2.5;
-    ctx.drawImage(im, x - s / 2, y - s / 2, s, s);
-    return;
+function drawYarn(ctx, x, y, r, rot) {
+  // rot: radians of spin. The yarn texture AND the loose thread end ride in the
+  // ball's rotating frame (2026-10-20 rotation pass — the thread no longer stays frozen).
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot || 0);
+  const yim = Assets.prop('yarn');
+  if (yim) {
+    const im = yim, s = r * 2.5;
+    ctx.drawImage(im, -s / 2, -s / 2, s, s);
+  } else {
+    const g = ctx.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.2, 0, 0, r);
+    g.addColorStop(0, '#ff7a9c');
+    g.addColorStop(0.65, '#e84a6f');
+    g.addColorStop(1, '#c23157');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+    // wound yarn strands
+    ctx.strokeStyle = 'rgba(150,20,60,0.55)'; ctx.lineWidth = 1.6;
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.arc(0, 0, r * (0.32 + i * 0.17), 0.3 + i * 1.4, 2.4 + i * 1.4);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(255,200,220,0.7)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(-r * 0.35, -r * 0.35, r * 0.45, 3.6, 5.2); ctx.stroke();
   }
-  const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.2, x, y, r);
-  g.addColorStop(0, '#ff7a9c');
-  g.addColorStop(0.65, '#e84a6f');
-  g.addColorStop(1, '#c23157');
-  ctx.fillStyle = g;
-  ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
-  // wound yarn strands
-  ctx.strokeStyle = 'rgba(150,20,60,0.55)'; ctx.lineWidth = 1.6;
-  for (let i = 0; i < 4; i++) {
-    ctx.beginPath();
-    ctx.arc(x, y, r * (0.32 + i * 0.17), 0.3 + i * 1.4, 2.4 + i * 1.4);
-    ctx.stroke();
-  }
-  ctx.strokeStyle = 'rgba(255,200,220,0.7)'; ctx.lineWidth = 1.2;
-  ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.45, 3.6, 5.2); ctx.stroke();
-  // loose trailing end
+  // loose trailing end — anchored at the rim, rides the ball's rotation
+  const a0 = 2.58; // rim angle of the thread root (ball-local)
+  const rx = Math.cos(a0) * r, ry = Math.sin(a0) * r;
   ctx.strokeStyle = '#b83556'; ctx.lineWidth = 2; ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(x - r * 0.8, y + r * 0.5);
-  ctx.quadraticCurveTo(x - r - 12, y + r + 10, x - r - 4, y + r + 20);
+  ctx.moveTo(rx, ry);
+  ctx.quadraticCurveTo(rx - r * 0.4, ry + r * 0.9, rx - r * 0.2, ry + r * 1.55);
   ctx.stroke();
+  ctx.restore();
 }
 
 // Shared tabby fur helpers ---------------------------------------------------
@@ -144,9 +136,9 @@ function eyesMain(ctx, hx, hy, ex, face, time) {
 
 // -----------------------------------------------------------------------------
 
-// Generated sprite assets (Qwen Image 2.1 turbo pipeline, alpha PNGs).
-// 4 cat varieties × 8 chonk stages (10→80 lb). If any sprite is missing the
-// vector renderer takes over (asset 404 safe).
+// Generated cat sprite loading + the full asset manifest live in js/assets.js
+// (Sprites.imgs / Sprites.ok), so the declared keys and the loader can't drift.
+// Species × stage key vocabulary stays here (cat domain); assets.js builds the manifest from it.
 const CAT_VARS = ['cat', 'orange', 'tuxedo', 'calico'];
 const STAGE_LBS = [10, 20, 30, 40, 50, 60, 70, 80]; // sprite files on disk
 // Exponential weight thresholds selecting each sprite: every size-up costs
@@ -158,19 +150,7 @@ function stageIdxForLb(lb) {
   for (let i = 0; i < STAGE_AT_LB.length; i++) if (lb >= STAGE_AT_LB[i]) st = i;
   return st;
 }
-const Sprites = {
-  imgs: (typeof Image === 'function') ? CAT_VARS.map(v => STAGE_LBS.map(lb => {
-    const im = new Image();
-    im.src = 'assets/' + v + '_w' + lb + '.png';
-    return im;
-  })) : [],
-  ready: 0,
-  init() {
-    this.imgs.forEach(row => row.forEach(im => im.onload = () => { this.ready++; }));
-  },
-  ok() { return this.ready === CAT_VARS.length * STAGE_LBS.length; },
-};
-if (typeof Image === 'function') Sprites.init();
+// (Sprites now lives in js/assets.js — same name, single loader.)
 
 // Draw the sprite as NC vertical strips (cat.phys.sprite.cy/cb/ck) so travelling belly waves,
 // head bob and tail sway show up as spatial deformation, not just whole-image squash.
@@ -210,8 +190,9 @@ const Cats = {
   STRIPS: true,   // false = whole-image params only (cheapest); true = per-column deformation when the cat is moving
   // Shooter cat perched at the top. aimAng in radians (canvas coords), loaded = yarn ready.
   drawShooter(ctx, x, y, aimAng, loaded) {
-    if (Assets.ok('shooter')) {
-      const im = Assets.imgs.shooter, h = 118, w = h * (im.width / im.height);
+    const shim = Assets.prop('shooter');
+    if (shim) {
+      const im = shim, h = 118, w = h * (im.width / im.height);
       ctx.drawImage(im, x - w / 2, y - 14, w, h);
       if (loaded) { // glow when a shot is ready
         ctx.fillStyle = 'rgba(255,220,80,0.5)';

@@ -13,6 +13,8 @@ const suites = {
   catphysics: 'catphysics.js', // cat stages, CatPhysics integration, face/aliveness draw
   save: 'save.js',           // save schema v2 — versioned profile + migration
   ui: 'ui.js',               // weigh-in ceremony, music loader, daily challenge, menu
+  trophies: 'trophies.js',   // achievements: unlocks, aggregates, pause, trails, weigh-in stats
+  pwa: 'pwa.js',             // PWA shell — manifest, icons, service worker, title anim
 };
 
 let names = Object.keys(suites);

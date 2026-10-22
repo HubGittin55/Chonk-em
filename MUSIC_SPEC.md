@@ -5,9 +5,10 @@ runs fine on the 5090; Small SFX variant for the SFX clips in AUDIO_SPEC.md).
 Drop finished files in `assets/music/<name>.mp3` (44.1 kHz, 128–160 kbps — keep
 them small, this ships on a web page).
 
-NOTE: no music loader exists in `js/audio.js` yet (SFX manifest only) — Stunkus
-will wire `assets/music/` playback + menu toggle in a daily session. This spec
-covers generation only.
+NOTE: the loader is already wired (2026-10-14, `AudioSys.music` in `js/audio.js`):
+the four tracks auto-switch with game state, loop seamlessly, sit under the SFX,
+and the game stays silent until files land here. This spec covers generation
+only — generate the files below and drop them in, no code changes needed.
 
 Art direction: chunky cartoon kitchen, warm and bouncy. Peggle meets a cat café.
 **Instrumental only — no vocals, no lyrics.** Loops must be SEAMLESS (generate

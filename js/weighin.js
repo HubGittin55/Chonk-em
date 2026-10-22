@@ -21,15 +21,24 @@ function endGame(win) {
     const before = CAT_UNLOCKS.filter((c, i) => i > 0 && catUnlocked(i)).length;
     const n = starsFor(game.weightLb, game.level);
     if (game.daily) Profile.recordDaily(game.daily.date, n, game.calories);
+    else if (game.endless) Profile.recordEndless(game.endless.depth, game.calories); // depth cleared, never the campaign board
     else saveBest(game.levelIndex, n, game.calories);
     Profile.recordWin(game.calories, game.weightLb, game.maxCombo, game.shotsFired);
+    Achievements.checkEndOfLevel(true); // trophy aggregates run on the fresh profile numbers
     const after = CAT_UNLOCKS.filter((c, i) => i > 0 && catUnlocked(i)).length;
     game.justUnlocked = after > before ? CAT_UNLOCKS[after].name : null;
     showResults(n);
   } else {
     AudioSys.lose();
-    overlayTitle.textContent = 'Still scrawny…';
-    overlaySub.textContent = `${game.calories}/${game.goalNow} calories. The cat demands another try.`;
+    Achievements.checkEndOfLevel(false); // diet-plan trophy, such as it is
+    if (game.endless) { // the run ends at this depth — show how far the climb got
+      const best = Profile.endlessBest();
+      overlayTitle.textContent = 'The climb ends at depth ' + game.endless.depth;
+      overlaySub.textContent = `depth ${game.endless.depth} · ${game.calories}/${game.goalNow} calories · best depth ${best.bestDepth}. The vacuum claims another chonk.`;
+    } else {
+      overlayTitle.textContent = 'Still scrawny…';
+      overlaySub.textContent = `${game.calories}/${game.goalNow} calories. The cat demands another try.`;
+    }
     nextBtn.classList.add('hidden');
     overlay.classList.remove('hidden');
   }
@@ -50,12 +59,16 @@ function showResults(nStars) {
     sp.textContent = '☆'; sp.className = '';
   }
   document.getElementById('res-title').textContent =
-    game.daily
-      ? `Daily ${game.daily.date.slice(4, 6)}/${game.daily.date.slice(6, 8)} — Weigh-In`
-      : `Level ${game.levelIndex + 1} — Weigh-In`;
+    game.endless
+      ? `Endless · Depth ${game.endless.depth} — Weigh-In`
+      : game.daily
+        ? `Daily ${game.daily.date.slice(4, 6)}/${game.daily.date.slice(6, 8)} — Weigh-In`
+        : `Level ${game.levelIndex + 1} — Weigh-In`;
   document.getElementById('res-sub').textContent = '';
   for (const id of ['res-retry', 'res-menu', 'res-next']) document.getElementById(id).style.visibility = 'hidden';
-  document.getElementById('res-next').style.display = (!game.daily && game.levelIndex + 1 < NUM_LEVELS) ? '' : 'none';
+  const nx = document.getElementById('res-next');
+  if (game.endless) { nx.style.display = ''; nx.textContent = 'Climb →'; }
+  else { nx.textContent = 'Next →'; nx.style.display = (!game.daily && game.levelIndex + 1 < NUM_LEVELS) ? '' : 'none'; }
   AudioSys.sfx('splash', function() { this.tone(400, 0.25, 'sine', 0.06, 800); });
   AudioSys.meow(chonkT(game.weightLb)); // the ceremony opens with a weight-appropriate meow
   resultsEl().classList.remove('hidden');
@@ -106,12 +119,15 @@ function updateWeigh(dt) { // real-time, called from tick()
   if (k >= 1 && !w.finale) {
     w.finale = true;
     const sub = document.getElementById('res-sub');
+    // per-level stats card: cal delivered, best combo, shots fired, barrels
+    // popped, final weight — the full post-game box score.
+    const stats = `${game.calories} cal · combo ×${game.maxCombo || 1} · ${game.shotsFired} shots · ${game.bursts || 0} popped · ${w.target.toFixed(1)} lb`;
     if (w.stars === 1) {
       AudioSys.trombone();
-      sub.textContent = `${game.calories} cal · best combo ×${game.maxCombo || 1} · ${w.target.toFixed(1)} lb — the cat wanted more snacks. Womp womp.`;
+      sub.textContent = stats + ' — the cat wanted more snacks. Womp womp.';
     } else if (w.stars === 2) {
       AudioSys.jingle();
-      sub.textContent = `${game.calories} cal · best combo ×${game.maxCombo || 1} · ${w.target.toFixed(1)} lb — a respectable chonk.`;
+      sub.textContent = stats + ' — a respectable chonk.';
     } else {
       AudioSys.fanfare();
       for (let i = 0; i < 90; i++) w.confetti.push({
@@ -120,7 +136,7 @@ function updateWeigh(dt) { // real-time, called from tick()
         c: ['#e91e63', '#ff9800', '#ffeb3b', '#4caf50', '#2196f3', '#9c27b0'][i % 6],
         r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 10,
       });
-      sub.textContent = `${game.calories} cal · best combo ×${game.maxCombo || 1} · ${w.target.toFixed(1)} lb — certified maximum chonk.`;
+      sub.textContent = stats + ' — certified maximum chonk.';
     }
     if (game.justUnlocked) {
       sub.textContent += ` \U0001F408 NEW CAT UNLOCKED: ${game.justUnlocked}!`;

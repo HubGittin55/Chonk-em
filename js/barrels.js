@@ -13,6 +13,10 @@ const CONTENT = {
   slow:     { cal:  0, icon: '⭐', name: 'Slow-Mo',     grav: 0.80, drift: 30, power: 'slow'   },
   magnet:   { cal:  0, icon: '⭐', name: 'Magnet',      grav: 0.80, drift: 30, power: 'magnet' },
   split:    { cal:  0, icon: '⭐', name: 'Split Yarn',  grav: 0.80, drift: 30, power: 'split'  },
+  // --- vacuum counterplay (2026-10-18): bursts IMMEDIATELY on hit (not on delivery),
+  // firing an EMP that shorts the vacuum for 10s. The counterplay has to land before
+  // the vacuum eats the loot on its way down, so this one skips the falling-item flow.
+  emp:      { cal:  0, icon: '⚡', name: 'Short-Circuit', grav: 0.80, drift: 30, power: 'emp'    },
   // --- tier 1 unlocks (level 5+, 10-cal max) ---
   turkey:   { cal:  6, icon: '🦃', name: 'Turkey',   grav: 1.00, drift:  0  },
   shrimp:   { cal:  8, icon: '🍤', name: 'Shrimp',   grav: 0.90, drift: 40  },
@@ -40,6 +44,30 @@ const CONTENT = {
   cucumber:  { cal:  0, icon: '🥒', name: 'Cucumber',        grav: 1.00, drift: 40 },
 };
 
+// Per-exotic signature effects (2026-10-16): the moment an exotic bursts it gets
+// its own named popup + signature particle palette. Driven by FX.exoticFx; the
+// top-tier feasts (75+ cal) also steal a dramatic slow-mo beat.
+const EXOTIC_FX = {
+  caviar:    { text: 'POPPING PEARLS!',   colors: ['#212121', '#616161', '#f5f5f5'] },
+  lobster:   { text: 'RED CRUSTACEAN CARNAGE!', colors: ['#d32f2f', '#ff7043', '#ffab91'] },
+  wagyu:     { text: 'MARBLED MADNESS!',   colors: ['#b71c1c', '#ef9a9a', '#fff3e0'] },
+  btruffle:  { text: 'EARTHY BOOM!',       colors: ['#3e2723', '#5d4037', '#a1887f'] },
+  saffron:   { text: 'GOLDEN DUST!',       colors: ['#ff8f00', '#ffb300', '#ffecb3'] },
+  bluefin:   { text: 'TORO TORPEDO!',      colors: ['#880e4f', '#c2185b', '#f8bbd0'] },
+  foiegras:  { text: 'RICHNESS OVERLOAD!', colors: ['#f48fb1', '#ffe0b2', '#fff8e1'] },
+  goldkib:   { text: 'PURE BLING!',        colors: ['#ffb300', '#ffca28', '#ffffff'] },
+  kingcrab:  { text: 'CRAB RAVE!',         colors: ['#d84315', '#ff5722', '#ffab91'] },
+  uni:       { text: 'SEA URCHIN SURPRISE!', colors: ['#ef6c00', '#ffa726', '#ffe0b2'] },
+  kobe:      { text: 'KOBE KRAKEN!',       colors: ['#6d0f0f', '#c62828', '#ffd54f'] },
+  matsutake: { text: 'FUNGI FRENZY!',      colors: ['#5d4037', '#8d6e63', '#d7ccc8'] },
+  beluga:    { text: 'CAVIAR ROYALE!',     colors: ['#455a64', '#90a4ae', '#eceff1'] },
+  iberico:   { text: 'HAM SLAM!',          colors: ['#ad1457', '#e91e63', '#f8bbd0'] },
+  amberjack: { text: 'JACK ATTACK!',       colors: ['#00838f', '#26c6da', '#b2ebf2'] },
+  wtruffle:  { text: 'WHITE GOLD!',        colors: ['#fafafa', '#f5f5f5', '#d7ccc8'] },
+  saffris:   { text: 'RISOTTO RIOT!',      colors: ['#f9a825', '#ffeb3b', '#fff9c4'] },
+  imperial:  { text: 'IMPERIAL FEAST!',    colors: ['#ffd700', '#9c27b0', '#ffffff'] },
+};
+
 // Twinkling 4-point sparkle — the "reads as special" hint for mystery barrels
 function drawSparkle(ctx, x, y, s, alpha) {
   ctx.save();
@@ -50,6 +78,34 @@ function drawSparkle(ctx, x, y, s, alpha) {
   ctx.quadraticCurveTo(x, y, x, y + s); ctx.quadraticCurveTo(x, y, x - s, y);
   ctx.quadraticCurveTo(x, y, x, y - s);
   ctx.fill();
+  ctx.restore();
+}
+
+// Power-up ring: gold dashed for standard powers, crackling electric blue for
+// the EMP short-circuit (drawn in both the sprite and vector barrel paths)
+function drawPowerRing(ctx, b, r, time) {
+  if (b.kind !== 'power') return;
+  if (b.content === 'emp') {
+    ctx.save();
+    ctx.strokeStyle = '#40c4ff'; ctx.lineWidth = 3;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.arc(b.x, b.y, r + 2.5, time * 3, time * 3 + Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(64,196,255,0.45)'; ctx.lineWidth = 6;
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(b.x, b.y, r + 6, -time * 2, -time * 2 + Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#e1f5fe'; // crackling sparks
+    for (let i = 0; i < 3; i++) {
+      const a = time * 7 + i * 2.1;
+      const rr = r + 8 + Math.sin(time * 13 + i * 2) * 4;
+      ctx.beginPath(); ctx.arc(b.x + Math.cos(a) * rr, b.y + Math.sin(a) * rr, 2.2, 0, 7); ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+  ctx.save();
+  ctx.strokeStyle = '#ef6c00'; ctx.lineWidth = 2.5;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.arc(b.x, b.y, r + 1.5, time * 1.5, time * 1.5 + Math.PI * 2); ctx.stroke();
   ctx.restore();
 }
 
@@ -114,18 +170,12 @@ function drawBarrels(ctx, barrels, time) {
     }
 
     // Generated barrel skin (AoT style), vector fallback below
-    if (typeof Assets !== 'undefined' && Assets.ok('barrel_' + b.content)) {
-      const im = Assets.imgs['barrel_' + b.content];
+    const bim = typeof Assets !== 'undefined' ? Assets.barrel(b.content) : null;
+    if (bim) {
+      const im = bim;
       const s = r * 2.75;
       ctx.drawImage(im, b.x - s / 2, b.y - s / 2, s, s);
-      if (b.kind === 'power') { // dashed gold ring
-        ctx.strokeStyle = '#ef6c00';
-        ctx.lineWidth = 2.5;
-        ctx.save();
-        ctx.setLineDash([3, 3]);
-        ctx.beginPath(); ctx.arc(b.x, b.y, r + 1.5, time * 1.5, time * 1.5 + Math.PI * 2); ctx.stroke();
-        ctx.restore();
-      }
+      drawPowerRing(ctx, b, r, time);
       drawKindRing(ctx, b, r, time);
       drawArmor(ctx, b, r);
       continue;
@@ -333,12 +383,7 @@ function drawBarrels(ctx, barrels, time) {
     ctx.strokeStyle = b.kind === 'veggie' ? '#c62828' : b.kind === 'power' ? '#ef6c00' : '#2e7d32';
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(b.x, b.y, br, 0, 7); ctx.stroke();
-    if (b.kind === 'power') { // dashed gold ring
-      ctx.save();
-      ctx.setLineDash([3, 3]);
-      ctx.beginPath(); ctx.arc(b.x, b.y, r + 1.5, time * 1.5, time * 1.5 + Math.PI * 2); ctx.stroke();
-      ctx.restore();
-    }
+    if (b.kind === 'power') drawPowerRing(ctx, b, r, time); // dashed gold ring (blue crackle for EMP)
     ctx.font = Math.max(9, Math.round(r * 0.72)) + 'px serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(c.icon, b.x, b.y + 1);

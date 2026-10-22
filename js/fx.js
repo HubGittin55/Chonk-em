@@ -49,6 +49,42 @@ const FX = {
     else if (cal >= 10) { this.hitstop(0.02); }
   },
 
+  // EMP short-circuit: expanding shockwave ring + electric sparks + shake + hit-stop.
+  empBlast(x, y) {
+    this.shake(34, 0.32); this.hitstop(0.05);
+    if (typeof spawnRing === 'function') spawnRing(x, y, '#40c4ff', 260, 0.6);
+    if (typeof REDUCED !== 'undefined' && REDUCED) return;
+    for (let i = 0; i < 24; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 100 + Math.random() * 340;
+      game.particles.push({
+        x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        rot: 0, vr: 0, size: 2.5 + Math.random() * 3.5, life: 0.4 + Math.random() * 0.4,
+        color: ['#40c4ff', '#e1f5fe', '#0288d1', '#ffffff'][i % 4],
+      });
+    }
+    if (game.particles.length > 220) game.particles.splice(0, game.particles.length - 220);
+  },
+
+  // Per-exotic signature burst: named popup + signature particle palette (EXOTIC_FX
+  // table in barrels.js). The biggest feasts (75+ cal) steal a dramatic slow-mo beat.
+  exoticFx(x, y, content) {
+    const fx = (typeof EXOTIC_FX !== 'undefined' && EXOTIC_FX[content]) || null;
+    if (!fx) return;
+    addPopup(x, y - 34, fx.text, '#ffd54f');
+    if (typeof REDUCED !== 'undefined' && REDUCED) return;
+    for (let i = 0; i < 22; i++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, sp = 140 + Math.random() * 280;
+      game.particles.push({
+        x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        rot: Math.random() * 6, vr: (Math.random() - 0.5) * 16,
+        size: 3 + Math.random() * 4, life: 0.7 + Math.random() * 0.6,
+        color: fx.colors[i % fx.colors.length],
+      });
+    }
+    if (game.particles.length > 220) game.particles.splice(0, game.particles.length - 220);
+    if ((CONTENT[content] || {}).cal >= 75) this.slowmo(0.5, 0.8); // imperial-tier beat
+  },
+
   tick(dt) { // real-time decay of FX slow-mo (hit-stop is consumed in tick())
     if (game.fxSlowT > 0) game.fxSlowT -= dt;
   },

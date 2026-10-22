@@ -12,6 +12,8 @@
      settings:  { difficulty, mute, cat, howSeen, worldopen: { [w]: bool } },
      daily:     { last: 'YYYYMMDD'|null, streak: 0, best: { [date]: {stars, cal} } },
      weight:    5.0,   // the cat's saved weight across sessions (START_LB default)
+     endless:   { bestDepth: 0, bestCal: 0, runs: 0 }, // Endless Climb records (2026-10-16)
+   trophies:  { [id]: timestampMs }, // trophy unlocks (2026-10-19)
    } */
 
 const PROFILE_KEY = 'chonk-em:profile-v2';
@@ -36,6 +38,8 @@ function _freshProfile() {
     settings: { difficulty: 'normal', mute: false, cat: 0, howSeen: 0, worldopen: {} },
     daily: { last: null, streak: 0, best: {} },
     weight: 5.0,
+    endless: { bestDepth: 0, bestCal: 0, runs: 0 },
+    trophies: {},
   };
 }
 
@@ -49,7 +53,13 @@ const Profile = {
       const raw = localStorage.getItem(PROFILE_KEY);
       if (raw) p = JSON.parse(raw);
     } catch (e) { p = null; }
-    if (p && p.version === 2) { this._p = p; return p; }
+    if (p && p.version === 2) {
+      if (!p.endless || typeof p.endless !== 'object') // endless records are newer than some v2 profiles
+        p.endless = { bestDepth: 0, bestCal: 0, runs: 0 };
+      if (!p.trophies || typeof p.trophies !== 'object') // trophies are newer than some v2 profiles
+        p.trophies = {};
+      this._p = p; return p;
+    }
     p = _freshProfile();
     // migrate legacy flat keys
     const lb = _lsGet('best');
@@ -91,6 +101,10 @@ const Profile = {
   best() { return this.get().best; },
   totalStars() {
     return Object.values(this.get().best).reduce((a, r) => a + ((r && r.stars) || 0), 0);
+  },
+  // How many levels hold at least n stars (trophy aggregate checks).
+  starCount(n) {
+    return Object.values(this.get().best).filter(r => r && r.stars >= n).length;
   },
   saveBest(idx, stars, cal) {
     const b = this.get().best;
@@ -139,6 +153,19 @@ const Profile = {
   },
   dailyBest(date) { return this.get().daily.best[date] || null; },
   streak() { return this.get().daily.streak || 0; },
+
+  // ---- endless climb ----
+  recordEndless(depth, cal) {
+    const E = this.get().endless;
+    E.bestDepth = Math.max(E.bestDepth || 0, depth || 0);
+    E.bestCal = Math.max(E.bestCal || 0, cal || 0);
+    E.runs = (E.runs || 0) + 1;
+    this.save();
+  },
+  endlessBest() { return this.get().endless || { bestDepth: 0, bestCal: 0, runs: 0 }; },
+
+  // ---- trophies ----
+  trophies() { return this.get().trophies || {}; },
 
   // ---- saved weight (across sessions) ----
   weight() { const w = this.get().weight; return typeof w === 'number' ? w : 5.0; },

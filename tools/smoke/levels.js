@@ -79,8 +79,8 @@ T('v0.4: vacuum drawn after the main cat (never hidden)', (() => {
 })());
 T('v0.4: vacuum cannot steal from the bowl chute', (() => {
   const v = Vacuum.create(1);
-  const it = { x: 100, y: 720, vx: 0, vy: 0, r: 9, state: 'belt', cal: 3, gone: false };
-  v.x = 100;
+  const it = { x: 300, y: 720, vx: 0, vy: 0, r: 9, state: 'belt', cal: 3, gone: false };
+  v.x = 300;
   Vacuum.tick(v, 1 / 60, [it], () => {});
   return !it.gone && !it.sucked;
 })());
@@ -98,7 +98,20 @@ T('tiers: handcrafted 1-12 respect tier max cal', (() => {
 T('curve: 80lb impossible on L10, reachable ~L50, 130+ on L100', (() => {
   const maxLb = n => 5 + 0.3 * getLevel(n - 1).barrels
     .filter(b => b.kind === 'snack').reduce((a, b) => a + CONTENT[b.content].cal, 0);
-  return maxLb(10) < 40 && maxLb(50) >= 75 && maxLb(50) <= 90 && maxLb(100) >= 130;
+  // 2026-10-17 tuning deep-dive: foodFactor trims the curve (-10% L20 → -50% L100)
+  return maxLb(10) < 40 && maxLb(50) >= 50 && maxLb(50) <= 75 && maxLb(100) >= 60;
+})());
+T('tuning: foodFactor is 1 below L20, 0.9 at L20, 0.5 at L100, floored at 0.3', (() =>
+  foodFactor(1) === 1 && foodFactor(19) === 1 && foodFactor(20) === 0.9 &&
+  Math.abs(foodFactor(100) - 0.5) < 1e-9 && foodFactor(140) === 0.3 && foodFactor(200) === 0.3)());
+T('tuning: food barrels shrink on the curve (L100 ≈ half of unscaled)', (() => {
+  const nFood = n => getLevel(n - 1).barrels.filter(b => b.kind === 'snack').length;
+  const f100 = nFood(100), f20 = nFood(20);
+  return f100 < f20 * 0.65 && f100 >= 8; // target -50% (slack for the tuning loop), floor holds
+})());
+T('tuning: daily challenge unaffected (tiers 5-15, below the curve)', (() => {
+  const L = genDailyLevel('20261017');
+  return L.balls >= 8 && L.goal > 0;
 })());
 T('curve: tier exotic present on 10/25/50/100', [10, 25, 50, 100].every(n =>
   getLevel(n - 1).barrels.some(b => b.kind === 'snack' && b.content === tierExotic(n))));
@@ -175,13 +188,41 @@ T('v0.5: veggies quartered (procedural ~3%)', (() => [13, 50, 100].every(n => {
   const veg = L.barrels.filter(b => b.kind === 'veggie').length;
   return veg <= Math.ceil(L.barrels.length * 0.05);
 }))());
-T('v0.5: conveyor has 32px gaps on BOTH sides (symmetric)', (() => {
+T('dual-belts: center bowl, inward belts, end gaps + center gap', (() => {
   const nb = (x) => Conveyor.onBelt(x, false);
-  return !nb(50) && !nb(65) && nb(100) && nb(300) && nb(500) && !nb(540) && !nb(550) &&
-         Conveyor.onBelt(50, true) && Conveyor.onBelt(550, true);
+  return Conveyor.BOWL_X === 300 &&
+         nb(50) === null && nb(540) === null && nb(590) === null && // far ends: lost
+         nb(100) === 'L' && nb(268) === 'L' &&                     // left belt → gap
+         nb(332) === 'R' && nb(500) === 'R' &&                     // right belt → gap
+         nb(300) === null &&                                       // center gap: no belt
+         Conveyor.onBelt(50, true) === 'L' && Conveyor.onBelt(560, true) === 'R' && // bridge spans end gaps
+         Conveyor.onBelt(300, true) === null;                      // bridge never spans the gap
 })());
-T('v0.4: conveyor slats run left with the food', (() => {
+T('dual-belts: belt catch needs a plane crossing (pop-bug fix)', (() =>
+  Conveyor.crossesBelt(699, 701, 100) === true &&
+  Conveyor.crossesBelt(700, 701, 100) === false &&  // already at/below: no catch
+  Conveyor.crossesBelt(720, 730, 100) === false &&  // below the line: the pop case
+  Conveyor.crossesBelt(699, 701, -100) === false)); // moving up: no catch
+T('dual-belts: conveyor slats run inward with the food', (() => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'js', 'conveyor.js'), 'utf8');
-  return src.includes('40 - (this.t * this.SPEED) % 40');
+  return src.includes('const off = dir > 0 ? phase : 40 - phase');
 })());
 
+// 2026-10-16: endless climb — post-campaign survival climb
+T('endless: same depth → identical level; deeper → different level', (() => {
+  const flat = L => JSON.stringify(L.barrels.map(b => [b.x, b.y, b.kind, b.content]));
+  const a1 = flat(genEndlessLevel(1)), a2 = flat(genEndlessLevel(1)), b1 = flat(genEndlessLevel(2));
+  return a1 === a2 && a1 !== b1;
+})());
+T('endless: vacuum always on, goal climbs with depth, balls playable', (() => {
+  const d1 = genEndlessLevel(1), d10 = genEndlessLevel(10);
+  return d1.vacuum === true && d10.vacuum === true && d1.goal > 0 &&
+    d10.goal > d1.goal && d1.name.indexOf('Depth 1') === 0 && d1.balls >= 8;
+})());
+T('endless: max food tier from depth 1 (exotics seed immediately)', (() => {
+  const seen = new Set();
+  for (let d = 1; d <= 6; d++)
+    for (const b of genEndlessLevel(d).barrels)
+      if (b.content && CONTENT[b.content] && CONTENT[b.content].cal >= 15) seen.add(b.content);
+  return seen.size >= 3;
+})());

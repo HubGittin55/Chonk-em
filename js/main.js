@@ -8,7 +8,12 @@ const ctx = canvas.getContext('2d');
 const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlaySub = document.getElementById('overlay-sub');
-document.getElementById('retry').addEventListener('click', () => loadLevel(game.levelIndex));
+document.getElementById('retry').addEventListener('click', () => {
+  hideOverlay();
+  if (game.daily) loadDaily(); // the old handler re-loaded level -1 (a crash) on daily losses
+  else if (game.endless) loadEndless(game.endless.depth);
+  else loadLevel(game.levelIndex);
+});
 const nextBtn = document.getElementById('next');
 nextBtn.addEventListener('click', () => { hideOverlay(); loadLevel(game.levelIndex + 1); });
 
@@ -79,6 +84,26 @@ const WORLDS = [
   'Kitchen', 'Pantry', 'Garden', 'Fish Market', 'Bakery',
   'Diner', 'Farm', 'Park Picnic', 'Candy Shop', 'Banquet Hall',
 ];
+// Per-world background wash (2026-10-16): a cheap procedural take on per-world
+// backgrounds — one tinted gradient over the kitchen bg, different per world.
+// Kitchen keeps the home look (no wash); the endless climb cycles worlds as it descends.
+const WORLD_TINTS = [
+  null,
+  ['rgba(216,142,44,0.16)',  'rgba(216,142,44,0.05)'],  // Pantry — amber spice shelves
+  ['rgba(66,158,74,0.16)',   'rgba(66,158,74,0.05)'],   // Garden — green
+  ['rgba(54,128,196,0.16)',  'rgba(54,128,196,0.05)'],   // Fish Market — sea blue
+  ['rgba(228,128,150,0.16)', 'rgba(228,128,150,0.05)'],  // Bakery — strawberry pink
+  ['rgba(218,64,64,0.14)',   'rgba(218,64,64,0.05)'],    // Diner — ketchup red
+  ['rgba(118,168,58,0.15)',  'rgba(118,168,58,0.05)'],   // Farm — field green
+  ['rgba(96,178,228,0.15)',  'rgba(96,178,228,0.05)'],   // Park Picnic — sky blue
+  ['rgba(228,118,218,0.16)', 'rgba(228,118,218,0.05)'],  // Candy Shop — candy pink
+  ['rgba(148,96,218,0.18)',  'rgba(148,96,218,0.06)'],   // Banquet Hall — royal purple
+];
+function worldTintFor() { // which world wash to draw under the current board
+  if (game.endless) return WORLD_TINTS[game.endless.depth % 10];
+  const w = worldForLevel(game.levelIndex + 1);
+  return WORLD_TINTS[w] || null;
+}
 function totalStars() { return Profile.totalStars(); }
 function catUnlocked(i) { return totalStars() >= CAT_UNLOCKS[i].stars; }
 function selectedCat() {
@@ -104,11 +129,11 @@ const store = {
 function saveBest(idx, stars, cal) { Profile.saveBest(idx, stars, cal); }
 
 const game = {
-  levelIndex: 0, level: null, daily: null, // daily: { date } when playing the daily challenge
-  balls: 0, shots: [], items: [], barrels: [], particles: [],
-  multiShots: 0, slowT: 0, magnetT: 0, bridgeT: 0, shotsFired: 0,
+  levelIndex: 0, level: null, daily: null, endless: null, // daily: { date }; endless: { depth }
+  balls: 0, shots: [], items: [], barrels: [], particles: [], rings: [],
+  multiShots: 0, slowT: 0, magnetT: 0, bridgeT: 0, shotsFired: 0, lastBallTold: false,
   calories: 0, stage: 0, combo: 0, mult: 1,
-  time: 0, over: null, popups: [],
+  time: 0, over: null, paused: false, popups: [],
   nomT: 0, face: 'normal', faceT: 0,
   aim: null, aimAng: null,
   jiggle: 0, jiggleV: 0, displayRx: catRx(0), // jiggle mirrors wob.belly (smoke-test compat)
@@ -124,18 +149,28 @@ function stageFor(cal) {
   return s;
 }
 
-function loadLevel(i) { game.daily = null; startLevel(getLevel(i), i); }
+function loadLevel(i) { game.daily = null; game.endless = null; startLevel(getLevel(i), i); }
 
 function loadDaily() { // one fresh date-seeded level per calendar day
   const date = dailyKey();
   game.daily = { date };
+  game.endless = null;
   startLevel(genDailyLevel(date), -1);
   showDailySplash(date);
 }
 
+function loadEndless(depth) { // endless climb: one run, deeper every win, death ends the run
+  game.daily = null;
+  game.endless = { depth };
+  startLevel(genEndlessLevel(depth), -2);
+  showEndlessSplash(depth);
+}
+
 function startLevel(L, i) {
-  const daily = !!game.daily;
-  const dn = daily ? 100000 + (hashStr('chonk-deals-' + game.daily.date) % 800000) : i + 1; // 1-based deal number
+  const daily = !!game.daily, endless = !!game.endless;
+  const dn = daily ? 100000 + (hashStr('chonk-deals-' + game.daily.date) % 800000)
+         : endless ? 200000 + game.endless.depth
+         : i + 1; // 1-based deal number
   game.levelIndex = i;
   game.level = L;
   game.catVar = selectedCat(); // player's unlocked species
@@ -147,13 +182,16 @@ function startLevel(L, i) {
   game.par = Math.round(L.par * D.balls);
   game.goalNow = Math.round(L.goal * D.goal);
   game.shots = [];
-  game.multiShots = 0; game.maxCombo = 0; game.splitNext = false; game.weigh = null; game.shakeT = 0; game.shakeAmt = 36; game.goalMet = false; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0; game.shotsFired = 0;
+  game.multiShots = 0; game.maxCombo = 0; game.splitNext = false; game.weigh = null; game.shakeT = 0; game.shakeAmt = 36; game.goalMet = false; game.slowT = 0; game.magnetT = 0; game.bridgeT = 0; game.shotsFired = 0; game.lastBallTold = false; game.rings = [];
+  game.paused = false; hidePause(); // fresh level: never start paused, overlay off
+  game.bursts = 0; game.kegsBurst = 0; game.spooks = 0; // trophy counters + weigh-in stats
   game.cukeT = 0; game.scareJump = 0; game.hitstopT = 0; game.fxSlowT = 0; game.fxSlowScale = 0.45; // FX bus state
   game.weightLb = START_LB; // size resets every level (owner)
   game.lbPerCal = LB_PER_CAL; // flat 0.3 lb/cal — the food in the barrels is the only limit
   game.items = [];
   game.popups = [];
-  game.vacuum = L.vacuum ? Vacuum.create((DIFFS[game.diffKey] || DIFFS.normal).vacuum * (1 + 0.05 * (daily ? 5 : worldForLevel(i + 1)))) : null;
+  game.vacuum = L.vacuum ? Vacuum.create((DIFFS[game.diffKey] || DIFFS.normal).vacuum *
+    (1 + 0.05 * (daily ? 5 : endless ? 5 + game.endless.depth : worldForLevel(i + 1)))) : null;
   if (game.vacuum) addPopup(W / 2, 330, '⚠ VACUUM PATROL ⚠', '#c62828');
   game.barrels = L.barrels.map(b => ({ x: b.x, y: b.y, r: L.r || 15, kind: b.kind, content: b.content, armor: !!b.armor, cracked: false, cleared: false }));
   dealSpecialBarrels(game.barrels, dn); // golden + mystery + rare cuke, dealt from empty slots
@@ -220,7 +258,7 @@ function fireShot(px, py) {
     const nb = {
       x: SHOOT.x, y: SHOOT.y + 26,
       vx: Math.cos(a) * BALL_SPEED, vy: Math.sin(a) * BALL_SPEED,
-      r: BALL_R, life: 0, slowT: 0, bounces: 0,
+      r: BALL_R, life: 0, slowT: 0, bounces: 0, trail: [], rot: 0,
     };
     if (game.splitNext && game.shots.length === 0) { nb.splitArmed = true; game.splitNext = false; }
     game.shots.push(nb);
@@ -228,6 +266,11 @@ function fireShot(px, py) {
     game.shotsFired++;
   }
   if (game.balls === 0 && game.goalMet && !game.over) FX.slowmo(0.45, 1.4); // final-ball win: dramatic beat before the score
+  if (game.balls === 1 && !game.lastBallTold && !game.over) { // the tension shot
+    game.lastBallTold = true;
+    addPopup(300, 300, 'LAST BALL…', '#c62828');
+    AudioSys.tick(880);
+  }
   AudioSys.pop();
 }
 
@@ -279,11 +322,36 @@ function drawParticles(ctx) {
   ctx.globalAlpha = 1;
 }
 
+// Expanding shockwave rings (EMP blast, and anything else that wants one).
+// Reduced-motion safe: the ring is information, not decoration — kept, but still.
+function spawnRing(x, y, color, maxR, life) {
+  game.rings.push({ x, y, color, maxR, t: 0, life: life || 0.5 });
+}
+function tickRings(dt) {
+  for (let i = game.rings.length - 1; i >= 0; i--) {
+    game.rings[i].t += dt;
+    if (game.rings[i].t >= game.rings[i].life) game.rings.splice(i, 1);
+  }
+}
+function drawRings(ctx) {
+  for (const r of game.rings) {
+    const f = r.t / r.life;
+    ctx.save();
+    ctx.globalAlpha = (1 - f) * 0.9;
+    ctx.strokeStyle = r.color; ctx.lineWidth = 5 * (1 - f) + 1;
+    ctx.beginPath(); ctx.arc(r.x, r.y, r.maxR * f, 0, 7); ctx.stroke();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 * (1 - f);
+    ctx.beginPath(); ctx.arc(r.x, r.y, r.maxR * f * 0.82, 0, 7); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
 // Mystery reveal: 65% tier snack, 20% power-up, 15% veggie dud (the spice of mystery)
 function resolveMystery() {
   const roll = Math.random();
   if (roll < 0.15) return Math.random() < 0.5 ? 'broccoli' : 'celery';
-  if (roll < 0.35) return ['multi', 'wide', 'slow', 'magnet'][Math.floor(Math.random() * 4)];
+  if (roll < 0.35) return ['multi', 'wide', 'slow', 'magnet', 'emp'][Math.floor(Math.random() * 5)];
   const commons = tierCommons(game.levelIndex + 1).filter(k => ((CONTENT[k] || {}).cal || 0) > 0);
   return commons[Math.floor(Math.random() * commons.length)];
 }
@@ -299,6 +367,9 @@ function spookCat(item) {
   addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, 'SPOOKED! aim wobbles!', '#2e7d32');
   AudioSys.startle();
   FX.shake(34, 0.3);
+  game.spooks = (game.spooks || 0) + 1; // trophy counters
+  Achievements.unlock('jumpscare');
+  if (game.spooks >= 3) Achievements.unlock('cuke-hunter');
 }
 
 function onBarrelCrack(barrel) {
@@ -306,6 +377,12 @@ function onBarrelCrack(barrel) {
 }
 
 function onBarrelBurst(barrel, ball) {
+  game.bursts = (game.bursts || 0) + 1; // weigh-in stats: barrels popped
+  if (barrel.kind === 'golden') Achievements.unlock('jackpot');
+  if (barrel.kind === 'keg') { // demolition crew: 3 kegs in one level
+    game.kegsBurst = (game.kegsBurst || 0) + 1;
+    if (game.kegsBurst >= 3) Achievements.unlock('demolition');
+  }
   // Split-yarn: the armed ball divides into three on its first burst
   if (ball && ball.splitArmed && !ball.splitDone) {
     ball.splitDone = true;
@@ -315,13 +392,14 @@ function onBarrelBurst(barrel, ball) {
       game.shots.push({
         x: ball.x, y: ball.y,
         vx: Math.cos(base + da) * sp * 0.92, vy: Math.sin(base + da) * sp * 0.92,
-        r: ball.r, life: 0, slowT: 0, bounces: 0,
+        r: ball.r, life: 0, slowT: 0, bounces: 0, trail: [], rot: ball.rot || 0,
       });
     }
     AudioSys.pop();
   }
   spawnChips(barrel.x, barrel.y);
   if (barrel.kind === 'keg') { explode(barrel.x, barrel.y); return; } // powder keg: chain explosion
+  if (barrel.kind === 'power' && barrel.content === 'emp') { fireEMP(barrel.x, barrel.y); return; } // short-circuit: burst-immediate, not on delivery — the counterplay has to land before the vacuum eats the loot
   if (barrel.kind === 'empty') { AudioSys.burst(); return; } // hollow barrel: no loot inside
   if (barrel.kind === 'mystery') { // the reveal: tier snack, power-up, or rare veggie dud
     const resolved = resolveMystery();
@@ -336,12 +414,13 @@ function onBarrelBurst(barrel, ball) {
     const jackpot = (c.cal || 5) * 2;
     AudioSys.fanfare();
     FX.burstJuice('golden', jackpot, barrel.x, barrel.y);
+    if ((c.cal || 0) >= 15) FX.exoticFx(barrel.x, barrel.y, barrel.content); // jackpot exotics get their signature
     game.items.push({
       x: barrel.x, y: barrel.y,
       vx: (Math.random() - 0.5) * 150, vy: -60 - Math.random() * 90,
       r: 9, state: 'fall', cal: jackpot, icon: c.icon || '⭐', name: 'Golden ' + (c.name || 'Snack'),
       content: barrel.content, grav: c.grav || 1, drift: c.drift || 0, power: null, golden: true,
-      t: 0, gone: false,
+      t: 0, gone: false, rot: 0,
     });
     return;
   }
@@ -353,7 +432,7 @@ function onBarrelBurst(barrel, ball) {
       vx: (Math.random() - 0.5) * 150, vy: -60 - Math.random() * 90,
       r: 9, state: 'fall', cal: 0, icon: '🥒', name: 'Cucumber',
       content: 'cucumber', grav: 1, drift: 40, power: null, spook: true,
-      t: 0, gone: false,
+      t: 0, gone: false, rot: 0,
     });
     return;
   }
@@ -361,13 +440,14 @@ function onBarrelBurst(barrel, ball) {
   if (!c) { AudioSys.burst(); return; } // unknown content: burst sound, no loot, never crash
   AudioSys.burst();
   FX.burstJuice(barrel.kind, c.cal, barrel.x, barrel.y);
+  if (c.cal >= 15) FX.exoticFx(barrel.x, barrel.y, barrel.content); // every exotic bursts with its signature
   const pop = 1 - 0.35 * (c.grav - 1); // heavy loot pops weaker
   game.items.push({
     x: barrel.x, y: barrel.y,
     vx: (Math.random() - 0.5) * 150, vy: (-60 - Math.random() * 90) * pop,
     r: 9, state: 'fall', cal: c.cal, icon: c.icon, name: c.name, content: barrel.content,
     grav: c.grav, drift: c.drift, power: c.power || null,
-    t: 0, gone: false,
+    t: 0, gone: false, rot: 0,
   });
 }
 
@@ -392,6 +472,19 @@ function explode(x, y) {
   }
 }
 
+function fireEMP(x, y) { // EMP short-circuit: burst-immediate counterplay, not on delivery
+  AudioSys.zap();
+  FX.empBlast(x, y);
+  if (game.vacuum) {
+    Achievements.unlock('shortcircuit');
+    game.vacuum.zapT = Vacuum.ZAP_SECS; // ten seconds of safe feeding
+    game.vacuum.gulpT = 0;
+    addPopup(300, 420, '⚡ SHORT-CIRCUIT! vacuum down ' + Vacuum.ZAP_SECS + 's', '#0288d1');
+  } else {
+    addPopup(300, 420, '⚡ SHORT-CIRCUIT! (no vacuum this level)', '#0288d1');
+  }
+}
+
 function onBarrelSpecial(kind, b, ball) {
   if (kind === 'steel') {
     AudioSys.clang();
@@ -400,6 +493,7 @@ function onBarrelSpecial(kind, b, ball) {
     AudioSys.boing();
     game.combo++;
     game.maxCombo = Math.max(game.maxCombo || 0, game.combo);
+    Achievements.noteCombo(game.combo);
     spawnChips(b.x, b.y);
   }
 }
@@ -455,6 +549,8 @@ function deliver(item) {
   } else {
     game.combo++;
     game.maxCombo = Math.max(game.maxCombo || 0, game.combo);
+    Achievements.noteCombo(game.combo);
+    if (item.cal >= 75) Achievements.unlock('imperial'); // 75+ cal feast delivered
     AudioSys.nom();
     addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '+' + gained, '#2e7d32');
     spawnCrumbs(Conveyor.BOWL_X, Conveyor.BOWL_Y - 18);
@@ -535,6 +631,7 @@ function tick(dt) {
   const wdt = dt * game.timeScale;
   Conveyor.t += wdt;
   tickParticles(dt);
+  tickRings(dt);
 
   // CatPhysics: unified body sim (belly wave lattice + secondary springs + life).
   // game.jiggle mirrors the belly for smoke-test compatibility.
@@ -562,7 +659,19 @@ function tick(dt) {
   }
 
   for (let i = game.shots.length - 1; i >= 0; i--) {
-    if (Physics.stepBall(game.shots[i], wdt, game.barrels, onBarrelBurst, onBarrelCrack, onBarrelSpecial)) game.shots.splice(i, 1);
+    const b = game.shots[i];
+    if (Physics.stepBall(b, wdt, game.barrels, onBarrelBurst, onBarrelCrack, onBarrelSpecial)) {
+      game.shots.splice(i, 1);
+      continue;
+    }
+    // rotation pass (2026-10-20): spin follows horizontal velocity like a real
+    // rolling ball, clamped so flight-speed spin doesn't strobe into a blur.
+    b.rot = (b.rot || 0) + Math.max(-30, Math.min(30, b.vx / (b.r || 10))) * wdt;
+    if (!REDUCED && b.life > 0.04) { // yarn motion trail — a short fading wake behind the ball
+      b.trail = b.trail || [];
+      b.trail.push({ x: b.x, y: b.y });
+      if (b.trail.length > 7) b.trail.shift();
+    }
   }
 
   for (const it of game.items) {
@@ -573,24 +682,35 @@ function tick(dt) {
       it.vy += ITEM_GRAV * (it.grav || 1) * wdt;
       if (it.drift) it.vx += Math.sin(it.t * 7) * it.drift * wdt;
       if (game.magnetT > 0) it.vx += Math.sign(Conveyor.BOWL_X - it.x) * 300 * wdt;
+      const prevY = it.y; // lost-food-pop-bug: belt catch needs a plane crossing (conveyor.js)
       it.x += it.vx * wdt;
       it.y += it.vy * wdt;
+      // rotation pass (2026-10-20): tumbling follows horizontal velocity; veggie
+      // cubes and loot spin as they fly, capped so they don't strobe.
+      it.rot = (it.rot || 0) + Math.max(-12, Math.min(12, it.vx * 0.09)) * wdt;
       // Food bounces off barrels but NEVER breaks them (burst is yarn-only).
       Physics.bounceItem(it, game.barrels);
       // Side walls
       if (it.x < 20) { it.x = 20; it.vx = Math.abs(it.vx) * 0.5; }
       if (it.x > 580) { it.x = 580; it.vx = -Math.abs(it.vx) * 0.5; }
-      // Belt: bounce a couple of times, then settle and ride
-      if (it.y >= Conveyor.BELT_Y && it.vy > 0 && !it.sucked && Conveyor.onBelt(it.x, game.bridgeT > 0)) {
+      // Belt: bounce a couple of times, then settle and ride INWARD to the gap.
+      // The catch is a plane CROSSING — food that fell below the belt line and
+      // drifted back under it must NOT pop back up (lost-food-pop-bug, 2026-10-17).
+      const crossing = Conveyor.crossesBelt(prevY, it.y, it.vy);
+      const side = !it.sucked && crossing ? Conveyor.onBelt(it.x, game.bridgeT > 0) : null;
+      if (side) {
         if (it.vy > 110) {
           it.y = Conveyor.BELT_Y;
           it.vy = -it.vy * 0.45;
           it.vx *= 0.7;
           it.bounces = (it.bounces || 0) + 1;
         } else {
-          it.state = 'belt'; it.y = Conveyor.BELT_Y; it.vy = 0;
+          it.state = 'belt'; it.belt = side; it.y = Conveyor.BELT_Y; it.vy = 0;
           AudioSys.catch();
         }
+      } else if (!it.sucked && crossing && it.x >= Conveyor.GAP_L && it.x <= Conveyor.GAP_R) {
+        it.state = 'drop'; // straight down the center chute into the bowl
+        AudioSys.catch();
       }
       // Tile floor: missed food bounces, then it's lost
       if (it.state === 'fall' && it.y >= 853 && it.vy > 0) {
@@ -600,8 +720,11 @@ function tick(dt) {
       }
       if (it.y > H + 40 && !it.gone) { it.gone = true; loseItem(it); }
     } else if (it.state === 'belt') {
-      it.x -= Conveyor.SPEED * wdt;
-      if (it.x <= Conveyor.BOWL_X) it.state = 'drop';
+      it.x += (it.belt === 'L' ? 1 : -1) * Conveyor.SPEED * wdt; // inward, toward the gap
+      // rotation pass (2026-10-20): loot lands flat on the belt — ease any tumble out
+      it.rot = (it.rot || 0) * Math.max(0, 1 - 8 * wdt);
+      if (Math.abs(it.rot) < 0.02) it.rot = 0;
+      if (it.x >= Conveyor.GAP_L && it.x <= Conveyor.GAP_R) it.state = 'drop'; // into the bowl
     } else if (it.state === 'drop') {
       it.y += 460 * wdt;
       if (it.y >= Conveyor.BOWL_Y && !it.gone) { it.gone = true; deliver(it); }
@@ -627,8 +750,16 @@ function tick(dt) {
 /* ---------------- rendering ---------------- */
 
 function drawBackground() {
-  if (typeof Assets !== 'undefined' && Assets.ok('kitchen_bg')) {
-    ctx.drawImage(Assets.imgs.kitchen_bg, 0, 0, W, H);
+  const bgim = typeof Assets !== 'undefined' ? Assets.prop('kitchen_bg') : null;
+  if (bgim) {
+    ctx.drawImage(bgim, 0, 0, W, H);
+    const tint = worldTintFor();
+    if (tint) { // per-world wash over the bg — endless cycles worlds as it descends
+      const wg = ctx.createLinearGradient(0, 0, 0, H);
+      wg.addColorStop(0, tint[0]); wg.addColorStop(0.75, tint[1]); wg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = wg;
+      ctx.fillRect(0, 0, W, H);
+    }
     return;
   }
   const g = ctx.createLinearGradient(0, 0, 0, H);
@@ -718,8 +849,14 @@ function hudText(txt, x, y, size, color, align) {
   ctx.textBaseline = 'alphabetic';
 }
 function drawHUD() {
-  hudText('🧶 × ' + game.balls, 24, 14, 22, '#ffd9a8');
-  hudText('⚖ ' + game.weightLb.toFixed(1) + ' lb', 24, 42, 19, '#ffd9a8');
+  const lastBall = game.balls === 1 && !game.over && !game.shots.length;
+  const pulse = lastBall && !REDUCED ? 0.72 + 0.28 * Math.sin(game.time * 7) : 1;
+  ctx.save();
+  ctx.globalAlpha = pulse;
+  hudText('🧶 × ' + game.balls, 24, 14, 22, lastBall ? '#ff8a80' : '#ffd9a8');
+  ctx.restore();
+  if (lastBall) hudText('LAST BALL', 24, 42, 13, '#ff8a80');
+  else hudText('⚖ ' + game.weightLb.toFixed(1) + ' lb', 24, 42, 19, '#ffd9a8');
 
   // Chonk meter
   const mw = 230, mx = W / 2 - mw / 2, my = 14;
@@ -739,17 +876,25 @@ function drawPreview() {
   const ang = aimAngleFor(game.aim.x, game.aim.y);
   if (ang == null) return;
   game.aimAng = ang;
-  let x = SHOOT.x, y = SHOOT.y + 26;
-  let vx = Math.cos(ang) * BALL_SPEED, vy = Math.sin(ang) * BALL_SPEED;
-  const s = 1 / 60;
-  ctx.fillStyle = 'rgba(91,58,30,0.45)';
-  for (let i = 0; i < 36; i++) {
-    vy += Physics.GRAV * s;
-    x += vx * s; y += vy * s;
-    if (i % 3 === 0 && y < 660) {
-      ctx.beginPath(); ctx.arc(x, y, 3.2, 0, 7); ctx.fill();
+  // Multi-yarn previews all three ghost trajectories (the quirk where only the
+  // center ball previewed is fixed — the outer paths preview dimmer).
+  const angs = [ang];
+  if (game.multiShots > 0) angs.push(ang - 0.13, ang + 0.13);
+  const trace = (a, alpha) => {
+    let x = SHOOT.x, y = SHOOT.y + 26;
+    let vx = Math.cos(a) * BALL_SPEED, vy = Math.sin(a) * BALL_SPEED;
+    const s = 1 / 60;
+    ctx.fillStyle = 'rgba(91,58,30,' + alpha + ')';
+    for (let i = 0; i < 36; i++) {
+      vy += Physics.GRAV * s;
+      x += vx * s; y += vy * s;
+      if (i % 3 === 0 && y < 660) {
+        ctx.beginPath(); ctx.arc(x, y, 3.2, 0, 7); ctx.fill();
+      }
     }
-  }
+  };
+  if (angs.length > 1) { trace(angs[1], 0.25); trace(angs[2], 0.25); }
+  trace(angs[0], 0.45);
 }
 
 function drawItems() {
@@ -763,19 +908,32 @@ function drawItems() {
     // tiny shadow
     ctx.fillStyle = 'rgba(0,0,0,0.10)';
     ctx.beginPath(); ctx.ellipse(it.x, it.y + 10, 8, 3, 0, 0, 7); ctx.fill();
-    const key = 'food_' + it.content;
-    if (typeof Assets !== 'undefined' && Assets.ok(key)) {
-      const im = Assets.imgs[key], s = 40;
-      ctx.drawImage(im, it.x - s / 2, it.y - s / 2, s, s);
-      continue;
+    ctx.save(); // rotation pass (2026-10-20): loot tumbles while airborne, sits flat on the belt
+    ctx.translate(it.x, it.y);
+    ctx.rotate(it.rot || 0);
+    const fim = typeof Assets !== 'undefined' ? Assets.food(it.content) : null;
+    if (fim) {
+      const im = fim, s = 40;
+      ctx.drawImage(im, -s / 2, -s / 2, s, s);
+    } else {
+      ctx.fillText(it.icon, 0, 0);
     }
-    ctx.fillText(it.icon, it.x, it.y);
+    ctx.restore();
   }
   ctx.textBaseline = 'alphabetic';
 }
 
 function drawBall() {
-  for (const b of game.shots) drawYarn(ctx, b.x, b.y, b.r + 3);
+  for (const b of game.shots) {
+    if (!REDUCED && b.trail && b.trail.length > 1) { // fading yarn wake — oldest points smallest and faintest
+      for (let i = 0; i < b.trail.length; i++) {
+        const p = b.trail[i], k = (i + 1) / (b.trail.length + 1);
+        ctx.fillStyle = 'rgba(194,148,90,' + (k * 0.32).toFixed(2) + ')';
+        ctx.beginPath(); ctx.arc(p.x, p.y, (b.r + 3) * k * 0.75, 0, 7); ctx.fill();
+      }
+    }
+    drawYarn(ctx, b.x, b.y, b.r + 3, b.rot || 0);
+  }
 }
 
 function drawPopups() {
@@ -796,10 +954,12 @@ function drawPopups() {
 
 function drawPowerHUD() {
   const bits = [];
+  if (game.combo >= 2) bits.push('🔥 COMBO ×' + game.combo + (game.mult > 1 ? ' · ×' + game.mult : ''));
   if (game.multiShots > 0) bits.push('🧶×3 NEXT');
   if (game.bridgeT > 0)     bits.push('⭐ BRIDGE ' + Math.ceil(game.bridgeT));
   if (game.slowT > 0)       bits.push('⭐ SLOW ' + Math.ceil(game.slowT));
   if (game.magnetT > 0)     bits.push('⭐ MAGNET ' + Math.ceil(game.magnetT));
+  if (game.vacuum && game.vacuum.zapT > 0) bits.push('⚡ ZAP ' + Math.ceil(game.vacuum.zapT));
   if (!bits.length) return;
   ctx.font = '600 14px system-ui, sans-serif';
   ctx.textAlign = 'center';
@@ -872,10 +1032,11 @@ function render() {
   drawItems();
   drawPreview();
   drawBall();
+  drawRings(ctx);
   drawParticles(ctx);
   ctx.restore();
   Cats.drawShooter(ctx, SHOOT.x, SHOOT.y, game.aimAng, !game.shots.length && game.balls > 0 && !game.over);
-  Cats.drawMain(ctx, 252, 806 - (game.scareJump || 0), { // spooked cats hop
+  Cats.drawMain(ctx, 452, 806 - (game.scareJump || 0), { // spooked cats hop — sits right of the center bowl
     t: chonkT(game.phys.shownLb), lb: game.phys.shownLb, phys: game.phys, wob: game.wob, var: game.catVar,
     nomT: game.nomT, face: game.face, time: game.time,
   });
@@ -901,8 +1062,68 @@ AudioSys.loadMute();
 refreshMute();
 game.weightLb = Profile.weight();
 
+/* ---------------- pause ---------------- */
+const pauseOverlay = document.getElementById('pauseOverlay');
+function hidePause() { game.paused = false; pauseOverlay.classList.add('hidden'); }
+function togglePause() {
+  if (game.menuOpen || game.over) return; // nothing worth pausing on menus / results
+  game.paused = !game.paused;
+  pauseOverlay.classList.toggle('hidden', !game.paused);
+  if (game.paused) { game.aim = null; game.aimAng = null; } // drop a mid-drag aim line
+}
+document.getElementById('pauseBtn').addEventListener('click', (e) => { e.stopPropagation(); togglePause(); });
+document.getElementById('pauseResume').addEventListener('click', (e) => { e.stopPropagation(); togglePause(); });
+document.getElementById('pauseRestart').addEventListener('click', (e) => {
+  e.stopPropagation();
+  hidePause();
+  if (game.daily) loadDaily();
+  else if (game.endless) loadEndless(game.endless.depth);
+  else loadLevel(game.levelIndex);
+});
+document.getElementById('pauseMute').addEventListener('click', (e) => {
+  e.stopPropagation();
+  AudioSys.init(); AudioSys.toggle(); refreshMute();
+  e.target.textContent = AudioSys.muted ? '🔇 sound' : '🔊 sound';
+});
+document.getElementById('pauseQuit').addEventListener('click', (e) => { e.stopPropagation(); hidePause(); showMenu(); });
+
+/* ---------------- trophies (menu) ---------------- */
+function renderTrophyPanel() {
+  const won = Profile.trophies();
+  document.getElementById('trophyCount').textContent = '(' + Object.keys(won).length + '/' + ACHIEVEMENTS.length + ')';
+  const list = document.getElementById('trophyList');
+  list.innerHTML = '';
+  for (const a of ACHIEVEMENTS) {
+    const d = document.createElement('div');
+    d.className = 'trophy ' + (won[a.id] ? 'won' : 'locked');
+    const hint = won[a.id] ? null : Achievements.progress(a.id);
+    d.innerHTML = '<div class="t-name">' + a.icon + ' ' + a.name + '</div>' +
+      '<div class="t-desc">' + a.desc + '</div>' +
+      (won[a.id] ? '<div class="t-date">' + new Date(won[a.id]).toLocaleDateString() + '</div>' :
+        (hint ? '<div class="t-prog">' + hint + '</div>' : ''));
+    list.appendChild(d);
+  }
+}
+document.getElementById('trophyClose').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('trophyPanel').classList.add('hidden');
+});
+function renderTrophyRow() {
+  const tRow = document.getElementById('trophyRow');
+  tRow.innerHTML = '';
+  const tBtn = document.createElement('button');
+  tBtn.innerHTML = '🏆 Trophies <small>' + Achievements.count() + '/' + ACHIEVEMENTS.length + '</small>';
+  tBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    renderTrophyPanel();
+    document.getElementById('trophyPanel').classList.remove('hidden');
+  });
+  tRow.appendChild(tBtn);
+  document.getElementById('trophyPanel').classList.add('hidden'); // rebuild hides the stale panel
+}
+
 Input.init({
-  canAim: () => !game.over && !game.menuOpen && !game.shots.length && game.balls > 0,
+  canAim: () => !game.over && !game.menuOpen && !game.paused && !game.shots.length && game.balls > 0,
   onAimStart: (p) => { game.aim = p; game.aimAng = aimAngleFor(p.x, p.y); },
   onAimMove: (p) => { if (game.aim) { game.aim = p; game.aimAng = aimAngleFor(p.x, p.y); } },
   onAimEnd: (p) => {
@@ -964,11 +1185,23 @@ function showMenu() {
     (streak > 1 ? ' · 🔥 ' + streak + '-day streak' : '') + '</small>';
   dBtn.addEventListener('click', (e) => { e.stopPropagation(); hideMenu(); loadDaily(); });
   dRow.appendChild(dBtn);
+  // endless climb card — post-campaign survival; vacuum gets faster the deeper you go
+  const eBest = Profile.endlessBest();
+  const eRow = document.getElementById('endlessRow');
+  eRow.innerHTML = '';
+  const eBtn = document.createElement('button');
+  eBtn.innerHTML = '♾️ Endless Climb' +
+    '<small>' + (eBest.bestDepth > 0
+      ? 'best: depth ' + eBest.bestDepth + ' · ' + eBest.bestCal + ' cal' + (eBest.runs > 0 ? ' · ' + eBest.runs + ' runs' : '')
+      : 'survive the climb — the vacuum gets faster') + '</small>';
+  eBtn.addEventListener('click', (e) => { e.stopPropagation(); hideMenu(); loadEndless(1); });
+  eRow.appendChild(eBtn);
   const L = Profile.lifetime();
   document.getElementById('lifeRow').textContent =
     L.levelsCleared > 0
       ? `lifetime: ${L.totalCal} cal fed · best chonk ${L.bestChonk.toFixed(1)} lb · ${L.levelsCleared} levels cleared · max combo ×${L.maxCombo}`
       : '';
+  renderTrophyRow();
   levelGrid.innerHTML = '';
   for (let w = 0; w < 10; w++) { // world-map level select: collapsible world sections
     let wStars = 0;
@@ -1005,17 +1238,27 @@ function showMenu() {
   menuOverlay.classList.remove('hidden');
   if (!Profile.setting('howSeen', 0)) document.getElementById('howto').classList.remove('hidden'); // first-run tutorial
   if (AudioSys.music) AudioSys.music.setTrack('menu'); // light, curious, playful
+  if (typeof Mascot !== 'undefined') Mascot.mount(); // menu mascot: pupils track, blink, pettable
 }
-function hideMenu() { game.menuOpen = false; menuOverlay.classList.add('hidden'); }
+function hideMenu() { game.menuOpen = false; menuOverlay.classList.add('hidden'); if (typeof Mascot !== 'undefined') Mascot.rest(); }
 document.getElementById('menuBtn').addEventListener('click', (e) => { e.stopPropagation(); showMenu(); });
 document.getElementById('howtoGo').addEventListener('click', (e) => {
   e.stopPropagation();
   Profile.setSetting('howSeen', 1);
   document.getElementById('howto').classList.add('hidden');
 });
-document.getElementById('res-retry').addEventListener('click', () => { hideResults(); if (game.daily) loadDaily(); else loadLevel(game.levelIndex); });
+document.getElementById('res-retry').addEventListener('click', () => {
+  hideResults();
+  if (game.daily) loadDaily();
+  else if (game.endless) loadEndless(game.endless.depth);
+  else loadLevel(game.levelIndex);
+});
 document.getElementById('res-menu').addEventListener('click', () => { hideResults(); showMenu(); });
-document.getElementById('res-next').addEventListener('click', () => { hideResults(); loadLevel(game.levelIndex + 1); showSplash(game.levelIndex); });
+document.getElementById('res-next').addEventListener('click', () => {
+  hideResults();
+  if (game.endless) { loadEndless(game.endless.depth + 1); } // the climb continues deeper
+  else { loadLevel(game.levelIndex + 1); showSplash(game.levelIndex); }
+});
 document.getElementById('resetGame').addEventListener('click', (e) => {
   e.stopPropagation();
   if (confirm('Reset CHONK\'EM? This wipes best stars, lifetime stats and the cat\'s saved weight.')) {
@@ -1025,6 +1268,7 @@ document.getElementById('resetGame').addEventListener('click', (e) => {
 });
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { game.menuOpen ? hideMenu() : showMenu(); }
+  else if (e.key === 'p' || e.key === 'P') togglePause();
 });
 
 // Level intro splash card
@@ -1056,6 +1300,21 @@ function showDailySplash(date) {
   showSplash._t = setTimeout(() => sp.classList.add('hidden'), 2200);
 }
 
+// Endless-climb splash card
+function showEndlessSplash(depth) {
+  const L = genEndlessLevel(depth);
+  const D = DIFFS[Profile.setting('difficulty', 'normal')] || DIFFS.normal;
+  document.getElementById('splashTitle').textContent = '♾️ Endless Climb — Depth ' + depth;
+  document.getElementById('splashSub').textContent =
+    L.name + ' · goal ' + Math.round(L.goal * D.goal) + ' cal · ' +
+    Math.round(L.balls * D.balls) + ' yarn · vacuum ×' +
+    (1 + 0.05 * (5 + depth)).toFixed(2) + ' · lose and the run ends';
+  const sp = document.getElementById('levelSplash');
+  sp.classList.remove('hidden');
+  clearTimeout(showSplash._t);
+  showSplash._t = setTimeout(() => sp.classList.add('hidden'), 2200);
+}
+
 showMenu(); // boot into the level select
 
 let last = performance.now(), acc = 0;
@@ -1070,7 +1329,8 @@ function frameError(e) { // a bad frame must never kill the loop — report it, 
 function frame(now) {
   requestAnimationFrame(frame); // reschedule FIRST: an exception below can't stop the loop
   try {
-    if (game.menuOpen) { render(); return; }
+    if (typeof Mascot !== 'undefined') Mascot.frame(now); // menu mascot blink driver (no-op off-menu)
+    if (game.menuOpen || game.paused) { render(); return; } // paused: frozen sim, live canvas
     let dt = (now - last) / 1000;
     last = now;
     dt = Math.min(dt, 0.1);

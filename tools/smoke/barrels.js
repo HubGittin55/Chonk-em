@@ -10,14 +10,25 @@ step(60);
 T('vacuum: patrols slowly left/right', Math.abs(game.vacuum.x - vx0) > 1 && Math.abs(game.vacuum.x - vx0) < 60);
 game.vacuum.x = 529; game.vacuum.dir = 1; step(60);
 T('vacuum: bounces off the right wall', game.vacuum.dir === -1 && game.vacuum.x <= 530);
-game.vacuum.x = 300; game.vacuum.dir = 1;
-game.items.push({ x: 300, y: 700, vx: 0, vy: 0, r: 9, state: 'fall', cal: 3, t: 0, gone: false });
-game.items.push({ x: 320, y: 700, vx: 0, vy: 0, r: 9, state: 'belt', cal: 5, t: 0, gone: false });
-const farItem = { x: 550, y: 700, vx: 0, vy: 0, r: 9, state: 'belt', cal: 3, t: 0, gone: false };
-game.items.push(farItem);
+game.vacuum.x = 200; game.vacuum.dir = 1;
+// falling loot in the suction cone: yanked in and eaten
+game.items.push({ x: 200, y: 695, vx: 0, vy: 0, r: 9, state: 'fall', cal: 3, t: 0, gone: false });
 const eaten0 = game.vacuum.eaten;
-step(120); // 1s: enough for the 0.4s gulp between the two items
-T('vacuum: hoovers nearby fall + belt loot', game.vacuum.eaten >= eaten0 + 2);
+step(120);
+T('vacuum: hoovers nearby falling loot', game.vacuum.eaten >= eaten0 + 1);
+// belt loot in the cone: ripped off the belt, then eaten
+// (gulp cleared so the rip→eat chain is observable in isolation)
+game.vacuum.gulpT = 0; game.vacuum.eatenThisShot = 0;
+const beltIt = { x: 210, y: 700, vx: 0, vy: 0, r: 9, state: 'belt', belt: 'L', cal: 5, t: 0, gone: false };
+game.items.push(beltIt);
+step(3);
+T('vacuum: rips belt loot off the belt', beltIt.state === 'fall' && beltIt.sucked === true && !beltIt.gone);
+const eaten1 = game.vacuum.eaten;
+step(240);
+T('vacuum: eats the ripped loot', game.vacuum.eaten >= eaten1 + 1);
+const farItem = { x: 550, y: 700, vx: 0, vy: 0, r: 9, state: 'belt', belt: 'R', cal: 3, t: 0, gone: false };
+game.items.push(farItem);
+step(120);
 T('vacuum: ignores distant loot', !farItem.gone);
 T('vacuum: only 3 of 12 levels flagged', LEVELS.filter(L => L.vacuum).length === 3);
 T('vacuum: tuned down (suck 55 / eat 20 / 2 per shot)', Vacuum.SUCK_R === 55 && Vacuum.EAT_R === 20 && Vacuum.MEAL === 2);
@@ -28,6 +39,47 @@ T('vacuum: two-item limit per shot', (() => {
   const e0 = game.vacuum.eaten;
   step(300); // 2.5s: gulp windows let loot slip past, but the per-shot cap is never exceeded
   return game.vacuum.eaten - e0 <= 2;
+})());
+
+// 13b. EMP short-circuit barrel (vacuum counterplay, 2026-10-18)
+T('emp: CONTENT entry is a burst-immediate power', CONTENT.emp && CONTENT.emp.power === 'emp' && CONTENT.emp.cal === 0);
+T('emp: handcrafted vacuum levels each deal one', [5, 8, 11].every(i => LEVELS[i].barrels.some(b => b.kind === 'power' && b.content === 'emp')));
+T('emp: procedural vacuum levels deal one, non-vacuum levels deal none', (() => {
+  const withV = genLevelSeeded(12345, 5, 200, true), noV = genLevelSeeded(12345, 5, 200, false);
+  return withV.barrels.some(b => b.kind === 'power' && b.content === 'emp') &&
+         !noV.barrels.some(b => b.kind === 'power' && b.content === 'emp');
+})());
+T('emp: bursting one zaps the vacuum for 10s (no patrol, no suction)', (() => {
+  loadLevel(5);
+  const v = game.vacuum;
+  v.x = 200; v.dir = 1; v.gulpT = 0; v.eatenThisShot = 0;
+  onBarrelBurst({ x: 300, y: 400, kind: 'power', content: 'emp', cleared: false }, null);
+  if (v.zapT !== Vacuum.ZAP_SECS) return false;
+  const x0 = v.x, e0 = v.eaten;
+  const it = { x: 200, y: 690, vx: 0, vy: 0, r: 9, state: 'fall', cal: 3, t: 0, gone: false };
+  game.items.push(it);
+  step(120); // 1s: the item crosses the belt line and rides it, unsucked, uneaten
+  return v.x === x0 && v.zapT > 0 && v.zapT < Vacuum.ZAP_SECS && !it.sucked && v.eaten === e0;
+})());
+T('emp: vacuum recovers patrol and suction after the zap expires', (() => {
+  loadLevel(5);
+  const v = game.vacuum;
+  v.x = 200; v.dir = 1; v.zapT = 0.05; v.gulpT = 0; v.eatenThisShot = 0;
+  step(120); // zap burns off (0.05s), patrol resumes
+  const x0 = v.x;
+  game.items.push({ x: 200, y: 695, vx: 0, vy: 0, r: 9, state: 'fall', cal: 3, t: 0, gone: false });
+  const e0 = v.eaten;
+  step(120);
+  return v.zapT <= 0 && v.x !== x0 && v.eaten > e0;
+})());
+T('emp: fires cleanly with no vacuum on the level', (() => {
+  loadLevel(0);
+  onBarrelBurst({ x: 300, y: 400, kind: 'power', content: 'emp', cleared: false }, null);
+  return game.vacuum === null && game.rings.length > 0;
+})());
+T('emp: never disturbs the every-level split powerup', (() => {
+  const L = genLevelSeeded(999, 5, 200, true);
+  return L.barrels.some(b => b.kind === 'power' && b.content === 'split');
 })());
 
 // 14. food physics: bounce, never burst
@@ -297,6 +349,7 @@ T('vacuum-v2: gulp pause after eating blocks suction', (() => {
     if (game.vacuum) {
       const v = game.vacuum;
       if (v.gulpT !== 0) return false;
+      v.x = 200; // keep clear of the center-bowl chute protection zone
       let eaten = 0;
       game.items = [{ x: v.x, y: 740, vx: 0, vy: 0, r: 9, state: 'fall', cal: 3, t: 0, gone: false }];
       Vacuum.tick(v, 1 / 60, game.items, () => { eaten++; });
@@ -313,8 +366,8 @@ T('vacuum-v2: suction resumes after the gulp, per-shot cap intact', (() => {
     loadLevel(i);
     if (game.vacuum) {
       const v = game.vacuum;
-      v.x = 300; v.eatenThisShot = 0;
-      const drop = () => game.items.push({ x: 300, y: 735, vx: 0, vy: 0, r: 9, state: 'fall', cal: 3, t: 0, gone: false });
+      v.x = 200; v.eatenThisShot = 0; // keep clear of the center-bowl chute protection zone
+      const drop = () => game.items.push({ x: 200, y: 735, vx: 0, vy: 0, r: 9, state: 'fall', cal: 3, t: 0, gone: false });
       drop(); step(30); // first item eaten, gulp starts
       if (v.gulpT <= 0) return false;
       step(60); // gulp expires
@@ -337,3 +390,57 @@ T('vacuum-v2: speed scales with world', (() => {
   return false;
 })());
 
+
+// 2026-10-16: per-exotic signature effects
+T('exotic-fx: every exotic (15+ cal) has a signature entry', (() => {
+  const exotics = Object.keys(CONTENT).filter(k => CONTENT[k].cal >= 15);
+  return exotics.length === 18 &&
+    exotics.every(k => EXOTIC_FX[k] && EXOTIC_FX[k].text && EXOTIC_FX[k].colors.length >= 3);
+})());
+T('exotic-fx: burst pops the named popup + signature particles (no slow-mo below 75 cal)', (() => {
+  loadLevel(12); // L13: exotics legal
+  const p0 = game.particles.length;
+  FX.exoticFx(300, 400, 'lobster');
+  const popped = game.popups.some(p => p.text === EXOTIC_FX.lobster.text);
+  const sigCols = game.particles.slice(p0).every(p => EXOTIC_FX.lobster.colors.includes(p.color));
+  return popped && game.particles.length > p0 && sigCols && game.fxSlowT === 0;
+})());
+T('exotic-fx: imperial-tier feast (75+ cal) steals a slow-mo beat', (() => {
+  loadLevel(12);
+  FX.exoticFx(300, 400, 'imperial');
+  return game.fxSlowT > 0;
+})());
+T('exotic-fx: bursting an exotic barrel routes through the signature + still drops loot', (() => {
+  loadLevel(0);
+  const b = { x: 300, y: 400, r: 15, kind: 'snack', content: 'caviar', cleared: false };
+  const p0 = game.particles.length;
+  onBarrelBurst(b, null);
+  return game.particles.length > p0 &&
+    game.popups.some(p => p.text === EXOTIC_FX.caviar.text) &&
+    game.items.some(it => it.content === 'caviar');
+})());
+
+
+// 14b. rotation pass (2026-10-20): falling loot tumbles, belt loot sits flat
+loadLevel(0);
+// clear lane left of the barrel field (level 1 barrels span x 165-435): vx=60 -> 5.4 rad/s
+const ti = { x: 100, y: 300, vx: 60, vy: 0, r: 9, state: 'fall', cal: 3, t: 0, gone: false, rot: 0 };
+game.items.push(ti);
+step(60); // 0.5s of fall
+T('rotation: falling food tumbles with vx', ti.rot > 2.5 && ti.rot < 2.9);
+T('rotation: food tumble direction matches vx sign', ti.rot > 0);
+loadLevel(0);
+const si = { x: 200, y: 600, vx: 0, vy: 50, r: 9, state: 'fall', cal: 3, t: 0, gone: false, rot: 0 };
+game.items.push(si);
+let belted = false;
+for (let i = 0; i < 240; i++) { tick(1 / 120); if (si.state === 'belt') { belted = true; break; } }
+step(120); // ride the belt: tumble damps out
+T('rotation: belt loot settles flat (rot damps to 0)', belted && si.rot === 0);
+T('rotation: burst-spawned loot starts with rot 0', (() => {
+  loadLevel(0);
+  const sb = game.barrels.find(b => !b.cleared && b.kind === 'snack' && CONTENT[b.content]);
+  const n0 = game.items.length;
+  onBarrelBurst(sb, null);
+  const spawned = game.items.slice(n0);
+  return spawned.length === 1 && spawned[0].rot === 0;
+})());
