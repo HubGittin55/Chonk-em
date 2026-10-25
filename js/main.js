@@ -2,6 +2,7 @@
 /* CHONK'EM v0.1 — game orchestration: loop, states, scoring, rendering. */
 
 const W = 600, H = 900;
+let HUD_SAFE_RIGHT = W - 140; // game-x the HUD stage·cal line must not pass (top-right buttons); set properly by fitCanvas
 const REDUCED = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -47,6 +48,10 @@ function fitCanvas() {
   // each strip a blurry block with hard edges. 'high' = sharp, seam-free chonk.
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
+  // Top-right DOM button cluster (mute/menu/pause) ends 124 CSS px from the
+  // wrap's right edge; the HUD stage·cal line must stop 8px short of it.
+  // Converted to game coords so drawHUD can dodge the cluster at any width.
+  HUD_SAFE_RIGHT = W - 132 * (W / (r.width || W));
 }
 window.addEventListener('resize', fitCanvas);
 fitCanvas();
@@ -198,7 +203,7 @@ function startLevel(L, i) {
   dealMovers(game.barrels, dn); // world 4+: moving snack barrels on slow sinusoidal tracks
   game.calories = 0;
   game.stage = 0;
-  game.combo = 0; game.mult = 1.5;
+  game.combo = 0; game.mult = 1;
   game.over = null;
   game.aim = null; game.aimAng = null;
   game.nomT = 0; game.face = 'normal'; game.faceT = 0;
@@ -258,7 +263,7 @@ function fireShot(px, py) {
     const nb = {
       x: SHOOT.x, y: SHOOT.y + 26,
       vx: Math.cos(a) * BALL_SPEED, vy: Math.sin(a) * BALL_SPEED,
-      r: BALL_R, life: 0, slowT: 0, bounces: 0, trail: [], rot: 0,
+      r: BALL_R, life: 0, slowT: 0, bounces: 0, gentleT: 0, stuckT: 0, trail: [], rot: 0,
     };
     if (game.splitNext && game.shots.length === 0) { nb.splitArmed = true; game.splitNext = false; }
     game.shots.push(nb);
@@ -392,7 +397,7 @@ function onBarrelBurst(barrel, ball) {
       game.shots.push({
         x: ball.x, y: ball.y,
         vx: Math.cos(base + da) * sp * 0.92, vy: Math.sin(base + da) * sp * 0.92,
-        r: ball.r, life: 0, slowT: 0, bounces: 0, trail: [], rot: ball.rot || 0,
+        r: ball.r, life: 0, slowT: 0, bounces: 0, gentleT: 0, stuckT: 0, trail: [], rot: ball.rot || 0,
       });
     }
     AudioSys.pop();
@@ -515,8 +520,9 @@ function deliver(item) {
   }
   const before = game.stage;
 
-  // Combo calorie multiplier: every 3 clean deliveries bumps it, cap 3x.
-  game.mult = Math.min(3, 1.5 + 0.5 * Math.floor(game.combo / 3)); // 1.5x base, +0.5x per 3 combo, cap 3x (owner 2026-10-13)
+  // Combo calorie multiplier: +0.1x per clean delivery, cap 3x (owner 2026-10-22).
+  // Rounded to 1dp so the HUD never prints float dust (1.2000000000000002x).
+  game.mult = Math.min(3, Math.round((1 + 0.1 * game.combo) * 10) / 10);
   const gained = item.cal > 0 ? item.cal * game.mult : item.cal;
 
   game.calories = Math.max(0, game.calories + gained);
@@ -541,7 +547,7 @@ function deliver(item) {
   }
 
   if (item.cal < 0) {
-    game.combo = 0; game.mult = 1.5;
+    game.combo = 0; game.mult = 1;
     game.veggies++; game.stageVeggies++;
     game.face = 'disgust'; game.faceT = 1.8;
     AudioSys.sad();
@@ -550,14 +556,14 @@ function deliver(item) {
     game.combo++;
     game.maxCombo = Math.max(game.maxCombo || 0, game.combo);
     Achievements.noteCombo(game.combo);
-    if (item.cal >= 75) Achievements.unlock('imperial'); // 75+ cal feast delivered
+    if (item.content === 'imperial') Achievements.unlock('imperial'); // the Imperial Feast itself, delivered
     AudioSys.nom();
     addPopup(Conveyor.BOWL_X, Conveyor.BOWL_Y - 64, '+' + gained, '#2e7d32');
     spawnCrumbs(Conveyor.BOWL_X, Conveyor.BOWL_Y - 18);
     if (item.cal >= 15 || item.golden) FX.confetti(Conveyor.BOWL_X, Conveyor.BOWL_Y - 40, item.golden ? 40 : 22); // exotics rain paper
     if (game.combo >= 2) {
       addPopup(Conveyor.BOWL_X + 96, Conveyor.BOWL_Y - 96,
-        'COMBO ×' + game.combo + (game.mult > 1 ? '  (×' + game.mult + ' cal)' : ''), '#ff8f00');
+        'COMBO ×' + game.combo + (game.mult > 1 ? '  (×' + game.mult.toFixed(1) + ' cal)' : ''), '#ff8f00');
       if (game.combo >= 6 && game.faceT < 1) { game.face = 'smug'; game.faceT = 1.6; } // the cat knows it's good
     }
   }
@@ -592,7 +598,7 @@ function triggerFrenzy() {
 
 function loseItem(item) {
   if (game.over) return;
-  game.combo = 0; game.mult = 1.5;
+  game.combo = 0; game.mult = 1;
   game.misses++; game.stageMisses++;
   game.face = 'sad'; game.faceT = 1.2;
   AudioSys.sad();
@@ -721,9 +727,10 @@ function tick(dt) {
       if (it.y > H + 40 && !it.gone) { it.gone = true; loseItem(it); }
     } else if (it.state === 'belt') {
       it.x += (it.belt === 'L' ? 1 : -1) * Conveyor.SPEED * wdt; // inward, toward the gap
-      // rotation pass (2026-10-20): loot lands flat on the belt — ease any tumble out
-      it.rot = (it.rot || 0) * Math.max(0, 1 - 8 * wdt);
-      if (Math.abs(it.rot) < 0.02) it.rot = 0;
+      // rotation pass (2026-10-25, Blarmo's directive): loot rides the belt
+      // frozen at its landing angle — the 2026-10-20 damp-to-flat snapped it
+      // visibly upright on landing. No rot update here at all: it.rot stays
+      // whatever the fall tumble left it at when the belt catch fired.
       if (it.x >= Conveyor.GAP_L && it.x <= Conveyor.GAP_R) it.state = 'drop'; // into the bowl
     } else if (it.state === 'drop') {
       it.y += 460 * wdt;
@@ -838,6 +845,19 @@ function drawBackground() {
   ctx.fillRect(0, 0, W, H);
 }
 
+// Placement for the HUD stage·cal line: centered at W/2 normally; if the text
+// would reach the top-right button cluster (safeRight), shift it left so its
+// right edge stops at safeRight; if it still would not fit between the left
+// stats (x < 140) and the cluster, shrink it (floor 11px). Never returns a
+// center left of the band, and non-finite widths (stub contexts) stay centered.
+function hudLinePlace(lw, size, safeRight) {
+  const bandL = 140, cx = W / 2;
+  if (!isFinite(lw) || cx + lw / 2 <= safeRight) return { x: cx, size };
+  let s = size, w = lw;
+  if (lw > safeRight - bandL) { s = Math.max(11, Math.floor(size * (safeRight - bandL) / lw)); w = lw * (s / size); }
+  return { x: Math.max(bandL + w / 2, Math.min(cx, safeRight - w / 2)), size: s };
+}
+
 // High-contrast canvas text: dark outline under bright fill, readable over the kitchen bg.
 function hudText(txt, x, y, size, color, align) {
   ctx.font = 'bold ' + size + 'px system-ui, sans-serif';
@@ -858,17 +878,41 @@ function drawHUD() {
   if (lastBall) hudText('LAST BALL', 24, 42, 13, '#ff8a80');
   else hudText('⚖ ' + game.weightLb.toFixed(1) + ' lb', 24, 42, 19, '#ffd9a8');
 
-  // Chonk meter
+  // Chonk meter — star-progress edition (2026-10-23, owner directive; thresholds
+  // retuned 2026-10-25 to 60/80/100): the fill and the hash marks live in
+  // starsFor's coordinate system (weight gained as a fraction of the level's
+  // total raw calories), so the marks sit at the REAL star thresholds:
+  // 1★ = goal/raw (~60%), 2★ = 80%, 3★ = 100% (full bar = 3★).
   const mw = 230, mx = W / 2 - mw / 2, my = 14;
   ctx.fillStyle = 'rgba(91,58,30,0.18)';
   ctx.beginPath(); ctx.roundRect(mx, my, mw, 20, 10); ctx.fill();
-  const frac = Math.max(0, Math.min(1, game.calories / game.goalNow));
-  if (frac > 0) {
+  const rawTotal = Math.max(1, rawCal(game.level));
+  const sfrac = Math.max(0, Math.min(1, (game.weightLb - START_LB) / (LB_PER_CAL * rawTotal)));
+  if (sfrac > 0) {
     ctx.fillStyle = '#e8712b';
-    ctx.beginPath(); ctx.roundRect(mx, my, mw * frac, 20, 10); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(mx, my, mw * sfrac, 20, 10); ctx.fill();
   }
-  hudText(`${STAGES[game.stage].name} · ${game.calories}/${game.goalNow} cal` +
-    (game.mult > 1 ? ` · ×${game.mult}` : ''), W / 2, 40, 15, '#ffe9c9', 'center');
+  // star hash marks — white ticks on the bar, tiny gold numerals above.
+  // Positions from starMarks(): the real starsFor thresholds, so the marks
+  // never drift from what the weigh-in awards.
+  const marks = starMarks(game.level, game.goalNow);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  marks.forEach((m, i) => {
+    const x = mx + mw * Math.max(0.02, m);
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x, my - 1); ctx.lineTo(x, my + 21); ctx.stroke();
+    ctx.fillStyle = '#ffd54f'; ctx.font = 'bold 10px sans-serif';
+    ctx.fillText(String(i + 1), x, my - 3);
+  });
+  // Stage·cal line: centered, but it used to slide under the top-right button
+  // cluster on narrow windows. hudLinePlace shifts it left (shrinking only if
+  // the band between the left stats and the cluster is too narrow), so the
+  // line never hides under a button or the yarn/weight readouts.
+  const hudLine = `${STAGES[game.stage].name} · ${game.calories}/${game.goalNow} cal` +
+    (game.mult > 1 ? ` · ×${game.mult.toFixed(1)}` : '');
+  ctx.font = 'bold 15px system-ui, sans-serif';
+  const lp = hudLinePlace(ctx.measureText(hudLine).width, 15, HUD_SAFE_RIGHT);
+  hudText(hudLine, lp.x, 40, lp.size, '#ffe9c9', 'center');
 }
 
 function drawPreview() {
@@ -908,7 +952,7 @@ function drawItems() {
     // tiny shadow
     ctx.fillStyle = 'rgba(0,0,0,0.10)';
     ctx.beginPath(); ctx.ellipse(it.x, it.y + 10, 8, 3, 0, 0, 7); ctx.fill();
-    ctx.save(); // rotation pass (2026-10-20): loot tumbles while airborne, sits flat on the belt
+    ctx.save(); // rotation pass (2026-10-20 tumble, 2026-10-25 belt freeze): loot tumbles while airborne, rides the belt at its landing angle
     ctx.translate(it.x, it.y);
     ctx.rotate(it.rot || 0);
     const fim = typeof Assets !== 'undefined' ? Assets.food(it.content) : null;
@@ -954,7 +998,7 @@ function drawPopups() {
 
 function drawPowerHUD() {
   const bits = [];
-  if (game.combo >= 2) bits.push('🔥 COMBO ×' + game.combo + (game.mult > 1 ? ' · ×' + game.mult : ''));
+  if (game.combo >= 2) bits.push('🔥 COMBO ×' + game.combo + (game.mult > 1 ? ' · ×' + game.mult.toFixed(1) : ''));
   if (game.multiShots > 0) bits.push('🧶×3 NEXT');
   if (game.bridgeT > 0)     bits.push('⭐ BRIDGE ' + Math.ceil(game.bridgeT));
   if (game.slowT > 0)       bits.push('⭐ SLOW ' + Math.ceil(game.slowT));
@@ -1036,7 +1080,7 @@ function render() {
   drawParticles(ctx);
   ctx.restore();
   Cats.drawShooter(ctx, SHOOT.x, SHOOT.y, game.aimAng, !game.shots.length && game.balls > 0 && !game.over);
-  Cats.drawMain(ctx, 452, 806 - (game.scareJump || 0), { // spooked cats hop — sits right of the center bowl
+  Cats.drawMain(ctx, 400, 806 - (game.scareJump || 0), { // spooked cats hop — sits just right of the center bowl (bowl rim 359; the cat overlaps the rim in front, never behind it)
     t: chonkT(game.phys.shownLb), lb: game.phys.shownLb, phys: game.phys, wob: game.wob, var: game.catVar,
     nomT: game.nomT, face: game.face, time: game.time,
   });

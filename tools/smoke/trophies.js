@@ -69,8 +69,8 @@ T('trophies: EMP short unlocks shortcircuit', () => {
   fireEMP(300, 400);
   return Achievements.has('shortcircuit') && game.vacuum.zapT > 0;
 });
-T('trophies: 75+ cal delivery unlocks imperial', () => {
-  deliver({ x: 300, y: 700, cal: 80, icon: '🦞', name: 'Lobster', content: 'lobster', grav: 1, drift: 0, power: null, t: 0, gone: false });
+T('trophies: delivering an Imperial Feast unlocks imperial', () => {
+  deliver({ x: 300, y: 700, cal: CONTENT.imperial.cal, icon: '👑', name: 'Imperial Feast', content: 'imperial', grav: 1, drift: 0, power: null, t: 0, gone: false });
   return Achievements.has('imperial');
 });
 T('trophies: combo x6 / x12 unlock combo-chef / frenzy-master', () => {

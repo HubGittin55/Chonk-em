@@ -32,9 +32,9 @@ body {
 }
 #overlay button:active { transform: scale(0.96); }
 #mute {
-  position: absolute; top: 10px; right: 10px; z-index: 5;
+  position: absolute; top: 10px; right: 8px; z-index: 5;
   font-size: 20px; line-height: 1;
-  width: 42px; height: 42px; border-radius: 50%;
+  width: 36px; height: 36px; border-radius: 50%;
   background: rgba(255, 255, 255, 0.8); border: none; cursor: pointer;
 }
 #mute:active { transform: scale(0.92); }
@@ -156,9 +156,9 @@ body {
   background: transparent; color: #e8a37c; cursor: pointer;
 }
 #menuBtn {
-  position: absolute; top: 10px; right: 60px; z-index: 5;
+  position: absolute; top: 10px; right: 48px; z-index: 5;
   font-size: 20px; line-height: 1;
-  width: 42px; height: 42px; border-radius: 50%;
+  width: 36px; height: 36px; border-radius: 50%;
   background: rgba(255, 255, 255, 0.8); border: none; cursor: pointer;
 }
 #menuBtn:active { transform: scale(0.92); }
@@ -230,9 +230,9 @@ body {
 
 /* 2026-10-19 daily polish: pause button/overlay, trophy toast + menu panel. */
 #pauseBtn {
-  position: absolute; top: 10px; right: 110px; z-index: 5;
+  position: absolute; top: 10px; right: 88px; z-index: 5;
   font-size: 18px; line-height: 1;
-  width: 42px; height: 42px; border-radius: 50%;
+  width: 36px; height: 36px; border-radius: 50%;
   background: rgba(255, 255, 255, 0.8); border: none; cursor: pointer;
 }
 #pauseBtn:active { transform: scale(0.92); }

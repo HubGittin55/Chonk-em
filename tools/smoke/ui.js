@@ -1,10 +1,11 @@
 /* CHONK'EM smoke suite: weigh-in ceremony, music loader, daily challenge, menu,
    menu mascot. Loaded by tools/smoke.js — shares the harness globals. */
-T('weigh: stars are weight-based (1 win / 2 @70% / 3 @82% of level food)', (() => {
+T('weigh: stars are weight-based (1 win / 2 @80% / 3 @100% of level food)', (() => {
   loadLevel(0);
   const L = game.level, max = START_LB + LB_PER_CAL * rawCal(L);
-  return starsFor(START_LB + 0.85 * (max - START_LB), L) === 3 &&
-         starsFor(START_LB + 0.75 * (max - START_LB), L) === 2 &&
+  return starsFor(START_LB + 1.0 * (max - START_LB), L) === 3 &&
+         starsFor(START_LB + 0.99 * (max - START_LB), L) === 2 &&
+         starsFor(START_LB + 0.85 * (max - START_LB), L) === 2 &&
          starsFor(START_LB + 0.1 * (max - START_LB), L) === 1;
 })());
 T('weigh: ceremony runs needle to target and fires finale', (() => {
@@ -50,7 +51,7 @@ T('v0.5: no item wedges forever (freeze regression)', (() => {
 T('v0.5: big bites no longer 2x the cat (capped eating kick)', (() => {
   loadLevel(0);
   game.wob.belly.x = 0; game.wob.belly.v = 0;
-  deliver({ cal: 100 }); // imperial feast: old kick 1.6+35 -> ~2x height blowup
+  deliver({ cal: 100 }); // big bite at the old imperial-feast scale: old kick 1.6+35 -> ~2x height blowup
   let peak = 0;
   for (let i = 0; i < 600; i++) { tick(1 / 120); peak = Math.max(peak, Math.abs(game.wob.belly.x)); }
   return peak < 3.5; // capped: old formula peaked ~16 (2x+ visual blowup)
@@ -71,7 +72,8 @@ T('v0.5: weigh-in stars light cumulatively (1st star not skipped)', (() => {
     for (let i = 0; i < 400; i++) updateWeigh(1 / 60);
     return game.weigh.lit;
   };
-  return run(0.5) === 1 && run(0.8) === 2 && run(0.95) === 3;
+  // 2026-10-25: 60/80/100 ladder — 0.95 is only 2★ now, 3★ needs the full clear
+  return run(0.5) === 1 && run(0.8) === 2 && run(0.95) === 2 && run(1.0) === 3;
 })());
 T('v0.5: frame loop is unkillable (reschedule-first + try/catch + step cap)', (() => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'js', 'main.js'), 'utf8');
@@ -262,4 +264,72 @@ T('mascot: pet meows weight-pitched, then the cooldown blocks spam', (() => {
   Mascot.pet(); // inside the 700ms cooldown: swallowed
   AudioSys.meow = realMeow;
   return calls.length === 1 && calls[0] === chonkT(game.weightLb);
+})());
+
+// 2026-10-23: star hash marks on the chonk meter (owner directive) — the marks
+// must sit at the REAL starsFor thresholds, not hardcoded guesses.
+// Retuned 2026-10-25 to 60/80/100 (Blarmo's decision).
+T('star-meter: hash marks reconcile with starsFor (1★ ~goal/raw, 2★ 80%, 3★ 100%)', (() => {
+  loadLevel(0);
+  const marks = starMarks(game.level, game.goalNow);
+  const raw = rawCal(game.level);
+  const lbAt = m => START_LB + LB_PER_CAL * raw * m;
+  return Math.abs(marks[0] - game.goalNow / raw) < 1e-9 &&
+    marks[1] === 0.80 && marks[2] === 1.00 &&
+    starsFor(lbAt(marks[1]), game.level) === 2 &&
+    starsFor(lbAt(marks[2]), game.level) === 3 &&
+    starsFor(lbAt(marks[1]) - 0.01, game.level) === 1;
+})());
+T('star-meter: drawHUD renders meter + marks without throwing', (() => {
+  loadLevel(0);
+  game.weightLb = START_LB + 1; // partial fill so the bar and marks both draw
+  try { drawHUD(); } catch (e) { return false; }
+  return true;
+})());
+// 2026-10-24 pause-btn-overlap: the button cluster shrank (36px, right offsets
+// 8/48/88) and the stage·cal line dodges it instead of sliding underneath.
+T('pause-btn-overlap: cluster is 36px buttons at right 8/48/88', (() => {
+  const css = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'css', 'style.css'), 'utf8');
+  const block = (id) => (css.split(id + ' {')[1] || '').split('}')[0];
+  const ok = (id, right) => /width: 36px/.test(block(id)) && new RegExp('right: ' + right + 'px').test(block(id));
+  return ok('#mute', 8) && ok('#menuBtn', 48) && ok('#pauseBtn', 88);
+})());
+T('pause-btn-overlap: hudLinePlace centers, shifts, and shrinks', (() => {
+  const a = hudLinePlace(200, 15, 468);   // centered text clears the cluster
+  const b = hudLinePlace(300, 15, 400);   // longer than the 260px band: shrunk to 13, right edge at 400
+  const c = hudLinePlace(500, 15, 400);   // far wider than the band: shrunk to the 11px floor, left edge kept at 140
+  return a.x === 300 && a.size === 15 &&
+    b.size === 13 && Math.abs((b.x + (300 * b.size / 15) / 2) - 400) < 1e-9 &&
+    c.size === 11 && Math.abs((c.x - (500 * c.size / 15) / 2) - 140) < 1e-9;
+})());
+T('pause-btn-overlap: fitCanvas sets HUD_SAFE_RIGHT from the cluster', (() => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'js', 'main.js'), 'utf8');
+  return /HUD_SAFE_RIGHT = W - 132/.test(src) && drawHUD.toString().includes('hudLinePlace');
+})());
+// 2026-10-24 weighin-cat-pixelation: the scale canvas backs at displayed size x
+// dpr with 'high' smoothing instead of a fixed 320x250 'low' paint.
+T('weighin-cat-pixelation: drawScale uses DPR backing + high smoothing', (() => {
+  const origGet = global.document.getElementById, origDpr = global.window.devicePixelRatio;
+  const cv = elStub();
+  cv.getBoundingClientRect = () => ({ left: 0, top: 0, width: 320, height: 250 });
+  const seen = {};
+  const c2 = new Proxy({ canvas: cv }, {
+    get(t, k) { if (k in t) return t[k]; return (...a) => { seen[k] = a; return c2; }; },
+    set(t, k, v) { t[k] = v; seen[k] = v; return true; },
+  });
+  cv.getContext = () => c2;
+  global.document.getElementById = (id) => id === 'scaleCanvas' ? cv : origGet(id);
+  global.window.devicePixelRatio = 2;
+  try { drawScale({ shown: 50, confetti: [] }); } catch (e) { return false; }
+  finally { global.document.getElementById = origGet; global.window.devicePixelRatio = origDpr; }
+  return cv.width === 640 && cv.height === 500 && seen.imageSmoothingQuality === 'high' &&
+    seen.imageSmoothingEnabled === true && JSON.stringify(seen.setTransform) === '[2,0,0,2,0,0]';
+})());
+// 2026-10-24 cat-bowl-proximity: the main cat moves from +152 to +100 off the
+// bowl (452 -> 400) — visibly nearer, still right of the bowl, drawn in front
+// of it so the bowl rim stays readable.
+T('cat-bowl-proximity: main cat sits 100px right of the bowl, not 152', (() => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'js', 'main.js'), 'utf8');
+  const m = src.match(/Cats\.drawMain\(ctx, (\d+), 806/);
+  return m && +m[1] === 400 && +m[1] - Conveyor.BOWL_X === 100;
 })());

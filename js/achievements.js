@@ -18,7 +18,7 @@ const ACHIEVEMENTS = [
   { id: 'frenzy-master', icon: '🌪️', name: 'Frenzy Master',    desc: 'Reach combo ×12 in one level.' },
   { id: 'jackpot',       icon: '💰', name: 'Jackpot',          desc: 'Burst a golden barrel.' },
   { id: 'demolition',    icon: '🧨', name: 'Demolition Crew',  desc: 'Blow 3 powder kegs in one level.' },
-  { id: 'imperial',      icon: '👑', name: 'Imperial Banquet', desc: 'Deliver a 75+ calorie feast.' },
+  { id: 'imperial',      icon: '👑', name: 'Imperial Banquet', desc: 'Deliver an Imperial Feast.' },
   // ---- chaos & counterplay ----
   { id: 'jumpscare',     icon: '🥒', name: 'Jumpscare',        desc: 'Get the cat spooked by a cucumber.' },
   { id: 'cuke-hunter',   icon: '😱', name: 'Cucumber Season',  desc: 'Spook the cat 3 times in one level.' },

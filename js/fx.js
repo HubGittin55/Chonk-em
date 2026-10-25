@@ -82,7 +82,7 @@ const FX = {
       });
     }
     if (game.particles.length > 220) game.particles.splice(0, game.particles.length - 220);
-    if ((CONTENT[content] || {}).cal >= 75) this.slowmo(0.5, 0.8); // imperial-tier beat
+    if ((CONTENT[content] || {}).cal >= 30) this.slowmo(0.5, 0.8); // imperial-tier beat (top-3 exotics)
   },
 
   tick(dt) { // real-time decay of FX slow-mo (hit-stop is consumed in tick())

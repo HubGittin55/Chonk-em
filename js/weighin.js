@@ -6,12 +6,29 @@ function rawCal(L) {
   return L.barrels.filter(b => b.kind === 'snack')
     .reduce((a, b) => a + ((CONTENT[b.content] || {}).cal || 0), 0);
 }
-// Stars are WEIGHT stars now: 1 = goal met, 2 = 70% of the level's food delivered, 3 = 82%.
-// (Relaxed 2026-10-13: 75/90% punished normal item losses; breaking everything should star.)
+// Star hash marks for the HUD chonk meter (2026-10-25, Blarmo's 60/80/100
+// decision): fractions of the level's total raw calories, reconciled with
+// starsFor's real thresholds — 1★ = goal/raw (~60%), 2★ = 80%, 3★ = 100%
+// (full clear, so a full meter bar = 3★ and there is no dead zone at the
+// top). The meter fill in drawHUD uses the same coordinate system, so fill
+// and marks always agree. The 1★ mark stays goal-derived (the win rule is
+// the 1★ threshold) rather than a flat 0.60, since handcrafted goals round
+// to 60% of raw.
+function starMarks(L, goalNow) {
+  const raw = Math.max(1, rawCal(L));
+  return [Math.min(0.99, goalNow / raw), 0.80, 1.00];
+}
 function starsFor(lb, L) {
+  // WEIGHT stars: 1 = goal met, 2 = 80% of the level's food delivered,
+  // 3 = 100% (full clear). Blarmo's 2026-10-23 decision, superseding the
+  // 2026-10-13 relaxation (goal-met/70%/82%).
+  // The 1 - 1e-9 epsilon is float dust only: weight accumulates per-delivery
+  // (0.3 lb x cal) while max is computed from the raw total, so a true full
+  // clear can land an ulp short of 1.0; one calorie short is ~0.003 of frac,
+  // far above the epsilon, so it still correctly misses 3★.
   const max = START_LB + LB_PER_CAL * rawCal(L);
   const frac = (lb - START_LB) / Math.max(1, max - START_LB);
-  return frac >= 0.82 ? 3 : frac >= 0.7 ? 2 : 1;
+  return frac >= 1 - 1e-9 ? 3 : frac >= 0.8 ? 2 : 1;
 }
 
 function endGame(win) {
@@ -104,7 +121,7 @@ function updateWeigh(dt) { // real-time, called from tick()
   // star pops as the needle crosses each star's weight — cumulative: earning
   // star N lights stars 1..N (the old code left star 1 dark on 2- and 3-star wins)
   const max = START_LB + LB_PER_CAL * rawCal(game.level);
-  const need = [0, 0, START_LB + 0.7 * (max - START_LB), START_LB + 0.82 * (max - START_LB)];
+  const need = [0, 0, START_LB + 0.8 * (max - START_LB), START_LB + 1.0 * (max - START_LB)];
   const span = i => document.getElementById('rs' + i);
   const lightTo = (st) => {
     for (let s = 0; s < st; s++) {
@@ -154,6 +171,25 @@ function updateWeigh(dt) { // real-time, called from tick()
 function drawScale(w) {
   const cv = scaleCv(); if (!cv) return;
   const ctx = cv.getContext('2d');
+  // Render quality (2026-10-24): this canvas used to paint at a fixed 320x250
+  // backing with the browser's default 'low' smoothing — half-res on hidpi,
+  // and the per-strip sprite path turns each strip into a blurry block with
+  // hard edges (the same 'low'-filter fault fitCanvas fixed for the main
+  // canvas). Back it at displayed size x dpr (capped 2, like fitCanvas) and
+  // use 'high' smoothing, keeping the 320x250 coordinate system below.
+  const dpr = Math.min(2, (typeof window !== 'undefined' && window.devicePixelRatio) || 1);
+  let sx = 1, sy = 1;
+  if (typeof cv.getBoundingClientRect === 'function') {
+    const r = cv.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) {
+      const bw = Math.max(1, Math.round(r.width * dpr)), bh = Math.max(1, Math.round(r.height * dpr));
+      if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
+      sx = bw / 320; sy = bh / 250;
+    }
+  }
+  ctx.setTransform(sx, 0, 0, sy, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   const lb = w.shown;
   ctx.clearRect(0, 0, 320, 250);
   const cx = 160, cy = 132, R = 92;

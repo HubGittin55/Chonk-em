@@ -54,7 +54,7 @@ for (const n of [13, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]) {
   check(`L${n}: goal is 60% of raw`, L.goal === Math.round(r * 0.6), `goal=${L.goal} raw=${r}`);
   check(`L${n}: balls = 35% of food (min 8)`, L.balls === Math.max(8, Math.round(f * 0.35)), `balls=${L.balls} food=${f}`);
   check(`L${n}: par <= balls`, L.par <= L.balls);
-  check(`L${n}: 1★ reachable below 2★ (goal < 70% raw)`, L.goal < r * 0.7, `goal=${L.goal} 70%raw=${Math.round(r * 0.7)}`);
+  check(`L${n}: 1★ reachable below 2★ (goal < 80% raw)`, L.goal < r * 0.8, `goal=${L.goal} 80%raw=${Math.round(r * 0.8)}`);
   check(`L${n}: food floor holds`, f >= 8, `food=${f}`);
   check(`L${n}: food matches the spec ratio (f/f13 ≈ fm)`, Math.abs(f / f13base - fm) <= 0.15, `f=${f} f13=${f13base} fm=${fm}`);
 }

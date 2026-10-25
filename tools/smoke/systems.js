@@ -3,7 +3,7 @@
 // 8. stunkus systems: combo multiplier, frenzy, jiggle, eased body, shotsFired, mute
 loadLevel(0);
 deliver({ cal: 1 }); deliver({ cal: 1 }); deliver({ cal: 1 }); deliver({ cal: 1 });
-T('combos: after 3 clean deliveries, 4th+ earns ×2 calories', game.combo === 4 && game.mult === 2);
+T('combos: after 3 clean deliveries, 4th earns ×1.3 calories', game.combo === 4 && game.mult === 1.3);
 step(2); // phys mirror refreshes on tick()
 T('jiggle: delivery kicks the belly spring', game.jiggleV > 0);
 game.calories = 24; game.stageMisses = 0; game.stageVeggies = 0;

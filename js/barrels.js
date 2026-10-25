@@ -17,36 +17,37 @@ const CONTENT = {
   // firing an EMP that shorts the vacuum for 10s. The counterplay has to land before
   // the vacuum eats the loot on its way down, so this one skips the falling-item flow.
   emp:      { cal:  0, icon: '⚡', name: 'Short-Circuit', grav: 0.80, drift: 30, power: 'emp'    },
-  // --- tier 1 unlocks (level 5+, 10-cal max) ---
-  turkey:   { cal:  6, icon: '🦃', name: 'Turkey',   grav: 1.00, drift:  0  },
-  shrimp:   { cal:  8, icon: '🍤', name: 'Shrimp',   grav: 0.90, drift: 40  },
-  steak:    { cal: 10, icon: '🥩', name: 'Steak',    grav: 1.10, drift:  0  },
-  // --- exotic tier: new food every 5 levels, +5 cal (level 10+). Sprites TBD (emoji fallback) ---
+  // --- tier 1 unlocks (level 5+) — cut 2026-10-23 (owner: upgraded food was paying 100+ cal a shot) ---
+  turkey:   { cal:  4, icon: '🦃', name: 'Turkey',   grav: 1.00, drift:  0  },
+  shrimp:   { cal:  6, icon: '🍤', name: 'Shrimp',   grav: 0.90, drift: 40  },
+  steak:    { cal:  8, icon: '🥩', name: 'Steak',    grav: 1.10, drift:  0  },
+  // --- exotic tier: new food every 5 levels, +1 cal (level 10+). Cut 2026-10-23:
+  // --- top exotic (32) x max mult (3x) = 96 < 100, so no single delivery hits triple digits. Sprites TBD (emoji fallback) ---
   caviar:    { cal: 15, icon: '⚫', name: 'Caviar',          grav: 1.20, drift: 20 },
-  lobster:   { cal: 20, icon: '🦞', name: 'Lobster',         grav: 1.10, drift: 30 },
-  wagyu:     { cal: 25, icon: '🥩', name: 'Wagyu',           grav: 1.30, drift:  0 },
-  btruffle:  { cal: 30, icon: '🍄', name: 'Black Truffle',   grav: 1.00, drift: 50 },
-  saffron:   { cal: 35, icon: '🌾', name: 'Saffron',         grav: 0.80, drift: 60 },
-  bluefin:   { cal: 40, icon: '🍣', name: 'Bluefin',         grav: 1.20, drift: 20 },
-  foiegras:  { cal: 45, icon: '🪿', name: 'Foie Gras',       grav: 1.10, drift: 30 },
-  goldkib:   { cal: 50, icon: '🪙', name: 'Gold Kibble',      grav: 1.40, drift:  0 },
-  kingcrab:  { cal: 55, icon: '🦀', name: 'King Crab',        grav: 1.20, drift: 30 },
-  uni:       { cal: 60, icon: '🟠', name: 'Uni',              grav: 1.00, drift: 40 },
-  kobe:      { cal: 65, icon: '🥓', name: 'Kobe',             grav: 1.30, drift:  0 },
-  matsutake: { cal: 70, icon: '🍄‍🟫', name: 'Matsutake',      grav: 1.10, drift: 30 },
-  beluga:    { cal: 75, icon: '🐟', name: 'Beluga',           grav: 1.20, drift: 20 },
-  iberico:   { cal: 80, icon: '🍖', name: 'Ibérico',          grav: 1.30, drift:  0 },
-  amberjack: { cal: 85, icon: '🐠', name: 'Amberjack',        grav: 1.10, drift: 40 },
-  wtruffle:  { cal: 90, icon: '🤍', name: 'White Truffle',    grav: 1.00, drift: 50 },
-  saffris:   { cal: 95, icon: '🥘', name: 'Saffron Risotto',  grav: 1.20, drift: 20 },
-  imperial:  { cal: 100, icon: '👑', name: 'Imperial Feast',  grav: 1.40, drift: 10 },
+  lobster:   { cal: 16, icon: '🦞', name: 'Lobster',         grav: 1.10, drift: 30 },
+  wagyu:     { cal: 17, icon: '🥩', name: 'Wagyu',           grav: 1.30, drift:  0 },
+  btruffle:  { cal: 18, icon: '🍄', name: 'Black Truffle',   grav: 1.00, drift: 50 },
+  saffron:   { cal: 19, icon: '🌾', name: 'Saffron',         grav: 0.80, drift: 60 },
+  bluefin:   { cal: 20, icon: '🍣', name: 'Bluefin',         grav: 1.20, drift: 20 },
+  foiegras:  { cal: 21, icon: '🪿', name: 'Foie Gras',       grav: 1.10, drift: 30 },
+  goldkib:   { cal: 22, icon: '🪙', name: 'Gold Kibble',      grav: 1.40, drift:  0 },
+  kingcrab:  { cal: 23, icon: '🦀', name: 'King Crab',        grav: 1.20, drift: 30 },
+  uni:       { cal: 24, icon: '🟠', name: 'Uni',              grav: 1.00, drift: 40 },
+  kobe:      { cal: 25, icon: '🥓', name: 'Kobe',             grav: 1.30, drift:  0 },
+  matsutake: { cal: 26, icon: '🍄‍🟫', name: 'Matsutake',      grav: 1.10, drift: 30 },
+  beluga:    { cal: 27, icon: '🐟', name: 'Beluga',           grav: 1.20, drift: 20 },
+  iberico:   { cal: 28, icon: '🍖', name: 'Ibérico',          grav: 1.30, drift:  0 },
+  amberjack: { cal: 29, icon: '🐠', name: 'Amberjack',        grav: 1.10, drift: 40 },
+  wtruffle:  { cal: 30, icon: '🤍', name: 'White Truffle',    grav: 1.00, drift: 50 },
+  saffris:   { cal: 31, icon: '🥘', name: 'Saffron Risotto',  grav: 1.20, drift: 20 },
+  imperial:  { cal: 32, icon: '👑', name: 'Imperial Feast',  grav: 1.40, drift: 10 },
   // --- special kinds (barrel.kind, not snack content) ---
   cucumber:  { cal:  0, icon: '🥒', name: 'Cucumber',        grav: 1.00, drift: 40 },
 };
 
 // Per-exotic signature effects (2026-10-16): the moment an exotic bursts it gets
 // its own named popup + signature particle palette. Driven by FX.exoticFx; the
-// top-tier feasts (75+ cal) also steal a dramatic slow-mo beat.
+// top-tier feasts (30+ cal) also steal a dramatic slow-mo beat.
 const EXOTIC_FX = {
   caviar:    { text: 'POPPING PEARLS!',   colors: ['#212121', '#616161', '#f5f5f5'] },
   lobster:   { text: 'RED CRUSTACEAN CARNAGE!', colors: ['#d32f2f', '#ff7043', '#ffab91'] },

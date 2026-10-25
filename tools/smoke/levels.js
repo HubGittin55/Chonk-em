@@ -38,13 +38,13 @@ T('exotics capped at 3 per level (procedural)', [20, 40, 60, 80, 100].every(n =>
   return L.barrels.filter(b => EXK.has(b.content)).length <= 3;
 }));
 T('levels: calorie budget winnable (combo-aware effective cal >= 1.5x goal)', LEVELS.every(L => {
-  // model real play: clean deliveries ramp the combo multiplier 1.5,1.5,1.5,2,2,2,2.5,2.5,2.5,3...
+  // model real play: clean deliveries ramp the combo multiplier 1.0,1.1,1.2...3
   const cals = L.barrels.filter(b => b.kind === 'snack').map(b => CONTENT[b.content].cal).sort((a, b) => a - b);
   let eff = 0;
-  cals.forEach((c, i) => { eff += c * Math.min(3, 1.5 + 0.5 * Math.floor(i / 3)); });
+  cals.forEach((c, i) => { eff += c * Math.min(3, 1 + 0.1 * i); });
   return eff >= L.goal * 1.5;
 }));
-T('v0.4 levels: goals are the 60%-of-raw set', LEVELS.map(L => L.goal).join() === '35,37,39,42,44,47,49,51,54,56,59,61');
+T('v0.4 levels: goals are the 60%-of-raw set', LEVELS.map(L => L.goal).join() === '35,37,39,42,43,46,47,50,53,56,59,61');
 
 // 18. v0.4 features
 T('v0.4: menu API exists and boots open', typeof showMenu === 'function' && typeof hideMenu === 'function' && game.menuOpen === true);
@@ -75,7 +75,7 @@ T('v0.4: difficulty setting scales balls and goal', (() => {
 })());
 T('v0.4: vacuum drawn after the main cat (never hidden)', (() => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'js', 'main.js'), 'utf8');
-  return src.indexOf('Vacuum.draw(ctx, game.vacuum); // after the cat') > src.indexOf('Cats.drawMain(ctx, 252, 806');
+  return src.indexOf('Vacuum.draw(ctx, game.vacuum); // after the cat') > src.indexOf('Cats.drawMain(ctx, 400, 806');
 })());
 T('v0.4: vacuum cannot steal from the bowl chute', (() => {
   const v = Vacuum.create(1);
@@ -225,4 +225,12 @@ T('endless: max food tier from depth 1 (exotics seed immediately)', (() => {
     for (const b of genEndlessLevel(d).barrels)
       if (b.content && CONTENT[b.content] && CONTENT[b.content].cal >= 15) seen.add(b.content);
   return seen.size >= 3;
+})());
+T('endless: exotic cap scales with depth (campaign 3-cap untouched)', (() => {
+  const EXK = new Set(EXOTICS.map(e => e[0]));
+  const nEx = L => L.barrels.filter(b => EXK.has(b.content)).length;
+  const d1 = genEndlessLevel(1), d20 = genEndlessLevel(20);
+  const camp = getLevel(99); // L100 campaign: still capped at 3
+  return nEx(d1) <= 3 && nEx(d20) <= 3 + Math.floor(20 / 4) &&
+    nEx(d20) > 3 && nEx(camp) <= 3 && d20.goal > d1.goal;
 })());

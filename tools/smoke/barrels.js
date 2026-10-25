@@ -125,6 +125,47 @@ probe.x = 300; probe.y = 290; probe.vx = 0; probe.vy = 300;
 Physics.stepBall(probe, 1/60, [arm], () => { didBurst = true; }, () => { didCrack = true; });
 T('armor: second hit bursts', didBurst && arm.cleared);
 
+// 2026-10-25: yarn-ball-vanish — a ball at rest on an unbreakable barrel
+// used to micro-bounce every frame, hit bounces>14 in ~0.25 s, and vanish
+// while visibly sitting on the barrel (bumpers also spammed combo/boing).
+// Now it slides off tangentially with no bounce count and no special.
+T('vanish: ball at rest on steel slides off, no bounce count, no cull', (() => {
+  const ball = { x: 300, y: 275, vx: 0, vy: 0, r: 10, life: 0, slowT: 0, bounces: 0, gentleT: 0, stuckT: 0 };
+  const steel = [{ x: 300, y: 300, r: 15, kind: 'steel', cleared: false }];
+  let dead = false, steps = 0;
+  for (; steps < 180 && !dead; steps++) dead = Physics.stepBall(ball, 1 / 60, steel, () => {}, () => {}, () => {});
+  // rolled off the barrel; if it died, it fell out the bottom (normal shot
+  // end), not by a bounce/slow cull while sitting on the barrel
+  return ball.bounces === 0 && ball.x !== 300 && (!dead || ball.y > 940);
+})());
+T('vanish: ball at rest on bumper slides off, no combo/boing spam', (() => {
+  const ball = { x: 300, y: 275, vx: 0, vy: 0, r: 10, life: 0, slowT: 0, bounces: 0, gentleT: 0, stuckT: 0 };
+  const bump = [{ x: 300, y: 300, r: 15, kind: 'bumper', cleared: false }];
+  let specials = 0, dead = false, steps = 0;
+  for (; steps < 180 && !dead; steps++) dead = Physics.stepBall(ball, 1 / 60, bump, () => {}, () => {}, () => { specials++; });
+  return specials === 0 && ball.bounces === 0 && (!dead || ball.y > 940);
+})());
+T('vanish: ball wedged in a steel pocket gets kicked free, not culled', (() => {
+  const ball = { x: 300, y: 285, vx: 0, vy: 0, r: 10, life: 0, slowT: 0, bounces: 0, gentleT: 0, stuckT: 0 };
+  const pocket = [
+    { x: 280, y: 300, r: 15, kind: 'steel', cleared: false },
+    { x: 320, y: 300, r: 15, kind: 'steel', cleared: false },
+  ];
+  let dead = false, steps = 0, freed = false;
+  for (; steps < 300 && !dead; steps++) {
+    dead = Physics.stepBall(ball, 1 / 60, pocket, () => {}, () => {}, () => {});
+    if (Math.abs(ball.x - 300) > 40) freed = true; // kicked clear of the pocket
+  }
+  return freed && ball.bounces <= 14;
+})());
+T('vanish: fast steel hits still bounce and count (no slide regression)', (() => {
+  const ball = { x: 300, y: 200, vx: 0, vy: 400, r: 10, life: 0, slowT: 0, bounces: 0, gentleT: 0, stuckT: 0 };
+  const steel = [{ x: 300, y: 300, r: 15, kind: 'steel', cleared: false }];
+  let specials = 0, dead = false;
+  for (let i = 0; i < 60 && !dead; i++) dead = Physics.stepBall(ball, 1 / 60, steel, () => {}, () => {}, () => { specials++; });
+  return ball.bounces > 0 && specials > 0; // a real hit still clangs and counts
+})());
+
 // 19. daily 2026-10-13: mystery / golden / cucumber barrels + FX bus + juice pass
 T('deal: exactly 1 golden jackpot per level, content = level top snack', (() => {
   loadLevel(0);
@@ -287,11 +328,31 @@ T('burst with unknown content never throws', (() => {
   try { onBarrelBurst(b, null); } catch (e) { return false; }
   return game.items.length >= 0;
 })());
-T('combo multiplier: 1.5x base, +0.5x per 3 combo, caps at 3x', (() => {
+T('combo multiplier: +0.1x per food delivered, caps at 3x', (() => {
   loadLevel(0);
+  game.combo = 0; game.mult = 1;
   const vals = [];
-  for (let c = 0; c <= 12; c++) { game.combo = c; game.mult = Math.min(3, 1.5 + 0.5 * Math.floor(game.combo / 3)); vals.push(game.mult); }
-  return vals[0] === 1.5 && vals[2] === 1.5 && vals[3] === 2 && vals[6] === 2.5 && vals[9] === 3 && vals[12] === 3;
+  for (let n = 0; n < 25; n++) { deliver({ cal: 3, x: 100, y: 700 }); vals.push(game.mult); }
+  // mult is computed from the pre-delivery combo: 1st delivery 1.0x, 2nd 1.1x...
+  return vals[0] === 1 && vals[1] === 1.1 && vals[9] === 1.9 &&
+    vals[19] === 2.9 && vals[20] === 3 && vals[24] === 3;
+})());
+T('combo multiplier: miss and veggie reset it to 1x', (() => {
+  loadLevel(0);
+  game.combo = 5; game.mult = 1.5;
+  loseItem({ x: 100, y: 700 });
+  const afterMiss = game.mult;
+  game.combo = 5; game.mult = 1.5;
+  deliver({ cal: -2, x: 100, y: 700 });
+  return afterMiss === 1 && game.mult === 1 && game.combo === 0;
+})());
+T('cal-cut: no single food delivery reaches 100 cal at max mult', (() => {
+  const top = Math.max(...Object.values(CONTENT).filter(c => c.cal > 0).map(c => c.cal));
+  return top * 3 < 100; // imperial 32 x 3 = 96 — the old 100-cal single shots are gone
+})());
+T('cal-cut: exotic ladder is 15..32 in +1 steps (18 exotics)', (() => {
+  const ex = EXOTICS.map(e => (CONTENT[e[0]] || {}).cal);
+  return ex.length === 18 && ex.every((c, i) => c === 15 + i);
 })());
 
 
@@ -397,7 +458,7 @@ T('exotic-fx: every exotic (15+ cal) has a signature entry', (() => {
   return exotics.length === 18 &&
     exotics.every(k => EXOTIC_FX[k] && EXOTIC_FX[k].text && EXOTIC_FX[k].colors.length >= 3);
 })());
-T('exotic-fx: burst pops the named popup + signature particles (no slow-mo below 75 cal)', (() => {
+T('exotic-fx: burst pops the named popup + signature particles (no slow-mo below 30 cal)', (() => {
   loadLevel(12); // L13: exotics legal
   const p0 = game.particles.length;
   FX.exoticFx(300, 400, 'lobster');
@@ -405,7 +466,7 @@ T('exotic-fx: burst pops the named popup + signature particles (no slow-mo below
   const sigCols = game.particles.slice(p0).every(p => EXOTIC_FX.lobster.colors.includes(p.color));
   return popped && game.particles.length > p0 && sigCols && game.fxSlowT === 0;
 })());
-T('exotic-fx: imperial-tier feast (75+ cal) steals a slow-mo beat', (() => {
+T('exotic-fx: imperial-tier feast (30+ cal) steals a slow-mo beat', (() => {
   loadLevel(12);
   FX.exoticFx(300, 400, 'imperial');
   return game.fxSlowT > 0;
@@ -421,7 +482,8 @@ T('exotic-fx: bursting an exotic barrel routes through the signature + still dro
 })());
 
 
-// 14b. rotation pass (2026-10-20): falling loot tumbles, belt loot sits flat
+// 14b. rotation pass (2026-10-20 tumble, 2026-10-25 belt freeze): falling loot
+// tumbles, belt loot rides frozen at its landing angle (no snap to flat).
 loadLevel(0);
 // clear lane left of the barrel field (level 1 barrels span x 165-435): vx=60 -> 5.4 rad/s
 const ti = { x: 100, y: 300, vx: 60, vy: 0, r: 9, state: 'fall', cal: 3, t: 0, gone: false, rot: 0 };
@@ -430,12 +492,13 @@ step(60); // 0.5s of fall
 T('rotation: falling food tumbles with vx', ti.rot > 2.5 && ti.rot < 2.9);
 T('rotation: food tumble direction matches vx sign', ti.rot > 0);
 loadLevel(0);
-const si = { x: 200, y: 600, vx: 0, vy: 50, r: 9, state: 'fall', cal: 3, t: 0, gone: false, rot: 0 };
+const si = { x: 200, y: 600, vx: 60, vy: 50, r: 9, state: 'fall', cal: 3, t: 0, gone: false, rot: 0 };
 game.items.push(si);
 let belted = false;
 for (let i = 0; i < 240; i++) { tick(1 / 120); if (si.state === 'belt') { belted = true; break; } }
-step(120); // ride the belt: tumble damps out
-T('rotation: belt loot settles flat (rot damps to 0)', belted && si.rot === 0);
+const landingRot = si.rot;
+step(120); // ride the belt: the landing angle must survive unchanged
+T('rotation: belt loot rides frozen at its landing angle', belted && landingRot !== 0 && si.rot === landingRot);
 T('rotation: burst-spawned loot starts with rot 0', (() => {
   loadLevel(0);
   const sb = game.barrels.find(b => !b.cleared && b.kind === 'snack' && CONTENT[b.content]);

@@ -75,7 +75,7 @@ Aim → Launch yarn ball → Burst barrels → Loot spills & falls
 - **Three-spring wobble:** belly (slow, heavy), cheeks (quick), tail (sway) — impulses on every delivery, nom, frenzy, and weight milestone, plus idle breathing.
 
 ### 4.6 Combos & special moments
-- Consecutive bowl deliveries with no misses build a calorie multiplier (×2, ×3…). A miss or a veggie resets it.
+- Consecutive bowl deliveries with no misses build a calorie multiplier: +0.1× per food, cap 3× (owner 2026-10-22). A miss or a veggie resets it to 1×. Applies to calorie score only — weight gain uses raw calories.
 - **FEAST FRENZY:** fill a full chonk stage with zero misses and zero veggies → slow-mo multi-yarn barrage, main cat catches the shower.
 - Callouts: "BARREL BURST!", "BANK!", "NOM!", "BROCCOLI?!"
 
@@ -188,8 +188,9 @@ Owner's post-PR4 list, built on top of qwen's sprite/ghost-food work (main @ 938
 
 ## Food tiers & the 100-level chonk curve (PR #5, 2026-10-06)
 Owner's long-term replay design: per-level reset STAYS, but food is the progression.
-- New exotic food every 5 levels, +5 cal: L1 max 5 (tuna), L5 max 10 (steak),
-  L10 caviar 15, L15 lobster 20 … L100 Imperial Feast 100. Past exotics stay on the menu.
+- New exotic food every 5 levels, +1 cal (cut 2026-10-23 — the old +5 ladder let a
+  single delivery pay 100+ cal): L1 max 5 (tuna), L5 max 8 (steak),
+  L10 caviar 15, L15 lobster 16 … L100 Imperial Feast 32. Past exotics stay on the menu.
 - Each level's TOTAL raw cal follows 55 + 4*(n-1): L1 55 (21.5 lb max), L10 91
   (32 lb — 80 impossible), L50 251 (80 lb with near-perfect play — rare),
   L100 451 (140 lb). Cap raised to 150 for the even-bigger chonk.
@@ -202,7 +203,12 @@ Owner's long-term replay design: per-level reset STAYS, but food is the progress
 Owner's idea: after a win, the cat steps onto a scale. Analog dial (0-150 lb),
 needle eases up over ~2.6s with rising tick sounds; the cat emoji on the platform
 grows and squashes as the needle climbs. Stars are WEIGHT stars now:
-1 = goal met, 2 = 75% of the level's food delivered, 3 = 90%.
+1 = goal met, 2 = 80% of the level's food delivered, 3 = 100% (full clear;
+retuned 2026-10-25 per Blarmo's 60/80/100 decision, superseding the 2026-10-13
+relaxation goal-met/70%/82% — the old meter maxed out early while the run
+could still land at 1 star, so now full bar = 3★ with no dead zone at the
+top). The HUD chonk meter draws hash marks at the same three thresholds
+(1★ = goal/raw, 2★ 80%, 3★ 100%) so the marks always agree with starsFor.
 Stars pop in as the needle crosses each threshold. Finale: 1 star = sad trombone
 (synth), 2 stars = jingle, 3 stars = fanfare + canvas confetti.
 Stats line (cal, best combo) + Retry/Menu/Next buttons appear after the needle lands.

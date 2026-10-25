@@ -1,7 +1,7 @@
 'use strict';
 /* Level data. kind: 'snack' | 'veggie' | 'power' | 'empty' | 'steel' | 'keg' | 'bumper' | 'mystery' | 'golden' | 'cuke'. content keys must exist in CONTENT (barrels.js).
    Levels 1-12 handcrafted; 13-100 generated deterministically by genLevel(n).
-   Food tiers: new exotic every 5 levels (+5 cal); raw cal follows 55+4*(n-1).
+   Food tiers: new exotic every 5 levels (+1 cal); raw cal follows 55+4*(n-1).
    Balls: 35% of food barrels (owner directive 2026-10-13). Veggies quartered (owner 2026-10-07).
    Exotics capped at 3 per level (owner 2026-10-13): the raw-cal tuning loop may not
    mint more high-tier barrels than the seeded ones.
@@ -325,7 +325,7 @@ const LEVELS = [
     name: 'Smiley Face',
     balls: 11,
     par: 12,
-    goal: 44,
+    goal: 43,
     r: 10,
     barrels: [
     { x: 244, y: 188, kind: 'empty', content: null },
@@ -418,7 +418,7 @@ const LEVELS = [
     name: 'Diagonal Dash',
     balls: 11,
     par: 12,
-    goal: 47,
+    goal: 46,
     r: 10,
     vacuum: true,
     barrels: [
@@ -517,7 +517,7 @@ const LEVELS = [
     name: 'Twin Peaks',
     balls: 12,
     par: 13,
-    goal: 49,
+    goal: 47,
     r: 10,
     barrels: [
     { x: 202, y: 261, kind: 'snack', content: 'kibble' },
@@ -622,7 +622,7 @@ const LEVELS = [
     name: 'The Gauntlet',
     balls: 9,
     par: 10,
-    goal: 51,
+    goal: 50,
     r: 10,
     barrels: [
     { x: 258, y: 164, kind: 'snack', content: 'salmon' },
@@ -730,7 +730,7 @@ const LEVELS = [
     name: 'Star Invader',
     balls: 13,
     par: 14,
-    goal: 54,
+    goal: 53,
     r: 10,
     vacuum: true,
     barrels: [
@@ -1218,14 +1218,14 @@ const LEVELS = [
 
 /* __TIER_CODE__ */
 /* ================= food tiers & the 100-level chonk curve =================
-   Owner's design (2026-10-06): new exotic food every 5 levels (+5 cal), per-level
+   Owner's design (2026-10-06): new exotic food every 5 levels (+1 cal), per-level
    reset stays, and each level's TOTAL food scales so 80 lb is impossible on L10
    but reachable with near-perfect play on L50+. rawTarget(L) = 55 + 4*(L-1):
    L1→55 raw (21.5 lb max), L10→91 (32 lb), L50→251 (80 lb), L100→451 (140 lb). */
 
 const NUM_LEVELS = 100;
 
-const EXOTICS = [ // [key, name] — tier t (levels 10+5*(t-2)) unlocks cal 15+5*(t-2)
+const EXOTICS = [ // [key, name] — tier t (levels 10+5*(t-2)) unlocks cal 15+(t-2)
   ['caviar', 'Caviar'], ['lobster', 'Lobster'], ['wagyu', 'Wagyu'],
   ['btruffle', 'Black Truffle'], ['saffron', 'Saffron'], ['bluefin', 'Bluefin'],
   ['foiegras', 'Foie Gras'], ['goldkib', 'Gold Kibble'], ['kingcrab', 'King Crab'],
@@ -1308,13 +1308,16 @@ function genDailyLevel(dateStr) {
 
 // Endless Climb (2026-10-16): post-campaign survival climb. Always max food tier
 // (all 18 exotics legal from depth 1), calorie target climbs 22/depth, vacuum
-// always patrols. Death ends the run; depth clears are recorded in the profile.
+// always patrols. The exotic cap scales with depth (3 + depth/4): on the cut
+// calorie ladder a 3-exotic board maxes out below the climbing target, so the
+// cap has to grow for the climb to stay real. Death ends the run; depth clears
+// are recorded in the profile.
 const _endlessCache = {};
 function genEndlessLevel(depth) { // depth >= 1. Deterministic — same depth, same level, every load.
   if (_endlessCache[depth]) return _endlessCache[depth];
   const fm = foodFactor(100 + depth); // the climb starts where the campaign's curve ends
   const L = genLevelSeeded(hashStr('chonk-endless-' + depth), 19,
-    Math.round((450 + 22 * (depth - 1)) * fm), true, fm);
+    Math.round((450 + 22 * (depth - 1)) * fm), true, fm, 3 + Math.floor(depth / 4));
   L.name = 'Depth ' + depth + ' · ' + L.name;
   L._endless = depth;
   _endlessCache[depth] = L;
@@ -1325,8 +1328,9 @@ function genEndlessLevel(depth) { // depth >= 1. Deterministic — same depth, s
 // genLevel (campaign) and genDailyLevel (daily challenge) both build through here.
 // foodMul (2026-10-17 tuning deep-dive): trims food barrels at the high end —
 // the caller scales the raw-cal target by the same factor.
-function genLevelSeeded(seed, tier, target, vacuum, foodMul) {
+function genLevelSeeded(seed, tier, target, vacuum, foodMul, maxExotics) {
   foodMul = (foodMul == null) ? 1 : foodMul;
+  maxExotics = (maxExotics == null) ? 3 : maxExotics;
   const rnd = mulberry32(seed);
   const R = 10, DX = 21, DY = 18.2;
   const pts = [];
@@ -1395,7 +1399,7 @@ function genLevelSeeded(seed, tier, target, vacuum, foodMul) {
   // tune total raw cal to the curve
   const calOf = b => (CONTENT[b.content] || { cal: 0 }).cal;
   const EXOTIC_KEYS = new Set(EXOTICS.map(e => e[0]));
-  const MAX_EXOTICS = 3; // owner 2026-10-13: no more than 3 upgraded-food barrels per level
+  const MAX_EXOTICS = maxExotics; // owner 2026-10-13: no more than 3 upgraded-food barrels per level (campaign); endless scales the cap with depth (2026-10-23) so the calorie climb stays achievable on the cut ladder
   let raw = snacks.reduce((a, b) => a + calOf(b), 0);
   guard = 0;
   while (raw < target - 3 && guard++ < 600) {
