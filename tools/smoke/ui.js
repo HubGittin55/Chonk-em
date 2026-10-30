@@ -333,3 +333,114 @@ T('cat-bowl-proximity: main cat sits 100px right of the bowl, not 152', (() => {
   const m = src.match(/Cats\.drawMain\(ctx, (\d+), 806/);
   return m && +m[1] === 400 && +m[1] - Conveyor.BOWL_X === 100;
 })());
+// 2026-10-26 keyboard-aim: arrows sweep the aim angle (Left increases it
+// toward the 170° end, Right decreases toward 10°), clamped to the aim arc;
+// Space fires the keyboard aim, straight down when never aimed; all blocked
+// while paused, in the menu, or with a ball flying.
+T('keyboard-aim: arrows sweep the angle and clamp at the arc ends', (() => {
+  loadLevel(0); game.menuOpen = false; game.paused = false;
+  if (!onKeyAim('ArrowLeft')) return false;
+  const afterLeft = game.keyAng, aimLeft = game.aim;
+  if (Math.abs(afterLeft - Math.PI / 2 - 2 * Math.PI / 180) > 1e-9) return false;
+  if (!aimLeft || Math.abs(aimLeft.x - (SHOOT.x + Math.cos(afterLeft) * 200)) > 1e-6) return false;
+  if (!onKeyAim('ArrowRight') || !onKeyAim('ArrowRight')) return false;
+  if (Math.abs(game.keyAng - (Math.PI / 2 - 2 * Math.PI / 180)) > 1e-9) return false;
+  game.keyAng = KEY_ARC.hi;
+  if (!onKeyAim('ArrowLeft') || game.keyAng !== KEY_ARC.hi) return false;
+  game.keyAng = KEY_ARC.lo;
+  if (!onKeyAim('ArrowRight') || game.keyAng !== KEY_ARC.lo) return false;
+  return true;
+})());
+T('keyboard-aim: Space fires a shot and spends one ball', (() => {
+  loadLevel(0); game.menuOpen = false; game.paused = false;
+  const balls = game.balls;
+  onKeyAim('ArrowLeft'); onKeyAim('ArrowLeft');
+  if (!onKeyAim(' ')) return false;
+  return game.shots.length >= 1 && game.balls === balls - 1 && game.aim === null;
+})());
+T('keyboard-aim: Space with no prior aim fires straight down', (() => {
+  loadLevel(0); game.menuOpen = false; game.paused = false; game.keyAng = null;
+  if (!onKeyAim(' ')) return false;
+  const b = game.shots[0];
+  return b && Math.abs(b.vx) < 1e-6 && b.vy > 0;
+})());
+T('keyboard-aim: blocked while paused, in menu, or with a ball flying', (() => {
+  loadLevel(0); game.menuOpen = false; game.paused = true;
+  if (onKeyAim('ArrowLeft') || onKeyAim(' ')) return false;
+  game.paused = false; game.menuOpen = true;
+  if (onKeyAim('ArrowLeft') || onKeyAim(' ')) return false;
+  game.menuOpen = false;
+  game.shots.push({ x: 300, y: 300, vx: 0, vy: 0, r: 10, life: 0, slowT: 0, bounces: 0, gentleT: 0, stuckT: 0, trail: [], rot: 0 });
+  return !onKeyAim('ArrowLeft') && !onKeyAim(' ');
+})());
+T('keyboard-aim: unknown keys are ignored', (() => {
+  loadLevel(0); game.menuOpen = false; game.paused = false;
+  return onKeyAim('a') === false && onKeyAim('Enter') === false;
+})());
+// 2026-10-28 pointer-keyboard-aim-sync: pointer aim shares the keyboard
+// angle, so arrows continue from the pointer's angle and Space after a
+// pointer aim fires along it; the synced angle is unwobbled, so a spooked
+// aim still wobbles live but doesn't bake the wobble into the stored angle.
+T('pointer-keyboard-aim-sync: pointer aim sets keyAng, arrows continue from it', (() => {
+  loadLevel(0); game.menuOpen = false; game.paused = false; game.keyAng = null;
+  const p = { x: SHOOT.x + Math.cos(Math.PI / 3) * 200, y: SHOOT.y + Math.sin(Math.PI / 3) * 200 };
+  onPointerAim(p);
+  if (Math.abs(game.keyAng - Math.PI / 3) > 1e-9) return false;
+  if (!onKeyAim('ArrowLeft')) return false;
+  return Math.abs(game.keyAng - (Math.PI / 3 + 2 * Math.PI / 180)) < 1e-9;
+})());
+T('pointer-keyboard-aim-sync: Space after a pointer aim fires along the pointer angle', (() => {
+  loadLevel(0); game.menuOpen = false; game.paused = false; game.keyAng = null;
+  const p = { x: SHOOT.x + Math.cos(Math.PI / 3) * 200, y: SHOOT.y + Math.sin(Math.PI / 3) * 200 };
+  onPointerAim(p);
+  if (!onKeyAim(' ')) return false;
+  const b = game.shots[0];
+  return b && Math.abs(Math.atan2(b.vy, b.vx) - Math.PI / 3) < 1e-9;
+})());
+T('pointer-keyboard-aim-sync: synced angle is unwobbled under a cucumber spook', (() => {
+  loadLevel(0); game.menuOpen = false; game.paused = false; game.keyAng = null;
+  game.time = 0.5; game.cukeT = 1;
+  const p = { x: SHOOT.x + Math.cos(Math.PI / 3) * 200, y: SHOOT.y + Math.sin(Math.PI / 3) * 200 };
+  onPointerAim(p);
+  const rawOk = Math.abs(game.keyAng - Math.PI / 3) < 1e-9;
+  const wobbled = Math.abs(game.aimAng - game.keyAng) > 0.01;
+  game.cukeT = 0;
+  return rawOk && wobbled;
+})());
+// 2026-10-29 coarse-aim: Shift+arrow steps 10° per press instead of 2°,
+// clamped to the same arc; plain arrows keep the fine step after a coarse one.
+T('coarse-aim: Shift+arrow steps 10 degrees, plain arrows keep the 2 degree step', (() => {
+  loadLevel(0); game.menuOpen = false; game.paused = false; game.keyAng = null;
+  if (!onKeyAim('ArrowLeft', true)) return false;
+  if (Math.abs(game.keyAng - (Math.PI / 2 + 10 * Math.PI / 180)) > 1e-9) return false;
+  if (!onKeyAim('ArrowRight', true)) return false;
+  if (Math.abs(game.keyAng - Math.PI / 2) > 1e-9) return false;
+  if (!onKeyAim('ArrowLeft')) return false;
+  return Math.abs(game.keyAng - (Math.PI / 2 + 2 * Math.PI / 180)) < 1e-9;
+})());
+T('coarse-aim: coarse steps clamp at the arc ends', (() => {
+  loadLevel(0); game.menuOpen = false; game.paused = false;
+  game.keyAng = KEY_ARC.hi - 5 * Math.PI / 180;
+  if (!onKeyAim('ArrowLeft', true) || game.keyAng !== KEY_ARC.hi) return false;
+  game.keyAng = KEY_ARC.lo + 5 * Math.PI / 180;
+  if (!onKeyAim('ArrowRight', true) || game.keyAng !== KEY_ARC.lo) return false;
+  return true;
+})());
+T('coarse-aim: how-to panel names Shift for big aim steps', (() => {
+  const html = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'index.html'), 'utf8');
+  return html.includes('hold Shift for big steps');
+})());
+// 2026-10-27 key-hints: P pause and Esc menu are real bindings (keydown
+// handler) but were documented nowhere except a button tooltip; the how-to
+// panel and the pause overlay now name them.
+T('key-hints: how-to panel names P pause and Esc menu', (() => {
+  const html = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'index.html'), 'utf8');
+  const howto = html.slice(html.indexOf('id="howto"'));
+  return howto.includes('P pauses') && howto.includes('Esc opens the menu');
+})());
+T('key-hints: pause overlay names P resume and Esc menu, with styling', (() => {
+  const html = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'index.html'), 'utf8');
+  const css = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'css', 'style.css'), 'utf8');
+  const ov = html.slice(html.indexOf('id="pauseOverlay"'), html.indexOf('id="overlay"'));
+  return ov.includes('P resume') && ov.includes('Esc menu') && css.includes('#pauseOverlay p.keys');
+})());

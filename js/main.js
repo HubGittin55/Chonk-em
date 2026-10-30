@@ -140,7 +140,7 @@ const game = {
   calories: 0, stage: 0, combo: 0, mult: 1,
   time: 0, over: null, paused: false, popups: [],
   nomT: 0, face: 'normal', faceT: 0,
-  aim: null, aimAng: null,
+  aim: null, aimAng: null, keyAng: null, // keyboard aim angle (persists across shots; null = straight down)
   jiggle: 0, jiggleV: 0, displayRx: catRx(0), // jiggle mirrors wob.belly (smoke-test compat)
   wob: { belly: { x: 0, v: 0 }, cheek: { x: 0, v: 0 }, tail: { x: 0, v: 0 } },
   weightLb: START_LB,
@@ -241,13 +241,20 @@ function checkLbMilestones(before, after) {
   }
 }
 
-function aimAngleFor(px, py) {
+// Unwobbled aim angle: the shooter's arc, clamped, null when the point is
+// too high to aim at. aimAngleFor adds the cucumber-spook wobble on top.
+function rawAimAngle(px, py) {
   const dx = px - SHOOT.x, dy = py - SHOOT.y;
   if (dy < 30) return null;
-  let ang = Math.atan2(dy, dx);
   const lo = 10 * Math.PI / 180, hi = 170 * Math.PI / 180;
-  if (game.cukeT > 0 && !REDUCED) ang += Math.sin(game.time * 9) * 0.07 * Math.min(1, game.cukeT); // spooked: aim wobbles
-  return Math.max(lo, Math.min(hi, ang));
+  return Math.max(lo, Math.min(hi, Math.atan2(dy, dx)));
+}
+
+function aimAngleFor(px, py) {
+  const ang = rawAimAngle(px, py);
+  if (ang == null) return null;
+  if (game.cukeT > 0 && !REDUCED) return Math.max(10 * Math.PI / 180, Math.min(170 * Math.PI / 180, ang + Math.sin(game.time * 9) * 0.07 * Math.min(1, game.cukeT))); // spooked: aim wobbles
+  return ang;
 }
 
 function fireShot(px, py) {
@@ -1166,10 +1173,56 @@ function renderTrophyRow() {
   document.getElementById('trophyPanel').classList.add('hidden'); // rebuild hides the stale panel
 }
 
+// Keyboard aim (desktop-first, 2026-10-26): arrows sweep the aim angle, Space
+// fires. The keyboard aim is a synthetic pointer point 200px out from the
+// shooter, so drawPreview, drawShooter and fireShot behave exactly as they do
+// for pointer aim — no physics or pointer-input changes. keyAng persists
+// across shots, so repeat Space fires keep the last angle; arrows re-show the
+// preview at that angle. Named function (not just the window listener) so the
+// smoke harness can drive it headless. Coarse aim (2026-10-29): holding Shift
+// steps 10° per press instead of 2°, so re-aiming across the 160° arc takes
+// 16 presses, not 80; plain arrows keep the fine step.
+function keyCanAim() { return !game.over && !game.menuOpen && !game.paused && !game.shots.length && game.balls > 0; }
+const KEY_ARC = { lo: 10 * Math.PI / 180, hi: 170 * Math.PI / 180, step: 2 * Math.PI / 180, coarse: 10 * Math.PI / 180 };
+function keyAimPoint() {
+  const ang = game.keyAng != null ? game.keyAng : Math.PI / 2;
+  return { x: SHOOT.x + Math.cos(ang) * 200, y: SHOOT.y + Math.sin(ang) * 200 };
+}
+function onKeyAim(key, shiftKey) {
+  if (!keyCanAim()) return false;
+  if (key === 'ArrowLeft' || key === 'ArrowRight') {
+    // Arc runs 10° (right-down) to 170° (left-down): Left increases the angle.
+    const step = shiftKey ? KEY_ARC.coarse : KEY_ARC.step;
+    const base = game.keyAng != null ? game.keyAng : (game.aimAng != null ? game.aimAng : Math.PI / 2);
+    game.keyAng = Math.max(KEY_ARC.lo, Math.min(KEY_ARC.hi, base + (key === 'ArrowLeft' ? step : -step)));
+    const p = keyAimPoint();
+    game.aim = p; game.aimAng = aimAngleFor(p.x, p.y);
+    return true;
+  }
+  if (key === ' ') { // Space fires the keyboard aim (straight down if never aimed)
+    const p = keyAimPoint();
+    game.aim = null; game.aimAng = null; // match pointer onAimEnd clearing
+    fireShot(p.x, p.y);
+    return true;
+  }
+  return false;
+}
+
+// Pointer aim (2026-10-28): shared angle with keyboard aim. A mouse/touch
+// aim updates keyAng (unwobbled, so the spook wobble stays live-only), so
+// the next arrow press continues from the pointer's angle and Space after a
+// pointer aim fires along it instead of straight down. Named, like
+// onKeyAim, so the smoke harness drives it headless.
+function onPointerAim(p) {
+  game.aim = p; game.aimAng = aimAngleFor(p.x, p.y);
+  const raw = rawAimAngle(p.x, p.y);
+  if (raw != null) game.keyAng = raw;
+}
+
 Input.init({
-  canAim: () => !game.over && !game.menuOpen && !game.paused && !game.shots.length && game.balls > 0,
-  onAimStart: (p) => { game.aim = p; game.aimAng = aimAngleFor(p.x, p.y); },
-  onAimMove: (p) => { if (game.aim) { game.aim = p; game.aimAng = aimAngleFor(p.x, p.y); } },
+  canAim: keyCanAim,
+  onAimStart: (p) => { onPointerAim(p); },
+  onAimMove: (p) => { if (game.aim) onPointerAim(p); },
   onAimEnd: (p) => {
     if (game.aim) {
       const target = p || game.aim;
@@ -1313,6 +1366,7 @@ document.getElementById('resetGame').addEventListener('click', (e) => {
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { game.menuOpen ? hideMenu() : showMenu(); }
   else if (e.key === 'p' || e.key === 'P') togglePause();
+  else if (onKeyAim(e.key, e.shiftKey)) e.preventDefault(); // arrows/Space handled: don't scroll the page
 });
 
 // Level intro splash card

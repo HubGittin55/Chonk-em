@@ -247,6 +247,7 @@ body {
 #pauseOverlay.hidden { display: none; }
 #pauseOverlay h2 { font-size: 36px; color: #ffb14e; letter-spacing: 2px; margin-bottom: 4px; }
 #pauseOverlay p { font-size: 15px; opacity: 0.8; margin-bottom: 18px; }
+#pauseOverlay p.keys { font-size: 13px; opacity: 0.6; margin-top: -8px; }
 #pauseOverlay .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 #pauseOverlay .row button {
   font-size: 16px; font-weight: bold; padding: 10px 22px;

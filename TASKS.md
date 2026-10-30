@@ -1,5 +1,33 @@
 # TASKS.md — CHONK 'EM task board
 
+## Daily polish 2026-10-30 — gloves-off pick (Blarmo, 2026-10-30 09:38 CDT, main chat)
+
+- [ ] `missing-sprites-48` — PICKED for today's session. 48 of 102 declared sprites missing (js/assets.js manifest, tools/check-assets.js gap report), currently on emoji fallback. Gap split from the 2026-10-19 review: P1 EMP/split barrels+foods, P2 tier-1 foods, P3 prestige/exotic foods, P4 cucumber joke item. Vector fallback renderer is frozen, so generated PNGs are the only path for these sprites. In progress — stunkus, 2026-10-30: P1 DONE (barrel_emp, food_emp, barrel_split, food_split — cloud-generated, sprite_prep keyed, gap 48→44, smoke 274/274). Remaining 44: P2 turkey/shrimp/steak (6), P3 18 exotics (36), P4 cucumber (2). Work order for the rest in HANDOFFS 2026-10-30 (ComfyUI pipeline is the fast path; cloud generation is proven but capped at 4 images per message).
+
+## Daily polish 2026-10-29 (stunkus, branch `stunkus/daily-polish`)
+
+Backlog empty after the 2026-10-28 session, so this session falls back to small improvements (pace rule).
+
+- [x] `coarse-aim` — DONE (stunkus, 2026-10-29). Shift+←/→ sweeps the keyboard aim 10° per press instead of 2°, so re-aiming across the 160° arc takes 16 presses, not 80; plain arrows keep the fine step, same arc clamps, how-to panel names it. Smoke 274/274 (+3).
+
+## Daily polish 2026-10-28 (stunkus, branch `stunkus/daily-polish`)
+
+Backlog empty after the 2026-10-27 session, so this session falls back to small improvements (pace rule).
+
+- [x] `pointer-keyboard-aim-sync` — DONE (stunkus, 2026-10-28). Pointer aim and keyboard aim share one angle: a mouse/touch aim updates the keyboard angle (unwobbled, so the spook wobble stays live-only), so the next arrow press continues from where the pointer aimed (not a stale keyboard angle) and Space after a pointer aim fires along the pointer's angle instead of straight down. Smoke 271/271 (+3).
+
+## Daily polish 2026-10-27 (stunkus, branch `stunkus/daily-polish`)
+
+Backlog empty after the 2026-10-26 session, so this session falls back to small improvements (pace rule).
+
+- [x] `key-hints` — DONE (stunkus, 2026-10-27). P pause and Esc menu are now named in the how-to panel ("P pauses the game, Esc opens the menu") and the pause overlay carries a "P resume · Esc menu" line (small dim `.keys` style). No behavior change; bindings already existed. Smoke 268/268 (+2).
+
+## Daily polish 2026-10-26 (stunkus, branch `stunkus/daily-polish`)
+
+Backlog empty after the 2026-10-25 session, so this session falls back to one main change (pace rule).
+
+- [x] `keyboard-aim` — DONE (stunkus, 2026-10-26). Desktop-first keyboard play: ←/→ sweep the aim angle 2° per press (Left toward the 170° end, Right toward 10°), clamped to the aim arc; Space fires the keyboard aim, straight down if never aimed. Keyboard aim is a synthetic pointer point 200px out from the shooter, so drawPreview, drawShooter, and fireShot behave exactly as for pointer aim; keyAng persists across shots so repeat Space keeps the last angle. Blocked while paused, in the menu, or with a ball flying (same predicate as pointer aim); handled keys preventDefault so the page doesn't scroll. How-to panel notes the keys. Smoke 266/266 (+5).
+
 ## Daily polish 2026-10-22 (stunkus, branch `stunkus/daily-polish`)
 
 - [x] `trophy-progress` — DONE (stunkus, 2026-10-22). Locked trophies in the 🏆 panel show a derived progress hint ("3/10 three-star levels", "42/50 lb best chonk") from existing profile state. No new persisted fields; one-shot event trophies show no hint. Smoke 246/246 (+4).
@@ -48,7 +76,7 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 - [x] `barrel-types` — armored (2-hit) **DONE (stunkus, PR #3)** — steel-band visuals, crack on first hit, bursts on second; split-yarn powerup (next ball divides into 3 on first burst, ≥1 per level); mystery (???) stays unclaimed
 - [x] `hazards` — vacuum patrol **DONE (stunkus, PR #3)** — Roomba-style patroller under the belt, hoovers fall+belt loot; cucumber spook stays unclaimed
 - [x] `levels-xl` — **DONE (stunkus, PR #3)** — owner: amp it to the extreme. Barrels small (r=15) on a 78 px hex grid, 32/level, goals 72–166, balls 18–40, vacuum on 6/9/12; desktop-first sizing
-- [ ] `levels-2-15` — level pack + level select map
+- [x] `levels-2-15` — level pack + level select map (closed 2026-10-26: stale line — world-grouped level select shipped as `menu-worlds` 2026-10-14, level pack shipped in daily polish sessions)
 
 ## v0.2+ — Full-chonk pass (stunkus, 2026-10-05) — merged via PR #1, reviewed by qwen
 
@@ -60,7 +88,7 @@ Smoke-tested headless: chaining (3 barrels/shot), funnel→belt→bowl delivery,
 ## v0.3 — Portable & Assets
 
 - [x] `asset-pipeline` — ComfyUI MCP + Qwen Image 2.1 turbo recipe (8 steps + viggle LoRA). **DONE (qwen, 2026-10-06)**: AoT-style fleet shipped — 4 cat varieties × 8 chonk stages (10–80 lb), 9 barrel skins, bowl, yarn, shooter cat, kitchen bg. Sprite renderers in cats/barrels/conveyor/main with vector fallback. Weight system extended to 80 lb.
-- [ ] `pwa` — manifest, service worker, icons, offline
+- [x] `pwa` — manifest, service worker, icons, offline (closed 2026-10-26: stale line — PWA shell shipped 2026-10-16, see the DONE entry in the 2026-10-16 section)
 - [ ] `mobile-polish` — touch tuning, safe areas, DPR scaling, narrow-screen layout
 
 ## PR #4 — mega levels (stunkus, 2026-10-05)
